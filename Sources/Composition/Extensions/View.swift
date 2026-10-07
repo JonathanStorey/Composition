@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import SwiftUI
 
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 10.0, *)
@@ -8,3 +9,4 @@ public extension View {
         modifier(CardModifier(cornerRadius: cornerRadius, padding: padding))
     }
 }
+#endif

@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import SwiftUI
 import Testing
 @testable import Composition
@@ -110,3 +111,4 @@ private struct PlainItem: LabelRepresentable {
         #expect(String(localized: SampleAction.share.title) == "Share")
     }
 }
+#endif

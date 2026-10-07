@@ -1,3 +1,4 @@
+#if canImport(Foundation)
 import Foundation
 import Testing
 @testable import Composition
@@ -43,3 +44,4 @@ import Testing
         #expect("89AB".contains(characters[19]))
     }
 }
+#endif

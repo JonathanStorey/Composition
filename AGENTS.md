@@ -47,8 +47,6 @@ When some code in a file needs a framework such as Foundation and other code doe
 3. Order the dependency sections alphabetically by dependency name, for example Foundation before SwiftUI. Sections needing more than one dependency come last, named with `+` (for example `// MARK: - Foundation + SwiftUI`) and wrapped in `#if canImport(A) && canImport(B)`.
 4. Within each section, follow the member ordering above.
 
-When everything in a file shares the same imports, as in `View.swift` and `Searchable.swift`, put the imports at the top of the file and add no MARKs.
-
 ```swift
 public extension String {
 
@@ -72,6 +70,18 @@ public extension String {
 }
 #endif
 ```
+
+When everything in a file depends on the same imports, as in `View.swift` and `Searchable.swift`, wrap the whole file in `#if canImport(...)` with the import on the line below it and `#endif` as the last line. Add no MARKs.
+
+```swift
+#if canImport(SwiftUI)
+import SwiftUI
+
+public extension View { ... }
+#endif
+```
+
+Tests follow the same rule. Guard a test file, or a section of it in an extension of the suite, with the same `#if canImport(...)` as the code it tests, even when the test file itself imports only `Testing`. Files that need only the Swift standard library get no guard.
 
 ### Calls and closures
 

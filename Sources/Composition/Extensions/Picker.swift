@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import SwiftUI
 
 @available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, *)
@@ -8,3 +9,4 @@ public extension Picker where Label == Text, SelectionValue: CaseIterable & Labe
         self.init(selection: selection, content: { ForEach(Array(SelectionValue.allCases), id: \.self) { SwiftUI.Label($0) } }, label: { Text(title) })
     }
 }
+#endif

@@ -1,3 +1,4 @@
+#if canImport(Foundation)
 import Foundation
 
 public extension Date {
@@ -17,3 +18,4 @@ public extension Date {
         formatted(.relative(presentation: .named))
     }
 }
+#endif

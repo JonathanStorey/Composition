@@ -73,9 +73,18 @@ public extension String {
 #endif
 ```
 
+### Calls and closures
+
+- Keep every function call's arguments on a single line. Only the body of a trailing closure goes on the lines below.
+- Keep every declaration on a single line, including its generic `where` clause.
+- Prefer one argument plus one trailing closure, as in `Label(title) { icon }`. Do not use multiple trailing closures such as `Label { title } icon: { icon }`.
+- When SwiftUI only offers a multi-closure initializer, pass the closures as labeled arguments, as in `self.init(title: { Text(title) }, icon: icon)`, or add a helper initializer in the extension that gives the one-trailing-closure form.
+
 ### Naming
 
-Give a parameter both an argument label and a parameter name when that reads better at the call site or gives clearer autocomplete hints, for example `init?(timestamp uuid: UUID)`, called as `Date(timestamp: id)`.
+- Name a generic parameter with a single capital letter taken from its protocol, and name the value for what it is, for example `init<L: LabelRepresentable>(_ label: L)`.
+- Use a named generic parameter instead of `some Protocol` when a `where` clause needs the type's associated type.
+- Give a parameter both an argument label and a parameter name when that reads better at the call site or gives clearer autocomplete hints, for example `init?(timestamp uuid: UUID)`, called as `Date(timestamp: id)`.
 
 ### Formatting
 

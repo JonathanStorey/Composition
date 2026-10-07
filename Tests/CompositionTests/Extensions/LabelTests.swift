@@ -12,4 +12,12 @@ import Testing
     @Test func initAcceptsItemWithCustomIcon() {
         _ = Label(SampleStatus.online)
     }
+
+    @Test func initAcceptsTitleAndIcon() {
+        _ = Label("Favorite") { Image(systemName: "star") }
+    }
+
+    @Test func initAcceptsTitleAndNonImageIcon() {
+        _ = Label("") { Circle() }
+    }
 }

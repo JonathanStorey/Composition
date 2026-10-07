@@ -12,4 +12,13 @@ import Testing
         #expect(" \t\n".isBlank)
         #expect(!" a ".isBlank)
     }
+
+    @Test func matchesPatternRequiresWholeMatch() {
+        #expect("2026-10-07".matches(pattern: #"\d{4}-\d{2}-\d{2}"#))
+        #expect(!"Due 2026-10-07".matches(pattern: #"\d{4}-\d{2}-\d{2}"#))
+    }
+
+    @Test func matchesPatternReturnsFalseForInvalidPattern() {
+        #expect(!"abc".matches(pattern: "("))
+    }
 }

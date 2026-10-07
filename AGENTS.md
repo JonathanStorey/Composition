@@ -76,7 +76,7 @@ public extension String {
 ### Calls and closures
 
 - Keep every function call's arguments on a single line. Only the body of a trailing closure goes on the lines below.
-- Keep every declaration on a single line, including its generic `where` clause.
+- Keep every declaration on a single line, including its generic `where` clause, however long it gets. This applies to functions, initializers, types, and extensions, for example `public extension Picker where Label == Text, SelectionValue: CaseIterable & LabelRepresentable, Content == ForEach<...> {`. Never wrap a `where` clause or its requirements onto following lines.
 - Prefer one argument plus one trailing closure, as in `Label(title) { icon }`. Do not use multiple trailing closures such as `Label { title } icon: { icon }`.
 - When SwiftUI only offers a multi-closure initializer, pass the closures as labeled arguments, as in `self.init(title: { Text(title) }, icon: icon)`, or add a helper initializer in the extension that gives the one-trailing-closure form.
 

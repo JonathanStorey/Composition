@@ -14,6 +14,10 @@ enum SampleAction: CaseIterable, LabelRepresentable {
     case delete
     case share
 
+    var help: LocalizedStringResource? {
+        self == .delete ? "Permanently removes the item" : nil
+    }
+
     var role: ButtonRole? {
         self == .delete ? .destructive : nil
     }
@@ -42,6 +46,16 @@ private struct PlainItem: LabelRepresentable {
 }
 
 @Suite struct LabelRepresentableTests {
+
+    @Test func helpCanBeOverridden() throws {
+        let help = try #require(SampleAction.delete.help)
+        #expect(String(localized: help) == "Permanently removes the item")
+        #expect(SampleAction.share.help == nil)
+    }
+
+    @Test func helpDefaultsToNil() {
+        #expect(PlainItem().help == nil)
+    }
 
     @Test func roleDefaultsToNil() {
         #expect(PlainItem().role == nil)

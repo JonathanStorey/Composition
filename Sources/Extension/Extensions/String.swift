@@ -6,11 +6,14 @@ public extension String {
 
     /// A Boolean value indicating whether the string is empty or contains only whitespace and newlines.
     ///
-    /// Requires: Swift 5.2+. Standard library only, so it works on every platform.
+    ///     "   \n".isBlank // true
+    ///     " a ".isBlank   // false
     var isBlank: Bool {
         allSatisfy(\.isWhitespace)
     }
 }
+
+// MARK: - Foundation
 
 #if canImport(Foundation)
 import Foundation
@@ -19,14 +22,14 @@ public extension String {
 
     /// The string with leading and trailing whitespace and newlines removed.
     ///
-    /// Requires: Foundation. iOS 2.0+, macOS 10.0+, tvOS 9.0+, watchOS 2.0+.
+    ///     "  Hello, world!\n".trimmed // "Hello, world!"
     var trimmed: String {
         trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 #endif
 
-// MARK: - Functions
+// MARK: - iOS 16.0+ / macOS 13.0+ (Swift Regex)
 
 @available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, *)
 public extension String {
@@ -36,8 +39,6 @@ public extension String {
     ///
     ///     "2026-10-07".matches(pattern: #"\d{4}-\d{2}-\d{2}"#) // true
     ///     "Oct 7".matches(pattern: #"\d+"#)                    // false
-    ///
-    /// Requires: Swift 5.7+ (Swift Regex). Standard library only, no Foundation.
     func matches(pattern: String) -> Bool {
         guard let regex = try? Regex(pattern) else { return false }
         return wholeMatch(of: regex) != nil

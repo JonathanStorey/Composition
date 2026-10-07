@@ -26,8 +26,6 @@ public protocol Searchable {
 public extension Searchable {
     /// Default implementation: case- and diacritic-insensitive "contains" matching.
     /// A blank query matches everything, so an empty search field shows all results.
-    ///
-    /// Requires: Foundation. iOS 9.0+, macOS 10.11+, tvOS 9.0+, watchOS 2.0+.
     func matches(_ query: String) -> Bool {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return true }

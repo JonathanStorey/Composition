@@ -7,18 +7,13 @@ private struct Note: Digestible {
 
     let body: String
     let id: UUID
-    let parentChecksum: Data?
+    let parentChecksum: Checksum?
 
     func digest(into digester: inout Digester) {
         digester.combine(id)
         digester.combine(parentChecksum)
         digester.combine(body)
     }
-}
-
-private extension Data {
-
-    var hexString: String { map { String(format: "%02x", $0) }.joined() }
 }
 
 @Suite struct DigestibleTests {
@@ -38,13 +33,22 @@ private extension Data {
         #expect(first.checksum != second.checksum)
     }
 
+    @Test func checksumIsDigestible() {
+        #expect("abc".checksum.checksum != "abc".checksum)
+    }
+
     @Test func checksumIsStableForEqualValues() {
         let id = UUID()
         #expect(Note(body: "Draft", id: id, parentChecksum: nil).checksum == Note(body: "Draft", id: id, parentChecksum: nil).checksum)
     }
 
     @Test func checksumIsThirtyTwoBytes() {
-        #expect("".checksum.count == 32)
+        #expect("".checksum.bytes.count == 32)
+    }
+
+    @Test func checksumRoundTripsThroughCodable() throws {
+        let checksum = "abc".checksum
+        #expect(try JSONDecoder().decode(Checksum.self, from: JSONEncoder().encode(checksum)) == checksum)
     }
 
     @Test func dateMatchesItsTimeInterval() {
@@ -57,7 +61,7 @@ private extension Data {
     }
 
     @Test func intMatchesKnownVector() {
-        #expect(1.checksum.hexString == "e1204f7fab020db18a0690d525c4bfebd7ffcd34d6242f3956bc9780d29ff38e")
+        #expect(1.checksum.description == "e1204f7fab020db18a0690d525c4bfebd7ffcd34d6242f3956bc9780d29ff38e")
     }
 
     @Test func nilDiffersFromEmptyValue() {
@@ -65,7 +69,7 @@ private extension Data {
     }
 
     @Test func stringMatchesKnownVector() {
-        #expect("abc".checksum.hexString == "c3494ca1a2cf8eeb8a11ded316fb55b83c3bbbedb6313cd50415251e5d09e12f")
+        #expect("abc".checksum.description == "c3494ca1a2cf8eeb8a11ded316fb55b83c3bbbedb6313cd50415251e5d09e12f")
     }
 }
 #endif

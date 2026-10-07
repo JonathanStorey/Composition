@@ -1,3 +1,5 @@
+import Foundation
+
 public extension String {
     
     /// The string with leading and trailing whitespace and newlines removed.

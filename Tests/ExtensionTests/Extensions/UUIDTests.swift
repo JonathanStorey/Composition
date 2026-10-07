@@ -4,15 +4,24 @@ import Testing
 
 @Suite struct UUIDTests {
 
-    @Test func timeStampEmbedsCurrentTime() {
-        let before = UInt64(Date().timeIntervalSince1970 * 1000)
-        let uuid = UUID.timeStamp
-        let after = UInt64(Date().timeIntervalSince1970 * 1000)
+    @Test func initTimestampRejectsDatesBefore1970() {
+        #expect(UUID(timestamp: Date(timeIntervalSince1970: -1)) == nil)
+    }
 
-        let bytes = uuid.uuid
-        let embedded = [bytes.0, bytes.1, bytes.2, bytes.3, bytes.4, bytes.5]
-            .reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
-        #expect((before...after).contains(embedded))
+    @Test func initTimestampRoundTripsThroughDate() throws {
+        let date = Date(timeIntervalSince1970: 1_700_000_000.123)
+        let uuid = try #require(UUID(timestamp: date))
+        let decoded = try #require(Date(timestamp: uuid))
+        let reencoded = try #require(UUID(timestamp: decoded))
+        #expect(abs(decoded.timeIntervalSince(date)) < 0.0005)
+        #expect(reencoded.uuidString.prefix(13) == uuid.uuidString.prefix(13))
+    }
+
+    @Test func timeStampEmbedsCurrentTime() throws {
+        let before = Date().addingTimeInterval(-0.001)
+        let decoded = try #require(Date(timestamp: UUID.timeStamp))
+        let after = Date().addingTimeInterval(0.001)
+        #expect((before...after).contains(decoded))
     }
 
     @Test func timeStampIsUnique() {
@@ -23,5 +32,11 @@ import Testing
         let characters = Array(UUID.timeStamp.uuidString)
         #expect(characters[14] == "7")
         #expect("89AB".contains(characters[19]))
+    }
+
+    @Test func timeStampSortsByCreationTime() throws {
+        let earlier = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000)))
+        let later = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_001)))
+        #expect(earlier.uuidString < later.uuidString)
     }
 }

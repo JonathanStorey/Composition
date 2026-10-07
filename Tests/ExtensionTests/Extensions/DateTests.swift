@@ -4,18 +4,24 @@ import Testing
 
 @Suite struct DateTests {
 
-    @Test func isTodayRejectsOtherDays() {
-        #expect(!Date.yesterday.isToday)
-        #expect(!Date.tomorrow.isToday)
+    @Test func initTimestampRejectsNonVersion7UUID() {
+        #expect(Date(timestamp: UUID()) == nil)
     }
 
-    @Test func relativeDaysMatchTheirChecks() {
-        #expect(Date.today.isToday)
-        #expect(Date.tomorrow.isTomorrow)
-        #expect(Date.yesterday.isYesterday)
+    @Test func initTimestampReadsKnownValue() throws {
+        let uuid = try #require(UUID(uuidString: "018BCFE5-6800-7000-8000-000000000000"))
+        let date = try #require(Date(timestamp: uuid))
+        #expect(date == Date(timeIntervalSince1970: 1_700_000_000))
     }
 
-    @Test func todayIsStartOfDay() {
-        #expect(Date.today == Calendar.current.startOfDay(for: Date()))
+    @Test func relativeDescriptionDescribesPastAndFuture() {
+        let past = Date().addingTimeInterval(-130).relativeDescription
+        let future = Date().addingTimeInterval(130).relativeDescription
+        #expect(!past.isEmpty)
+        #expect(past != future)
+        if Locale.current.language.languageCode == .english {
+            #expect(past == "2 minutes ago")
+            #expect(future == "in 2 minutes")
+        }
     }
 }

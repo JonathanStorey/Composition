@@ -33,7 +33,7 @@ Files may use code from other files in the package. Reuse existing helpers inste
 
 ### Order members
 
-- Variables come before functions, each group in alphabetical order. Initializers follow the variables.
+- Order members as static variables, static functions, instance variables, initializers, then instance functions. Each group is alphabetical.
 - Do not add `// MARK: - Variables` or `// MARK: - Functions`.
 - Tests follow the same rule: test functions are alphabetical.
 
@@ -71,6 +71,10 @@ public extension String {
 }
 #endif
 ```
+
+### Naming
+
+Give a parameter both an argument label and a parameter name when that reads better at the call site or gives clearer autocomplete hints, for example `init?(timestamp uuid: UUID)`, called as `Date(timestamp: id)`.
 
 ### Formatting
 

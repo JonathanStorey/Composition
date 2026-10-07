@@ -1,4 +1,4 @@
-# Extension
+# Composition
 
 A Swift package.
 
@@ -12,10 +12,10 @@ A Swift package.
 Add the package to your `Package.swift` dependencies:
 
 ```swift
-.package(url: "https://github.com/jonathanstorey/extension.git", branch: "main")
+.package(url: "https://github.com/jonathanstorey/composition.git", branch: "main")
 ```
 
-Then add `"Extension"` to your target's dependencies. In Xcode, use **File → Add Package Dependencies…** and paste the repository URL.
+Then add `"Composition"` to your target's dependencies. In Xcode, use **File → Add Package Dependencies…** and paste the repository URL.
 
 ## Development
 

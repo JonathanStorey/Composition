@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## Project
 
-`Extension` is a Swift package of reusable extensions, protocols, property wrappers, and SwiftUI view modifiers.
+`Composition` is a Swift package of reusable extensions, protocols, property wrappers, and SwiftUI view modifiers.
 
 - Swift tools version 6.0. Package minimums: iOS 17, macOS 14.
 - Build and test with `swift build` and `swift test`. SwiftUI code only builds on Apple platforms, so run these on macOS.
@@ -12,12 +12,13 @@ Guidance for AI coding agents working in this repository.
 ## Layout
 
 ```
-Sources/Extension/
+Sources/Composition/
 ├── Extensions/        Extensions on existing types, one file per type (String.swift, View.swift)
+├── Macros/            Public macro declarations, one macro per file
 ├── PropertyWrappers/  One property wrapper per file
 ├── Protocols/         One protocol per file, with its default implementation
 └── ViewModifiers/     One ViewModifier per file
-Tests/ExtensionTests/  Mirrors the Sources folder structure
+Tests/CompositionTests/  Mirrors the Sources folder structure
 ```
 
 ## Conventions
@@ -88,5 +89,5 @@ Each public declaration gets a single-line `///` summary. Do not add usage examp
 ### Tests
 
 - Use Swift Testing (`import Testing`, `@Suite`, `@Test`, `#expect`). Do not use XCTest.
-- Place tests in the folder matching the source file, for example `Tests/ExtensionTests/Extensions/StringTests.swift`.
+- Place tests in the folder matching the source file, for example `Tests/CompositionTests/Extensions/StringTests.swift`.
 - Every new public API gets at least one test covering its main behavior and one edge case.

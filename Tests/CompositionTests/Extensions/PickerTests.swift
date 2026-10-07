@@ -1,6 +1,6 @@
 import SwiftUI
 import Testing
-@testable import Extension
+@testable import Composition
 
 @MainActor
 @Suite struct PickerTests {

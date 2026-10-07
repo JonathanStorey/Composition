@@ -52,6 +52,10 @@ private extension Data {
         #expect(date.checksum == date.timeIntervalSince1970.checksum)
     }
 
+    @Test func equivalentUnicodeFormsMatch() {
+        #expect("\u{E9}".checksum == "e\u{301}".checksum)
+    }
+
     @Test func intMatchesKnownVector() {
         #expect(1.checksum.hexString == "e1204f7fab020db18a0690d525c4bfebd7ffcd34d6242f3956bc9780d29ff38e")
     }

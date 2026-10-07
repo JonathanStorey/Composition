@@ -39,18 +39,25 @@ A developer should be able to copy a single file into their own project and have
 
 ### Order members in extension files
 
-Sort the file into sections. Inside every section, variables come before functions and each group is alphabetical.
+Every section lists variables before functions, each group in alphabetical order.
 
-1. **Unrestricted code first.** Members that need only the Swift standard library go at the top under `// MARK: - Variables` and `// MARK: - Functions`.
-2. **Then one section per requirement.** Members that need Foundation, a newer OS version, or another dependency go in their own MARK section below the unrestricted code. For a framework such as Foundation, put the import below the MARK and wrap the section in `#if canImport(...)`, so the rest of the file stays dependency-free. For a newer OS version, put `@available` on the section's extension.
-3. **Order the requirement sections:** Foundation first, then OS-version sections from oldest to newest. A member that needs both Foundation and a newer OS goes in the Foundation section with its own `@available`.
-4. **Leave out empty sections.**
+1. **Top half: standard library only.** One extension with `// MARK: - Variables` and `// MARK: - Functions`. Members that need a newer OS version stay here, sorted alphabetically with the rest, with `@available` on the member itself.
+2. **Bottom half: one section per dependency.** Members that need a framework such as Foundation go below, under a MARK named for the dependency. Put the import below the MARK and wrap the section in `#if canImport(...)`, so the rest of the file stays dependency-free.
+3. **Order the dependency sections alphabetically by dependency name.** Sections needing more than one dependency come after all single-dependency sections, named with `+` (for example `// MARK: - Foundation + SwiftUI`) and wrapped in `#if canImport(A) && canImport(B)`.
+4. **These are the only MARKs.** Do not add Variables or Functions MARKs inside dependency sections, and do not add MARKs for OS versions.
+5. **Leave out empty sections.**
 
 ```swift
-// MARK: - Variables
-
 public extension String {
+
+    // MARK: - Variables
+
     var isBlank: Bool { ... }
+
+    // MARK: - Functions
+
+    @available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, *)
+    func matches(pattern: String) -> Bool { ... }
 }
 
 // MARK: - Foundation
@@ -62,16 +69,9 @@ public extension String {
     var trimmed: String { ... }
 }
 #endif
-
-// MARK: - iOS 16.0+ / macOS 13.0+ (Swift Regex)
-
-@available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, *)
-public extension String {
-    func matches(pattern: String) -> Bool { ... }
-}
 ```
 
-If every member in a file shares the same requirement, as `View.swift` does with SwiftUI, import it at the top of the file as usual and use only the Variables and Functions sections.
+If every member in a file shares the same dependency, as `View.swift` does with SwiftUI, import it at the top of the file as usual and use only the Variables and Functions sections.
 
 ### Doc comments
 

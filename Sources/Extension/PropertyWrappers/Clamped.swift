@@ -8,8 +8,6 @@
 ///
 ///     settings.volume = 150 // stored as 100
 ///     settings.volume = -5  // stored as 0
-///
-/// Requires: Swift 5.1+. Standard library only, so it works on every platform.
 @propertyWrapper
 public struct Clamped<Value: Comparable> {
     private var value: Value

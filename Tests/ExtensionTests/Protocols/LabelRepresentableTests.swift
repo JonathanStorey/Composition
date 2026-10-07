@@ -18,11 +18,15 @@ enum SampleAction: CaseIterable, LabelRepresentable {
         self == .delete ? "Permanently removes the item" : nil
     }
 
+    var icon: Image {
+        Image(systemName: symbolName)
+    }
+
     var role: ButtonRole? {
         self == .delete ? .destructive : nil
     }
 
-    var systemImage: String {
+    var symbolName: String {
         switch self {
         case .archive: "archivebox"
         case .delete: "trash"
@@ -39,9 +43,29 @@ enum SampleAction: CaseIterable, LabelRepresentable {
     }
 }
 
+enum SampleStatus: CaseIterable, LabelRepresentable {
+
+    case offline
+    case online
+
+    @ViewBuilder var icon: some View {
+        switch self {
+        case .offline: Image(systemName: "wifi.slash")
+        case .online: Circle()
+        }
+    }
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .offline: "Offline"
+        case .online: "Online"
+        }
+    }
+}
+
 private struct PlainItem: LabelRepresentable {
 
-    let systemImage = "star"
+    let icon = Image(systemName: "star")
     let title: LocalizedStringResource = "Favorite"
 }
 
@@ -57,8 +81,9 @@ private struct PlainItem: LabelRepresentable {
         #expect(PlainItem().help == nil)
     }
 
-    @Test func roleDefaultsToNil() {
-        #expect(PlainItem().role == nil)
+    @Test func iconDefaultsToImageType() {
+        #expect(PlainItem.Icon.self == Image.self)
+        #expect(PlainItem().icon == Image(systemName: "star"))
     }
 
     @Test func roleCanBeOverridden() {
@@ -66,12 +91,17 @@ private struct PlainItem: LabelRepresentable {
         #expect(SampleAction.share.role == nil)
     }
 
+    @Test func roleDefaultsToNil() {
+        #expect(PlainItem().role == nil)
+        #expect(SampleStatus.online.role == nil)
+    }
+
     @Test func symbolsExist() {
         for action in SampleAction.allCases {
             #if canImport(UIKit)
-            #expect(UIImage(systemName: action.systemImage) != nil, "Missing symbol: \(action.systemImage)")
+            #expect(UIImage(systemName: action.symbolName) != nil, "Missing symbol: \(action.symbolName)")
             #elseif canImport(AppKit)
-            #expect(NSImage(systemSymbolName: action.systemImage, accessibilityDescription: nil) != nil, "Missing symbol: \(action.systemImage)")
+            #expect(NSImage(systemSymbolName: action.symbolName, accessibilityDescription: nil) != nil, "Missing symbol: \(action.symbolName)")
             #endif
         }
     }

@@ -2,14 +2,18 @@ import Testing
 @testable import Extension
 
 private struct Settings {
+
     @Clamped(0...100) var volume = 50
 }
 
 @Suite struct ClampedTests {
-    @Test func keepsInRangeValues() {
-        var settings = Settings()
-        settings.volume = 75
-        #expect(settings.volume == 75)
+
+    @Test func clampsInitialValue() {
+        struct Rating {
+
+            @Clamped(1...5) var stars = 9
+        }
+        #expect(Rating().stars == 5)
     }
 
     @Test func clampsToBounds() {
@@ -20,10 +24,9 @@ private struct Settings {
         #expect(settings.volume == 0)
     }
 
-    @Test func clampsInitialValue() {
-        struct Rating {
-            @Clamped(1...5) var stars = 9
-        }
-        #expect(Rating().stars == 5)
+    @Test func keepsInRangeValues() {
+        var settings = Settings()
+        settings.volume = 75
+        #expect(settings.volume == 75)
     }
 }

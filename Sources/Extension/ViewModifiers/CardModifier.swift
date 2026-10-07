@@ -1,20 +1,19 @@
 import SwiftUI
 
 /// Wraps content in a padded, rounded card with a subtle shadow.
-///
-/// Apply it with the `cardStyle()` shortcut defined in `View.swift`.
-///
-/// Minimums are set by `Material` (watchOS 10) and `background(_:in:)` (iOS 15, macOS 12, tvOS 15).
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 10.0, *)
 public struct CardModifier: ViewModifier {
+
     let cornerRadius: CGFloat
     let padding: CGFloat
 
+    /// Creates a card modifier with the given corner radius and padding.
     public init(cornerRadius: CGFloat = 12, padding: CGFloat = 16) {
         self.cornerRadius = cornerRadius
         self.padding = padding
     }
 
+    /// Applies the card styling to the content.
     public func body(content: Content) -> some View {
         content
             .padding(padding)

@@ -14,10 +14,27 @@ public protocol Digestible {
 public extension Digestible {
 
     /// The SHA-256 checksum of the value's content, identical on every device and every launch.
-    var checksum: Data {
+    var checksum: Checksum {
         var digester = Digester()
         digest(into: &digester)
         return digester.finalize()
+    }
+}
+
+/// A SHA-256 checksum, compared, hashed and stored by value.
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+public struct Checksum: Codable, Hashable, Sendable {
+
+    /// The 32 raw bytes of the checksum.
+    public let bytes: Data
+}
+
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+extension Checksum: CustomStringConvertible {
+
+    /// The checksum as lowercase hexadecimal.
+    public var description: String {
+        bytes.map { String(format: "%02x", $0) }.joined()
     }
 }
 
@@ -42,8 +59,8 @@ public struct Digester {
     }
 
     /// Returns the checksum of everything fed in so far.
-    public func finalize() -> Data {
-        Data(hasher.finalize())
+    public func finalize() -> Checksum {
+        Checksum(bytes: Data(hasher.finalize()))
     }
 }
 
@@ -63,6 +80,15 @@ extension Bool: Digestible {
     /// Feeds the value as a single byte.
     public func digest(into digester: inout Digester) {
         digester.combine(bytes: Data([self ? 1 : 0]))
+    }
+}
+
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+extension Checksum: Digestible {
+
+    /// Feeds the raw bytes.
+    public func digest(into digester: inout Digester) {
+        digester.combine(bytes: bytes)
     }
 }
 

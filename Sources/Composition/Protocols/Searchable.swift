@@ -1,3 +1,4 @@
+#if canImport(Foundation)
 import Foundation
 
 /// A type that can be matched against a search query.
@@ -27,3 +28,4 @@ public extension Sequence where Element: Searchable {
         filter { $0.matches(query) }
     }
 }
+#endif

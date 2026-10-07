@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import SwiftUI
 import Testing
 @testable import Composition
@@ -17,3 +18,4 @@ import Testing
         _ = Button(SampleAction.delete) {}
     }
 }
+#endif

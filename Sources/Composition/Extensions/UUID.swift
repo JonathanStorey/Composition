@@ -1,3 +1,4 @@
+#if canImport(Foundation)
 import Foundation
 
 public extension UUID {
@@ -38,3 +39,4 @@ private extension UUID {
         self.init(uuid: bytes)
     }
 }
+#endif

@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import SwiftUI
 
 /// Wraps content in a padded, rounded card with a subtle shadow.
@@ -32,3 +33,4 @@ public struct CardModifier: ViewModifier {
     }
     .padding()
 }
+#endif

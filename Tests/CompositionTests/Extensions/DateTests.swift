@@ -1,3 +1,4 @@
+#if canImport(Foundation)
 import Foundation
 import Testing
 @testable import Composition
@@ -31,3 +32,4 @@ import Testing
         }
     }
 }
+#endif

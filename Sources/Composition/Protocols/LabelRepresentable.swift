@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import SwiftUI
 
 /// A type that supplies the title, icon, role, and help text used to build a label, button, or picker option.
@@ -29,3 +30,4 @@ public extension LabelRepresentable {
     /// No role by default.
     var role: ButtonRole? { nil }
 }
+#endif

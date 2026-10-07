@@ -1,3 +1,4 @@
+#if canImport(Foundation)
 import Testing
 @testable import Composition
 
@@ -34,3 +35,4 @@ private struct Item: Searchable {
         #expect(!items[0].matches("bike"))
     }
 }
+#endif

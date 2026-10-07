@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import SwiftUI
 import Testing
 @testable import Composition
@@ -21,3 +22,4 @@ import Testing
         _ = Label("") { Circle() }
     }
 }
+#endif

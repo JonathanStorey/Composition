@@ -17,9 +17,16 @@ import Testing
     @Test func matchesPatternReturnsFalseForInvalidPattern() {
         #expect(!"abc".matches(pattern: "("))
     }
+}
+
+// MARK: - Foundation
+
+#if canImport(Foundation)
+extension StringTests {
 
     @Test func trimmedRemovesSurroundingWhitespace() {
         #expect("  Hello, world!\n".trimmed == "Hello, world!")
         #expect("no-op".trimmed == "no-op")
     }
 }
+#endif

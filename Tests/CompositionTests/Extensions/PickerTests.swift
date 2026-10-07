@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import SwiftUI
 import Testing
 @testable import Composition
@@ -13,3 +14,4 @@ import Testing
         _ = Picker("Status", selection: .constant(SampleStatus.online))
     }
 }
+#endif

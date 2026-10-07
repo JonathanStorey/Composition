@@ -1,21 +1,8 @@
-// Standalone file: paste it into any Swift project. It has no package dependencies.
-
 import Foundation
 
-/// A type that can be matched against a user's search query.
-///
-/// Conforming types only need to list the text that should be searchable.
-/// The matching logic comes for free from the default implementation below.
-///
-///     struct Contact: Searchable {
-///         let name: String
-///         let email: String
-///
-///         var searchableText: [String] { [name, email] }
-///     }
-///
-///     contact.matches("jane") // true if the name or email contains "jane"
+/// A type that can be matched against a search query.
 public protocol Searchable {
+
     /// The pieces of text that a search query is compared against.
     var searchableText: [String] { get }
 
@@ -24,19 +11,18 @@ public protocol Searchable {
 }
 
 public extension Searchable {
-    /// Default implementation: case- and diacritic-insensitive "contains" matching.
-    /// A blank query matches everything, so an empty search field shows all results.
+
+    /// Matches when any searchable text contains the query, ignoring case and diacritics. A blank query matches everything.
     func matches(_ query: String) -> Bool {
-        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = query.trimmed
         guard !query.isEmpty else { return true }
         return searchableText.contains { $0.localizedStandardContains(query) }
     }
 }
 
 public extension Sequence where Element: Searchable {
+
     /// Returns the elements that match the query.
-    ///
-    ///     contacts.filtered(by: searchText)
     func filtered(by query: String) -> [Element] {
         filter { $0.matches(query) }
     }

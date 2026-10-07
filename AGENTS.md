@@ -22,40 +22,39 @@ Tests/ExtensionTests/  Mirrors the Sources folder structure
 
 ## Conventions
 
-### Every file must stand alone
+### Share code across files
 
-A developer should be able to copy a single file into their own project and have it compile.
+Files may use code from other files in the package. Reuse existing helpers instead of duplicating them, for example `Searchable` uses `String.trimmed`.
 
-- Never depend on code from another file in this package. Inline small helpers instead.
-- The only exception is a `View` shortcut for a modifier in `ViewModifiers`. State the dependency in a comment at the top of the file, for example `// Requires CardModifier.swift (in ViewModifiers) alongside this file.`
-- Begin standalone files with `// Standalone file: paste it into any Swift project. It has no package dependencies.`
+### Mark access and availability
+
 - Mark everything that callers use as `public`.
+- When code needs iOS 13 / macOS 10.15 or later, add `@available(iOS x, macOS x, tvOS x, watchOS x, *)` with the correct version for every platform. Put it on the member, or on the whole type or extension when every member needs it.
 
-### Mark minimum versions with `@available`
+### Order members
 
-- When code needs iOS 13 / macOS 10.15 or later, add `@available(iOS x, macOS x, tvOS x, watchOS x, *)` with the correct version for every platform.
-- In the doc comment, note which API sets the minimum.
-- Do not add `@available` or version notes for code with lower minimums.
+- Variables come before functions, each group in alphabetical order. Initializers follow the variables.
+- Do not add `// MARK: - Variables` or `// MARK: - Functions`.
+- Tests follow the same rule: test functions are alphabetical.
 
-### Order members in extension files
+### Separate code by dependency
 
-Every section lists variables before functions, each group in alphabetical order.
+When some code in a file needs a framework such as Foundation and other code does not, split the file by dependency:
 
-1. **Top half: standard library only.** One extension with `// MARK: - Variables` and `// MARK: - Functions`. Members that need a newer OS version stay here, sorted alphabetically with the rest, with `@available` on the member itself.
-2. **Bottom half: one section per dependency.** Members that need a framework such as Foundation go below, under a MARK named for the dependency. Put the import below the MARK and wrap the section in `#if canImport(...)`, so the rest of the file stays dependency-free.
-3. **Order the dependency sections alphabetically by dependency name.** Sections needing more than one dependency come after all single-dependency sections, named with `+` (for example `// MARK: - Foundation + SwiftUI`) and wrapped in `#if canImport(A) && canImport(B)`.
-4. **These are the only MARKs.** Do not add Variables or Functions MARKs inside dependency sections, and do not add MARKs for OS versions.
-5. **Leave out empty sections.**
+1. Code that needs only the Swift standard library goes first, with no MARK.
+2. Each dependency gets its own section below, under a MARK named for the dependency. Put the import below the MARK and wrap the section in `#if canImport(...)`.
+3. Order the dependency sections alphabetically by dependency name, for example Foundation before SwiftUI. Sections needing more than one dependency come last, named with `+` (for example `// MARK: - Foundation + SwiftUI`) and wrapped in `#if canImport(A) && canImport(B)`.
+4. Within each section, follow the member ordering above.
+
+When everything in a file shares the same imports, as in `View.swift` and `Searchable.swift`, put the imports at the top of the file and add no MARKs.
 
 ```swift
 public extension String {
 
-    // MARK: - Variables
-
+    /// A Boolean value indicating whether the string is empty or contains only whitespace and newlines.
     var isBlank: Bool { ... }
 
-    // MARK: - Functions
-
+    /// Returns a Boolean value indicating whether the entire string matches a regular expression.
     @available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, *)
     func matches(pattern: String) -> Bool { ... }
 }
@@ -66,16 +65,21 @@ public extension String {
 import Foundation
 
 public extension String {
+
+    /// The string with leading and trailing whitespace and newlines removed.
     var trimmed: String { ... }
 }
 #endif
 ```
 
-If every member in a file shares the same dependency, as `View.swift` does with SwiftUI, import it at the top of the file as usual and use only the Variables and Functions sections.
+### Formatting
+
+- Do not add header comments at the top of files.
+- Leave a blank line after the opening brace of every type, protocol, and extension declaration, including in tests.
 
 ### Doc comments
 
-Each public declaration gets a `///` doc comment with a short usage example.
+Each public declaration gets a single-line `///` summary. Do not add usage examples, extra detail lines, or notes about minimum versions.
 
 ### Tests
 

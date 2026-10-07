@@ -1,26 +1,21 @@
-// Standalone file: paste it into any Swift project. It has no package dependencies.
-
-/// Keeps a value within a closed range. Out-of-range values are pulled to the nearest bound.
-///
-///     struct Settings {
-///         @Clamped(0...100) var volume = 50
-///     }
-///
-///     settings.volume = 150 // stored as 100
-///     settings.volume = -5  // stored as 0
+/// Keeps a value within a closed range by pulling out-of-range values to the nearest bound.
 @propertyWrapper
 public struct Clamped<Value: Comparable> {
-    private var value: Value
+
+    /// The range the value is kept within.
     public let range: ClosedRange<Value>
+    private var value: Value
 
-    public init(wrappedValue: Value, _ range: ClosedRange<Value>) {
-        self.range = range
-        self.value = min(max(wrappedValue, range.lowerBound), range.upperBound)
-    }
-
+    /// The clamped value.
     public var wrappedValue: Value {
         get { value }
         set { value = min(max(newValue, range.lowerBound), range.upperBound) }
+    }
+
+    /// Creates a wrapper that clamps the initial value and all later values to the range.
+    public init(wrappedValue: Value, _ range: ClosedRange<Value>) {
+        self.range = range
+        self.value = min(max(wrappedValue, range.lowerBound), range.upperBound)
     }
 }
 

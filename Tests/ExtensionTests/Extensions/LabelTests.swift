@@ -8,4 +8,8 @@ import Testing
     @Test func initAcceptsItem() {
         _ = Label(SampleAction.share)
     }
+
+    @Test func initAcceptsItemWithCustomIcon() {
+        _ = Label(SampleStatus.online)
+    }
 }

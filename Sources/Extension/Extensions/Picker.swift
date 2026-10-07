@@ -4,7 +4,7 @@ import SwiftUI
 public extension Picker
 where Label == Text,
       SelectionValue: CaseIterable & LabelRepresentable,
-      Content == ForEach<[SelectionValue], SelectionValue, SwiftUI.Label<Text, Image>> {
+      Content == ForEach<[SelectionValue], SelectionValue, SwiftUI.Label<Text, SelectionValue.Icon>> {
 
     /// Creates a picker with one labeled option for every case of the selection type.
     init(_ title: LocalizedStringResource, selection: Binding<SelectionValue>) {

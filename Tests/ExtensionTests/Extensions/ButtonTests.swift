@@ -5,6 +5,10 @@ import Testing
 @MainActor
 @Suite struct ButtonTests {
 
+    @Test func initAcceptsItemWithCustomIcon() {
+        _ = Button(SampleStatus.offline) {}
+    }
+
     @Test func initAcceptsItemWithDefaultRole() {
         _ = Button(SampleAction.share) {}
     }

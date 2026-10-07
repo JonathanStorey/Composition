@@ -8,4 +8,8 @@ import Testing
     @Test func initAcceptsCaseIterableItem() {
         _ = Picker("Action", selection: .constant(SampleAction.archive))
     }
+
+    @Test func initAcceptsCaseIterableItemWithCustomIcon() {
+        _ = Picker("Status", selection: .constant(SampleStatus.online))
+    }
 }

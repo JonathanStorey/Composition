@@ -2,6 +2,12 @@
 @propertyWrapper
 public struct Clamped<Value: Comparable> {
 
+    /// Creates a wrapper that clamps the initial value and all later values to the range.
+    public init(wrappedValue: Value, _ range: ClosedRange<Value>) {
+        self.range = range
+        self.value = min(max(wrappedValue, range.lowerBound), range.upperBound)
+    }
+
     /// The range the value is kept within.
     public let range: ClosedRange<Value>
     private var value: Value
@@ -10,12 +16,6 @@ public struct Clamped<Value: Comparable> {
     public var wrappedValue: Value {
         get { value }
         set { value = min(max(newValue, range.lowerBound), range.upperBound) }
-    }
-
-    /// Creates a wrapper that clamps the initial value and all later values to the range.
-    public init(wrappedValue: Value, _ range: ClosedRange<Value>) {
-        self.range = range
-        self.value = min(max(wrappedValue, range.lowerBound), range.upperBound)
     }
 }
 

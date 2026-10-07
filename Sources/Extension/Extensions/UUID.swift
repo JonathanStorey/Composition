@@ -2,16 +2,16 @@ import Foundation
 
 public extension UUID {
 
-    /// A new version 7 UUID for the current time, with sub-millisecond precision so values sort by creation time.
-    static var timeStamp: UUID {
-        UUID(unixTime: max(0, Date().timeIntervalSince1970))
-    }
-
     /// Creates a version 7 UUID for the date, or `nil` when the date is before 1970 or past the 48-bit timestamp limit.
     init?(timestamp date: Date) {
         let unixTime = date.timeIntervalSince1970
         guard (0..<281_474_976_710.656).contains(unixTime) else { return nil }
         self.init(unixTime: unixTime)
+    }
+
+    /// A new version 7 UUID for the current time, with sub-millisecond precision so values sort by creation time.
+    static var timestamp: UUID {
+        UUID(unixTime: max(0, Date().timeIntervalSince1970))
     }
 }
 

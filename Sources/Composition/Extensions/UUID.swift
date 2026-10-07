@@ -1,3 +1,5 @@
+// MARK: - Foundation
+
 #if canImport(Foundation)
 import Foundation
 
@@ -38,5 +40,43 @@ private extension UUID {
         bytes.8 = (bytes.8 & 0x3F) | 0x80
         self.init(uuid: bytes)
     }
+}
+#endif
+
+// MARK: - CryptoKit + Foundation
+
+#if canImport(CryptoKit) && canImport(Foundation)
+import CryptoKit
+import Foundation
+
+public extension UUID {
+
+    /// Creates a version 5 UUID from the value's contents, so equal values with the same namespace always give the same UUID.
+    init(hash value: some Encodable, namespace salt: String? = nil) throws {
+        let namespace = salt.map { UUID(name: Data($0.utf8), namespace: .composition) } ?? .composition
+        if let data = value as? Data {
+            self.init(name: data, namespace: namespace)
+        } else {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+            self.init(name: try encoder.encode(value), namespace: namespace)
+        }
+    }
+}
+
+extension UUID {
+
+    /// Builds an RFC 9562 version 5 UUID from the SHA-1 digest of a namespace followed by a name.
+    init(name: Data, namespace: UUID) {
+        var data = withUnsafeBytes(of: namespace.uuid) { Data($0) }
+        data.append(name)
+        var bytes = Array(Insecure.SHA1.hash(data: data).prefix(16))
+        bytes[6] = (bytes[6] & 0x0F) | 0x50
+        bytes[8] = (bytes[8] & 0x3F) | 0x80
+        self.init(uuid: bytes.withUnsafeBytes { $0.load(as: uuid_t.self) })
+    }
+
+    /// The namespace used when no salt is given.
+    static let composition = UUID(uuid: (0x63, 0xEE, 0x8B, 0xAF, 0xDB, 0x9B, 0x49, 0xDE, 0xA0, 0x24, 0xEA, 0x73, 0xA4, 0xA2, 0x88, 0x9D))
 }
 #endif

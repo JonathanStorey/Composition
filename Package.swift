@@ -4,24 +4,24 @@
 import PackageDescription
 
 let package = Package(
-    name: "Extension",
+    name: "Composition",
     platforms: [
         .iOS(.v17),
         .macOS(.v14),
     ],
     products: [
         .library(
-            name: "Extension",
-            targets: ["Extension"]
+            name: "Composition",
+            targets: ["Composition"]
         ),
     ],
     targets: [
         .target(
-            name: "Extension"
+            name: "Composition"
         ),
         .testTarget(
-            name: "ExtensionTests",
-            dependencies: ["Extension"]
+            name: "CompositionTests",
+            dependencies: ["Composition"]
         ),
     ]
 )

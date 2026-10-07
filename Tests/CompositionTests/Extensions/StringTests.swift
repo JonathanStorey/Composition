@@ -1,5 +1,5 @@
 import Testing
-@testable import Extension
+@testable import Composition
 
 @Suite struct StringTests {
 

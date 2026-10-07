@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import Extension
+@testable import Composition
 
 @Suite struct UUIDTests {
 

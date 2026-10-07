@@ -4,17 +4,26 @@ import Testing
 
 @Suite struct UUIDTests {
 
+    @Test func initTimestampEncodesSubMillisecondPrecision() throws {
+        let uuid = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.000_500_1)))
+        #expect(uuid.uuidString.hasPrefix("018BCFE5-6800-7800-"))
+    }
+
     @Test func initTimestampRejectsDatesBefore1970() {
         #expect(UUID(timestamp: Date(timeIntervalSince1970: -1)) == nil)
     }
 
     @Test func initTimestampRoundTripsThroughDate() throws {
-        let date = Date(timeIntervalSince1970: 1_700_000_000.123)
+        let date = Date(timeIntervalSince1970: 1_700_000_000.123456)
         let uuid = try #require(UUID(timestamp: date))
         let decoded = try #require(Date(timestamp: uuid))
-        let reencoded = try #require(UUID(timestamp: decoded))
-        #expect(abs(decoded.timeIntervalSince(date)) < 0.0005)
-        #expect(reencoded.uuidString.prefix(13) == uuid.uuidString.prefix(13))
+        #expect(abs(decoded.timeIntervalSince(date)) < 0.000_000_5)
+    }
+
+    @Test func initTimestampSortsWithinOneMillisecond() throws {
+        let earlier = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.0001)))
+        let later = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.0004)))
+        #expect(earlier.uuidString < later.uuidString)
     }
 
     @Test func timeStampEmbedsCurrentTime() throws {
@@ -32,11 +41,5 @@ import Testing
         let characters = Array(UUID.timeStamp.uuidString)
         #expect(characters[14] == "7")
         #expect("89AB".contains(characters[19]))
-    }
-
-    @Test func timeStampSortsByCreationTime() throws {
-        let earlier = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000)))
-        let later = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_001)))
-        #expect(earlier.uuidString < later.uuidString)
     }
 }

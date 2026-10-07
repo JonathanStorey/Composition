@@ -26,19 +26,19 @@ import Testing
         #expect(earlier.uuidString < later.uuidString)
     }
 
-    @Test func timeStampEmbedsCurrentTime() throws {
+    @Test func timestampEmbedsCurrentTime() throws {
         let before = Date().addingTimeInterval(-0.001)
-        let decoded = try #require(Date(timestamp: UUID.timeStamp))
+        let decoded = try #require(Date(timestamp: UUID.timestamp))
         let after = Date().addingTimeInterval(0.001)
         #expect((before...after).contains(decoded))
     }
 
-    @Test func timeStampIsUnique() {
-        #expect(UUID.timeStamp != UUID.timeStamp)
+    @Test func timestampIsUnique() {
+        #expect(UUID.timestamp != UUID.timestamp)
     }
 
-    @Test func timeStampSetsVersionAndVariant() {
-        let characters = Array(UUID.timeStamp.uuidString)
+    @Test func timestampSetsVersionAndVariant() {
+        let characters = Array(UUID.timestamp.uuidString)
         #expect(characters[14] == "7")
         #expect("89AB".contains(characters[19]))
     }

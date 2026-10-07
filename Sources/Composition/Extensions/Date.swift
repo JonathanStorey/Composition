@@ -6,8 +6,7 @@ public extension Date {
     init?(timestamp uuid: UUID) {
         let bytes = uuid.uuid
         guard bytes.6 >> 4 == 7, bytes.8 >> 6 == 0b10 else { return nil }
-        let milliseconds = [bytes.0, bytes.1, bytes.2, bytes.3, bytes.4, bytes.5]
-            .reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+        let milliseconds = [bytes.0, bytes.1, bytes.2, bytes.3, bytes.4, bytes.5].reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
         let fraction = UInt16(bytes.6 & 0x0F) << 8 | UInt16(bytes.7)
         self.init(timeIntervalSince1970: (TimeInterval(milliseconds) + TimeInterval(fraction) / 4096) / 1000)
     }

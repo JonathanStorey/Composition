@@ -17,7 +17,7 @@ public extension Versioned {
 
     /// Returns a commit of the current content made on the parent's revision, or a first commit when there is no parent.
     func commit(onto parent: Self? = nil) throws -> Commit {
-        try Commit(self, parent: parent, repository: repository)
+        try Commit(content: self, parent: parent, repository: repository)
     }
 }
 
@@ -31,7 +31,7 @@ public struct Commit: Codable, Hashable, Sendable {
     public let hash: Checksum
 
     fileprivate let parent: Checksum?
-    
+
     private init(content: Checksum, parent: Checksum?, repository name: String) {
         self.content = content
         self.hash = Self.hash(content: content, parent: parent, repository: name)

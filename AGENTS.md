@@ -34,7 +34,7 @@ Files may use code from other files in the package. Reuse existing helpers inste
 
 ### Order members
 
-- Order members as initializers, static variables, static functions, instance variables, then instance functions. Each group is alphabetical.
+- Order members as stored `let` properties, stored `var` properties, initializers, static variables, static functions, computed instance variables, then instance functions. Each group is alphabetical.
 - Do not add `// MARK: - Variables` or `// MARK: - Functions`.
 - Tests follow the same rule: test functions are alphabetical.
 

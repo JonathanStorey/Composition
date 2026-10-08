@@ -5,10 +5,10 @@ import Testing
 
 private struct Page: Versioned {
 
+    let timestamp = UUID.timestamp
     var body: String
     var repository = "Notes"
     var revision: Commit?
-    let timestamp = UUID.timestamp
 
     func digest(into digester: inout Digester) {
         digester.combine(body)

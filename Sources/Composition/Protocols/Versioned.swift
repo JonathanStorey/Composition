@@ -18,26 +18,23 @@ public extension Versioned {
         return revision.content == checksum ? .committed : .modified
     }
 
-    /// Stamps the current content with a commit made on the parent's revision, or a first commit when there is no parent.
-    mutating func commit(onto parent: Self? = nil) throws {
-        guard revision == nil else { throw Commit.Error.alreadyCommitted }
-        revision = try Commit(committing: self, onto: parent)
+    /// Applies the changes and commits them onto the current revision, keeping the revision when the content still matches it, and returns the result.
+    @discardableResult
+    mutating func commit(_ changes: (inout Self) throws -> Void = { _ in }) rethrows -> Self {
+        var version = self
+        try changes(&version)
+        let content = version.checksum
+        if content != revision?.content {
+            version.revision = Commit(content: content, parent: revision?.hash)
+        }
+        self = version
+        return version
     }
 
     /// Returns a Boolean value indicating whether the value was committed onto the parent's revision and both are still committed.
     func isChild(of parent: Self) -> Bool {
         guard let revision, let base = parent.revision else { return false }
         return revision.parent == base.hash && commitStatus == .committed && parent.commitStatus == .committed
-    }
-
-    /// Returns a copy of this value type with the changes applied and committed onto this value, or `nil` when the changes leave the content unchanged.
-    func revised(_ changes: (inout Self) throws -> Void) throws -> Self? {
-        var child = self
-        child.revision = nil
-        try changes(&child)
-        guard child.checksum != checksum else { return nil }
-        try child.commit(onto: self)
-        return child
     }
 }
 
@@ -117,14 +114,9 @@ public struct Commit: Codable, Hashable, Sendable {
     /// The hash of the commit this one was made on, or `nil` for a first commit.
     public let parent: Checksum?
 
-    fileprivate init<V: Versioned>(committing value: V, onto parent: V?) throws {
-        switch parent?.commitStatus {
-        case .modified?: throw Error.modifiedParent
-        case .uncommitted?: throw Error.uncommittedParent
-        case .committed?, nil: break
-        }
-        self.content = value.checksum
-        self.parent = parent?.revision?.hash
+    fileprivate init(content: Checksum, parent: Checksum?) {
+        self.content = content
+        self.parent = parent
     }
 
     /// The checksum of the content and the parent's hash.
@@ -138,19 +130,6 @@ public struct Commit: Codable, Hashable, Sendable {
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Commit {
-
-    /// An error thrown when a value cannot be committed.
-    enum Error: Swift.Error {
-
-        /// The value already has a revision, so committing again would orphan the values made on it.
-        case alreadyCommitted
-
-        /// The parent's content changed after its revision was made, so its revision no longer matches it.
-        case modifiedParent
-
-        /// The parent has no revision, so there is no hash to link to.
-        case uncommittedParent
-    }
 
     /// Whether a value has never been committed, was changed after its commit, or still matches its commit.
     enum Status: Hashable, Sendable {

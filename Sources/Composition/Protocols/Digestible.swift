@@ -108,9 +108,27 @@ extension Data: Digestible {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Date: Digestible {
 
-    /// Feeds the exact time interval since 1970.
+    /// Feeds the whole microseconds since 1970 as eight big-endian bytes, matching Python's `datetime` precision.
     public func digest(into digester: inout Digester) {
-        timeIntervalSince1970.digest(into: &digester)
+        Int(microsecondsSince1970).digest(into: &digester)
+    }
+}
+
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+extension Decimal: Digestible {
+
+    /// Feeds the UTF-8 bytes of the plain normalized string, such as "1.5" for 1.50.
+    public func digest(into digester: inout Digester) {
+        digester.combine(bytes: Data(normalizedDescription.utf8))
+    }
+}
+
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+extension Dictionary: Digestible where Key: Digestible, Value: Digestible {
+
+    /// Feeds each key's checksum followed by its value's checksum, with the pairs sorted so insertion order does not matter.
+    public func digest(into digester: inout Digester) {
+        map { $0.key.checksum.bytes + $0.value.checksum.bytes }.sorted { $0.lexicographicallyPrecedes($1) }.forEach { digester.combine(bytes: $0) }
     }
 }
 
@@ -144,6 +162,15 @@ extension Optional: Digestible where Wrapped: Digestible {
     public func digest(into digester: inout Digester) {
         guard let value = self else { return digester.combine(bytes: Data(count: 32)) }
         value.digest(into: &digester)
+    }
+}
+
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+extension Set: Digestible where Element: Digestible {
+
+    /// Feeds each element's checksum, sorted so iteration order does not matter.
+    public func digest(into digester: inout Digester) {
+        map(\.checksum.bytes).sorted { $0.lexicographicallyPrecedes($1) }.forEach { digester.combine(bytes: $0) }
     }
 }
 

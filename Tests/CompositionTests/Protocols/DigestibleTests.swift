@@ -57,14 +57,25 @@ private struct Note: Digestible {
         #expect(try JSONDecoder().decode(Checksum.self, from: JSONEncoder().encode(checksum)) == checksum)
     }
 
-    @Test func dateMatchesItsTimeInterval() {
-        let date = Date(timeIntervalSince1970: 1_700_000_000.5)
-        #expect(date.checksum == date.timeIntervalSince1970.checksum)
+    @Test func dateMatchesPythonMicroseconds() {
+        #expect(Date(timeIntervalSince1970: 1_700_000_000.123456).checksum.description == "7319daf208645ce78f8795a741d5da8bb48f2cd01a7a55eedbd7d6539c6592c7")
+        #expect(Date(timeIntervalSince1970: 1_700_000_000.123456).checksum == 1_700_000_000_123_456.checksum)
+    }
+
+    @Test func decimalMatchesPythonNormalizedString() throws {
+        #expect(try #require(Decimal(string: "1.50")).checksum.description == "9f29a130438b81170b92a42650f9a94291ecad60bd47af2a3886e75f7f728725")
+        #expect(Decimal(100).checksum == "100".checksum)
     }
 
     @Test func decomposedStringMatchesPythonBytes() {
         #expect("caf\u{E9}".checksum.description == "850f7dc43910ff890f8879c0ed26fe697c93a067ad93a7d50f466a7028a9bf4e")
         #expect("cafe\u{301}".checksum.description == "81ef060bcd98adc7824eb5c1ada83c32491b16018e11e79f00ab9d09e04b015a")
+    }
+
+    @Test func dictionaryMatchesPythonSortedPairs() {
+        var dictionary = ["b": 2]
+        dictionary["a"] = 1
+        #expect(dictionary.checksum.description == "50d73636681fe21c1f907ba74a5d2157ad808c91057c78fc0ab57a9e0c6527f2")
     }
 
     @Test func intMatchesKnownVector() {
@@ -88,6 +99,10 @@ private struct Note: Digestible {
         let first: [String?] = [nil, "x"]
         let second: [String?] = ["x", nil]
         #expect(first.checksum != second.checksum)
+    }
+
+    @Test func setMatchesPythonSortedDigests() {
+        #expect(Set(["b", "a"]).checksum.description == "18d79cb747ea174c59f3a3b41768672526d56fecc58360a99d283d0f9b0a3cc0")
     }
 
     @Test func someMatchesWrappedValue() {

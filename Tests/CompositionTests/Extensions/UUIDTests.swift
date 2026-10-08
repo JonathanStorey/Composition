@@ -91,6 +91,10 @@ extension UUIDTests {
         #expect(try UUID(hash: "Dune") != UUID(hash: "Emma"))
     }
 
+    @Test func initHashEncodesDatesAsMicroseconds() throws {
+        #expect(try UUID(hash: Date(timeIntervalSince1970: 1_700_000_000.123456)).uuidString == "7EB5B5B3-D6BA-539C-A6B5-47A691626BBA")
+    }
+
     @Test func initHashHashesDataBytesDirectly() throws {
         let data = Data("www.example.com".utf8)
         #expect(try UUID(hash: data).uuidString == "399FC331-BE2B-5B56-B676-D6F38DAE5AAA")
@@ -103,6 +107,10 @@ extension UUIDTests {
         var second = ["b": 2]
         second["a"] = 1
         #expect(try UUID(hash: first) == UUID(hash: second))
+    }
+
+    @Test func initHashMatchesPythonForDecimals() throws {
+        #expect(try UUID(hash: #require(Decimal(string: "1.50"))).uuidString == "C254C196-2421-5FCB-91B3-D9162B42429B")
     }
 
     @Test func initHashMatchesPythonForStrings() throws {

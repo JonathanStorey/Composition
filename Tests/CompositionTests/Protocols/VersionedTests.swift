@@ -177,9 +177,23 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
         #expect([root, first, second].duplicates.map(\.body) == ["Edited"])
     }
 
+    @Test func forkCommitsModifiedParentFirst() {
+        var parent = committed("Root")
+        parent.body = "Edited"
+        let child = parent.fork { $0.body = "Child" }
+        #expect(parent.commitStatus == .committed)
+        #expect(child.isChild(of: parent))
+    }
+
+    @Test func forkCommitsUncommittedParentFirst() {
+        var parent = Page(body: "Root")
+        let child = parent.fork { $0.body = "Child" }
+        #expect(parent.commitStatus == .committed)
+        #expect(child.isChild(of: parent))
+    }
+
     @Test func forkCreatesNewClassInstance() {
         var note = Note(body: "Root")
-        note.commit()
         let child = note.fork { $0.body = "Child" }
         #expect(child !== note)
         #expect(note.body == "Root")
@@ -187,22 +201,17 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
     }
 
     @Test func forkKeepsRevisionWhenContentMatches() {
-        let root = committed("Root")
-        #expect(root.fork() == root)
+        var root = committed("Root")
+        let child = root.fork()
+        #expect(child == root)
     }
 
-    @Test func forkLeavesParentUnchanged() {
-        let root = committed("Root")
+    @Test func forkLeavesParentContentUnchanged() {
+        var root = committed("Root")
         let child = root.fork { $0.body = "Child" }
         #expect(root.body == "Root")
         #expect(root.commitStatus == .committed)
         #expect(child.isChild(of: root))
-    }
-
-    @Test func forkOfUncommittedValueMakesFirstCommit() {
-        let child = Page(body: "Root").fork()
-        #expect(child.commitStatus == .committed)
-        #expect(child.revision?.parent == nil)
     }
 
     @Test func grandchildHashDependsOnGrandparent() {

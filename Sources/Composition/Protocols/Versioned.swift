@@ -34,8 +34,9 @@ public extension Versioned {
         return version
     }
 
-    /// Returns a new instance with the changes applied and committed as a child of this value's revision.
-    func fork(_ changes: (inout Self) throws -> Void = { _ in }) rethrows -> Self {
+    /// Commits this value, then returns a new instance with the changes applied and committed as its child.
+    mutating func fork(_ changes: (inout Self) throws -> Void = { _ in }) rethrows -> Self {
+        commit()
         var child = Self.forked(from: self)
         child.revision = revision
         try child.commit(changes)

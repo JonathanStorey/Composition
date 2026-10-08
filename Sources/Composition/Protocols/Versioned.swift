@@ -12,27 +12,29 @@ public protocol Versioned: Digestible {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Versioned {
 
-    /// A Boolean value indicating whether the revision matches the current content.
-    var isCommitted: Bool {
-        revision?.content == checksum
+    /// Whether the value has never been committed, was changed after its commit, or still matches its commit.
+    var commitState: CommitState {
+        guard let revision else { return .uncommitted }
+        return revision.content == checksum ? .committed : .modified
     }
 
     /// Stamps the current content with a commit made on the parent's revision, or a first commit when there is no parent.
     mutating func commit(onto parent: Self? = nil) throws {
+        guard revision == nil else { throw CommitError.alreadyCommitted }
         revision = try Commit(committing: self, onto: parent)
     }
 
     /// Returns a Boolean value indicating whether the value was committed onto the parent's revision and both are still committed.
     func isChild(of parent: Self) -> Bool {
         guard let revision, let base = parent.revision else { return false }
-        return revision.parent == base.hash && isCommitted && parent.isCommitted
+        return revision.parent == base.hash && commitState == .committed && parent.commitState == .committed
     }
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Collection where Element: Versioned {
 
-    /// The lines of committed values from their oldest reachable commit to their newest, the branch with the most commits first and ties ordered by the newest commit's hash.
+    /// The lines of values with a revision from their oldest reachable commit to their newest, the branch with the most commits first and ties ordered by the newest commit's hash.
     var branches: [Branch<Element>] {
         let commits = Dictionary(compactMap { value in value.revision.map { ($0.hash, value) } }, uniquingKeysWith: { first, _ in first })
         let parents = Set(commits.values.compactMap { $0.revision?.parent })
@@ -46,9 +48,20 @@ public extension Collection where Element: Versioned {
         }
         return branches.sorted { $0.count > $1.count }
     }
+
+    /// The values whose commit an earlier value in the collection already carries, so they can be deleted.
+    var duplicates: [Element] {
+        var hashes: Set<Checksum> = []
+        return filter { value in value.revision.map { !hashes.insert($0.hash).inserted } ?? false }
+    }
+
+    /// The values that have never been committed, so no branch can hold them.
+    var uncommitted: [Element] {
+        filter { $0.revision == nil }
+    }
 }
 
-/// A line of committed values from the oldest reachable commit to the newest.
+/// A line of values with a revision from the oldest reachable commit to the newest.
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct Branch<V: Versioned>: RandomAccessCollection {
 
@@ -89,7 +102,11 @@ public struct Commit: Codable, Hashable, Sendable {
     public let parent: Checksum?
 
     fileprivate init<V: Versioned>(committing value: V, onto parent: V?) throws {
-        guard parent?.isCommitted ?? true else { throw CommitError.uncommittedParent }
+        switch parent?.commitState {
+        case .modified?: throw CommitError.modifiedParent
+        case .uncommitted?: throw CommitError.uncommittedParent
+        case .committed?, nil: break
+        }
         self.content = value.checksum
         self.parent = parent?.revision?.hash
     }
@@ -107,7 +124,26 @@ public struct Commit: Codable, Hashable, Sendable {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public enum CommitError: Error {
 
-    /// The parent has no revision, or its content changed after its revision was made.
+    /// The value already has a revision, so committing again would orphan the values made on it.
+    case alreadyCommitted
+
+    /// The parent's content changed after its revision was made, so its revision no longer matches it.
+    case modifiedParent
+
+    /// The parent has no revision, so there is no hash to link to.
     case uncommittedParent
+}
+
+/// Whether a value has never been committed, was changed after its commit, or still matches its commit.
+public enum CommitState: Hashable, Sendable {
+
+    /// The revision matches the current content.
+    case committed
+
+    /// The content changed after the revision was made.
+    case modified
+
+    /// The value has no revision.
+    case uncommitted
 }
 #endif

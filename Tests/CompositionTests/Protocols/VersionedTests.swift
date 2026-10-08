@@ -76,19 +76,33 @@ private func committed(_ body: String, onto parent: Page? = nil) throws -> Page 
         #expect(first.revision?.hash != second.revision?.hash)
     }
 
+    @Test func commitAgainThrows() throws {
+        var page = try committed("Root")
+        #expect(throws: CommitError.alreadyCommitted) { try page.commit() }
+        page.body = "Edited"
+        #expect(throws: CommitError.alreadyCommitted) { try page.commit() }
+    }
+
     @Test func commitIsStableForEqualContent() throws {
         let parent = try committed("Root")
         #expect(try committed("Draft", onto: parent).revision == committed("Draft", onto: parent).revision)
     }
 
-    @Test func commitOntoChangedParentThrows() throws {
+    @Test func commitOntoModifiedParentThrows() throws {
         var parent = try committed("Root")
         parent.body = "Edited"
-        #expect(throws: CommitError.uncommittedParent) { try committed("Child", onto: parent) }
+        #expect(throws: CommitError.modifiedParent) { try committed("Child", onto: parent) }
     }
 
     @Test func commitOntoUncommittedParentThrows() {
         #expect(throws: CommitError.uncommittedParent) { try committed("Child", onto: Page(body: "Root")) }
+    }
+
+    @Test func commitRecordsParentHash() throws {
+        let parent = try committed("Root")
+        let child = try committed("Child", onto: parent)
+        #expect(child.revision?.parent == parent.revision?.hash)
+        #expect(parent.revision?.parent == nil)
     }
 
     @Test func commitRoundTripsThroughCodable() throws {
@@ -97,11 +111,32 @@ private func committed(_ body: String, onto parent: Page? = nil) throws -> Page 
         #expect(decoded == revision)
     }
 
-    @Test func commitRecordsParentHash() throws {
-        let parent = try committed("Root")
-        let child = try committed("Child", onto: parent)
-        #expect(child.revision?.parent == parent.revision?.hash)
-        #expect(parent.revision?.parent == nil)
+    @Test func commitStateIsCommittedAfterCommit() throws {
+        #expect(try committed("Root").commitState == .committed)
+    }
+
+    @Test func commitStateIsModifiedAfterEdit() throws {
+        var page = try committed("Root")
+        page.body = "Edited"
+        #expect(page.commitState == .modified)
+    }
+
+    @Test func commitStateIsUncommittedBeforeFirstCommit() {
+        #expect(Page(body: "Root").commitState == .uncommitted)
+    }
+
+    @Test func duplicatesIsEmptyWithoutRepeatedCommits() throws {
+        let root = try committed("Root")
+        let child = try committed("Child", onto: root)
+        #expect([root, child, Page(body: "Draft")].duplicates.isEmpty)
+    }
+
+    @Test func duplicatesListLaterIdenticalCommits() throws {
+        let root = try committed("Root")
+        let first = try committed("Child", onto: root)
+        var second = try committed("Child", onto: root)
+        second.body = "Edited"
+        #expect([root, first, second].duplicates.map(\.body) == ["Edited"])
     }
 
     @Test func grandchildHashDependsOnGrandparent() throws {
@@ -139,18 +174,16 @@ private func committed(_ body: String, onto parent: Page? = nil) throws -> Page 
         #expect(try committed("Child", onto: parent).isChild(of: parent))
     }
 
-    @Test func isCommittedIsFalseAfterEdit() throws {
-        var page = try committed("Root")
-        page.body = "Edited"
-        #expect(!page.isCommitted)
+    @Test func uncommittedIsEmptyWhenAllCommitted() throws {
+        let root = try committed("Root")
+        #expect([root].uncommitted.isEmpty)
     }
 
-    @Test func isCommittedIsFalseBeforeFirstCommit() {
-        #expect(!Page(body: "Root").isCommitted)
-    }
-
-    @Test func isCommittedIsTrueAfterCommit() throws {
-        #expect(try committed("Root").isCommitted)
+    @Test func uncommittedListsValuesWithoutRevision() throws {
+        let root = try committed("Root")
+        var edited = try committed("Edited")
+        edited.body = "Changed"
+        #expect([root, Page(body: "Draft"), edited].uncommitted.map(\.body) == ["Draft"])
     }
 }
 #endif

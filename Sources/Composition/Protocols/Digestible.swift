@@ -42,10 +42,10 @@ extension Checksum: CustomStringConvertible {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct Digester {
 
+    private var hasher = SHA256()
+
     /// Creates an empty digester.
     public init() {}
-
-    private var hasher = SHA256()
 
     /// Feeds a digestible value into the digester.
     public mutating func combine<D: Digestible>(_ value: D) {

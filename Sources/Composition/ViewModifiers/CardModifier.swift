@@ -5,14 +5,14 @@ import SwiftUI
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 10.0, *)
 public struct CardModifier: ViewModifier {
 
+    let cornerRadius: CGFloat
+    let padding: CGFloat
+
     /// Creates a card modifier with the given corner radius and padding.
     public init(cornerRadius: CGFloat = 12, padding: CGFloat = 16) {
         self.cornerRadius = cornerRadius
         self.padding = padding
     }
-
-    let cornerRadius: CGFloat
-    let padding: CGFloat
 
     /// Applies the card styling to the content.
     public func body(content: Content) -> some View {

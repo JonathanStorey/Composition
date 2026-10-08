@@ -35,7 +35,7 @@ public extension Versioned {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Collection where Element: Versioned {
 
-    /// The lines of committed values from their oldest reachable commit to each head, newest head first.
+    /// The lines of committed values from their oldest reachable commit to their newest, newest branch first.
     var branches: [Branch<Element>] {
         let commits = Dictionary(compactMap { value in value.revision.map { ($0.hash, value) } }, uniquingKeysWith: { first, _ in first })
         let parents = Set(commits.values.compactMap { $0.revision?.parent })
@@ -61,7 +61,7 @@ public extension Collection where Element: Versioned {
     }
 }
 
-/// A line of committed values from the oldest reachable commit to a head.
+/// A line of committed values from the oldest reachable commit to the newest.
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct Branch<V: Versioned>: RandomAccessCollection {
 
@@ -76,11 +76,6 @@ public struct Branch<V: Versioned>: RandomAccessCollection {
         values.endIndex
     }
 
-    /// The newest value in the branch.
-    public var head: V {
-        values[values.index(before: values.endIndex)]
-    }
-
     /// A Boolean value indicating whether the branch reaches back to a root commit, with no ancestor missing.
     public var isComplete: Bool {
         values.first?.revision?.parent == nil
@@ -88,7 +83,7 @@ public struct Branch<V: Versioned>: RandomAccessCollection {
 
     /// The name of the repository every value in the branch belongs to.
     public var repository: String {
-        head.repository
+        values[values.startIndex].repository
     }
 
     /// The position of the oldest value.

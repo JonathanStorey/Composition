@@ -37,7 +37,8 @@ private struct Page: Equatable, Versioned {
 
 private func committed(_ body: String, onto parent: Page? = nil) -> Page {
     var page = parent ?? Page(body: body)
-    return page.commit { $0.body = body }
+    page.body = body
+    return page.commit()
 }
 
 @Suite struct VersionedTests {
@@ -114,7 +115,8 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
         let revision = page.revision
         page.commit()
         #expect(page.revision == revision)
-        page.commit { $0.body = "Root" }
+        page.body = "Root"
+        page.commit()
         #expect(page.revision == revision)
     }
 
@@ -143,7 +145,8 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
     @Test func commitUpdatesValueInPlace() {
         var page = committed("Root")
         let root = page
-        let result = page.commit { $0.body = "Child" }
+        page.body = "Child"
+        let result = page.commit()
         #expect(page.body == "Child")
         #expect(result == page)
         #expect(page.isChild(of: root))
@@ -166,21 +169,27 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
     @Test func forkCommitsModifiedParentFirst() {
         var parent = committed("Root")
         parent.body = "Edited"
-        let child = parent.fork { $0.body = "Child" }
+        var child = parent.fork()
+        child.body = "Child"
+        child.commit()
         #expect(parent.revision?.matches(parent) == true)
         #expect(child.isChild(of: parent))
     }
 
     @Test func forkCommitsUncommittedParentFirst() {
         var parent = Page(body: "Root")
-        let child = parent.fork { $0.body = "Child" }
+        var child = parent.fork()
+        child.body = "Child"
+        child.commit()
         #expect(parent.revision?.matches(parent) == true)
         #expect(child.isChild(of: parent))
     }
 
     @Test func forkCreatesNewClassInstance() {
         var note = Note(body: "Root")
-        let child = note.fork { $0.body = "Child" }
+        var child = note.fork()
+        child.body = "Child"
+        child.commit()
         #expect(child !== note)
         #expect(note.body == "Root")
         #expect(child.isChild(of: note))
@@ -194,7 +203,9 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
 
     @Test func forkLeavesParentContentUnchanged() {
         var root = committed("Root")
-        let child = root.fork { $0.body = "Child" }
+        var child = root.fork()
+        child.body = "Child"
+        child.commit()
         #expect(root.body == "Root")
         #expect(root.revision?.matches(root) == true)
         #expect(child.isChild(of: root))

@@ -8,32 +8,28 @@ public protocol Versioned: Digestible {
     /// The commit that stamps the current content, or `nil` before the first commit, which `digest(into:)` must leave out.
     var revision: Commit? { get set }
 
-    /// Returns a new instance carrying over the fields that make up a version, leaving the revision to `fork(_:)`.
+    /// Returns a new instance carrying over the fields that make up a version, leaving the revision to `fork()`.
     static func forked(from parent: Self) -> Self
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Versioned {
 
-    /// Applies the changes and commits them onto the current revision, keeping the revision when the content still matches it, and returns the result.
+    /// Commits the current content onto the current revision, keeping the revision when the content still matches it, and returns the result.
     @discardableResult
-    mutating func commit(_ changes: (inout Self) throws -> Void = { _ in }) rethrows -> Self {
-        var version = self
-        try changes(&version)
-        let content = version.checksum
+    mutating func commit() -> Self {
+        let content = checksum
         if content != revision?.content {
-            version.revision = Commit(content: content, parent: revision?.hash)
+            revision = Commit(content: content, parent: revision?.hash)
         }
-        self = version
-        return version
+        return self
     }
 
-    /// Commits this value, then returns a new instance with the changes applied and committed as its child.
-    mutating func fork(_ changes: (inout Self) throws -> Void = { _ in }) rethrows -> Self {
+    /// Commits this value, then returns a new instance that shares its revision until the new instance is edited and committed.
+    mutating func fork() -> Self {
         commit()
         var child = Self.forked(from: self)
         child.revision = revision
-        try child.commit(changes)
         return child
     }
 

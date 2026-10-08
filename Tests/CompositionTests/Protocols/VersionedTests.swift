@@ -23,6 +23,45 @@ private func committed(_ body: String, onto parent: Page? = nil, repository: Str
 
 @Suite struct VersionedTests {
 
+    @Test func branchesAreEmptyWithoutCommits() {
+        #expect([Page(body: "A"), Page(body: "B")].branches.isEmpty)
+    }
+
+    @Test func branchesAreIncompleteWhenAncestorIsMissing() throws {
+        let parent = try committed("Parent", onto: committed("Root"))
+        let child = try committed("Child", onto: parent)
+        let branches = [child, parent].branches
+        #expect(branches.count == 1)
+        #expect(branches.first?.map(\.body) == ["Parent", "Child"])
+        #expect(branches.first?.isComplete == false)
+    }
+
+    @Test func branchesCollapseIdenticalCommits() throws {
+        let root = try committed("Root")
+        let first = try committed("Child", onto: root)
+        let second = try committed("Child", onto: root)
+        #expect([root, first, second].branches.count == 1)
+    }
+
+    @Test func branchesFollowParentsFromRootToHead() throws {
+        let root = try committed("Root")
+        let parent = try committed("Parent", onto: root)
+        let child = try committed("Child", onto: parent)
+        let branches = [child, root, parent].branches
+        #expect(branches.count == 1)
+        #expect(branches.first?.map(\.body) == ["Root", "Parent", "Child"])
+        #expect(branches.first?.head.body == "Child")
+        #expect(branches.first?.isComplete == true)
+    }
+
+    @Test func branchesSplitAtForkNewestHeadFirst() throws {
+        let root = try committed("Root")
+        let older = try committed("Older", onto: root)
+        let newer = try committed("Newer", onto: root)
+        let branches = [root, older, newer].branches
+        #expect(branches.map { $0.map(\.body) } == [["Root", "Newer"], ["Root", "Older"]])
+    }
+
     @Test func childHashDependsOnParent() throws {
         let first = try committed("Child", onto: committed("A"))
         let second = try committed("Child", onto: committed("B"))

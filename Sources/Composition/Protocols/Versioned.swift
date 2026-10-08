@@ -25,19 +25,26 @@ public extension Versioned {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct Commit: Codable, Hashable, Sendable {
 
+    fileprivate let content: Checksum
+
+    /// The checksum of the content, the parent's hash, and the repository name.
+    public let hash: Checksum
+
+    fileprivate let parent: Checksum?
+    
     private init(content: Checksum, parent: Checksum?, repository name: String) {
         self.content = content
         self.hash = Self.hash(content: content, parent: parent, repository: name)
         self.parent = parent
     }
 
-    fileprivate init<V: Versioned>(_ child: V, parent: V?, repository name: String) throws {
+    fileprivate init<V: Versioned>(content: V, parent: V?, repository name: String) throws {
         if let parent {
             guard let base = parent.revision else { throw CommitError.uncommittedParent }
             guard parent.repository == name else { throw CommitError.differentRepository }
             guard base.isIntact(for: parent) else { throw CommitError.expiredParent }
         }
-        self.init(content: child.checksum, parent: parent?.revision?.hash, repository: name)
+        self.init(content: content.checksum, parent: parent?.revision?.hash, repository: name)
     }
 
     private static func hash(content: Checksum, parent: Checksum?, repository name: String) -> Checksum {
@@ -47,13 +54,6 @@ public struct Commit: Codable, Hashable, Sendable {
         digester.combine(name)
         return digester.finalize()
     }
-
-    fileprivate let content: Checksum
-
-    /// The checksum of the content, the parent's hash, and the repository name.
-    public let hash: Checksum
-
-    fileprivate let parent: Checksum?
 
     fileprivate func isIntact<V: Versioned>(for value: V) -> Bool {
         content == value.checksum && hash == Self.hash(content: content, parent: parent, repository: value.repository)

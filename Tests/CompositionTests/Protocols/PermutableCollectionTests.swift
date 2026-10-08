@@ -27,14 +27,26 @@ private struct Deck: PermutableCollection {
         #expect(deck.cards == ["a", "b", "c"])
     }
 
+    @Test func increasingOffsetsAreFixedPoints() throws {
+        var deck = Deck(cards: ["a", "b", "c"])
+        deck.permute(using: try #require(Permutation(cycle: [0, 1, 2])))
+        #expect(deck.cards == ["a", "b", "c"])
+    }
+
     @Test func invalidCycleReturnsNil() {
         #expect(Permutation(cycle: [0, 2, 0]) == nil)
         #expect(Permutation(cycle: [-1, 1]) == nil)
     }
 
+    @Test func permuteAppliesEachCycleInTheLine() throws {
+        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        deck.permute(using: try #require(Permutation(cycle: [2, 0, 1, 4, 3])))
+        #expect(deck.cards == ["c", "a", "b", "e", "d"])
+    }
+
     @Test func permuteAppliesToLongerCollections() throws {
         var deck = Deck(cards: ["a", "b", "c", "d", "e"])
-        deck.permute(using: try #require(Permutation(cycle: [0, 1, 2])))
+        deck.permute(using: try #require(Permutation(cycle: [2, 0, 1])))
         #expect(deck.cards == ["c", "a", "b", "d", "e"])
     }
 
@@ -42,11 +54,5 @@ private struct Deck: PermutableCollection {
         var deck = Deck(cards: ["a", "b", "c", "d"])
         deck.permute(using: try #require(Permutation(cycle: [3, 0, 2])))
         #expect(deck.cards == ["d", "b", "a", "c"])
-    }
-
-    @Test func singleOffsetLeavesOrderUnchanged() throws {
-        var deck = Deck(cards: ["a", "b"])
-        deck.permute(using: try #require(Permutation(cycle: [1])))
-        #expect(deck.cards == ["a", "b"])
     }
 }

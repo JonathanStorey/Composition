@@ -217,6 +217,20 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
         #expect(first.revision?.hash != second.revision?.hash)
     }
 
+    @Test func hasUncommittedChangesIsFalseAfterCommit() {
+        #expect(!committed("Root").hasUncommittedChanges)
+    }
+
+    @Test func hasUncommittedChangesIsTrueAfterEdit() {
+        var page = committed("Root")
+        page.body = "Edited"
+        #expect(page.hasUncommittedChanges)
+    }
+
+    @Test func hasUncommittedChangesIsTrueBeforeFirstCommit() {
+        #expect(Page(body: "Root").hasUncommittedChanges)
+    }
+
     @Test func hashChangesWhenContentChanges() {
         #expect(committed("A").revision?.hash != committed("B").revision?.hash)
     }

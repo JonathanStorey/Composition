@@ -7,20 +7,11 @@ public protocol PermutableCollection: MutableCollection {
 
 public extension PermutableCollection {
 
-    /// Rotates each cycle with one `swapAt(_:_:)` per offset that does not start a cycle, which is the minimal number of swaps.
+    /// Applies the permutation with the minimal number of `swapAt(_:_:)` calls, one per offset that does not start a cycle.
     mutating func permute(using permutation: Permutation) {
         guard let largest = permutation.cycle.max() else { return }
         precondition(largest < count, "Every offset in the cycle must be within the collection.")
-        var anchor = startIndex
-        var start = -1
-        for offset in permutation.cycle {
-            if offset > start {
-                start = offset
-                anchor = index(startIndex, offsetBy: offset)
-            } else {
-                swapAt(anchor, index(startIndex, offsetBy: offset))
-            }
-        }
+        permutation.swapping { swapAt(index(startIndex, offsetBy: $0), index(startIndex, offsetBy: $1)) }
     }
 }
 
@@ -34,5 +25,17 @@ public struct Permutation: Hashable, Sendable {
     public init?(cycle: [Int]) {
         guard cycle.allSatisfy({ $0 >= 0 }), Set(cycle).count == cycle.count else { return nil }
         self.cycle = cycle
+    }
+
+    /// Calls the closure with each pair of offsets to swap, in order, deriving them in one pass with no allocation.
+    public func swapping(_ body: (Int, Int) throws -> Void) rethrows {
+        var start = -1
+        for offset in cycle {
+            if offset > start {
+                start = offset
+            } else {
+                try body(start, offset)
+            }
+        }
     }
 }

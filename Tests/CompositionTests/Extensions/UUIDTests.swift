@@ -107,14 +107,12 @@ extension UUIDTests {
 
     @Test func initHashMatchesPythonForStrings() throws {
         #expect(try UUID(hash: "Hello, World!").uuidString == "64DC4AC1-4A83-5B25-AABB-3603762EE2E3")
+        #expect(try UUID(hash: "caf\u{E9}").uuidString == "5ACA2037-E489-53A0-8A86-3CAB62A1217C")
+        #expect(try UUID(hash: "cafe\u{301}").uuidString == "7BF98B1B-D239-5B21-800B-BC2A5EAD565F")
     }
 
     @Test func initHashMatchesSortedJSON() throws {
         #expect(try UUID(hash: ["b": 2, "a": 1]).uuidString == "6FB42BB7-64C6-545B-BB52-552962F36259")
-    }
-
-    @Test func initHashNormalizesEquivalentStrings() throws {
-        #expect(try UUID(hash: "caf\u{E9}") == UUID(hash: "cafe\u{301}"))
     }
 
     @Test func initHashSetsVersionAndVariant() throws {

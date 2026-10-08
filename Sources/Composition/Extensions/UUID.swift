@@ -65,11 +65,11 @@ public extension UUID {
 
     /// Creates a version 5 UUID from the value's contents, so equal values with the same namespace always give the same UUID.
     init(hash value: some Encodable, namespace salt: String? = nil) throws {
-        let namespace = salt.map { UUID(name: Data($0.precomposedStringWithCanonicalMapping.utf8), namespace: .zero) } ?? .zero
+        let namespace = salt.map { UUID(name: Data($0.utf8), namespace: .zero) } ?? .zero
         if let data = value as? Data {
             self.init(name: data, namespace: namespace)
         } else if let string = value as? String {
-            self.init(name: Data(string.precomposedStringWithCanonicalMapping.utf8), namespace: namespace)
+            self.init(name: Data(string.utf8), namespace: namespace)
         } else {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]

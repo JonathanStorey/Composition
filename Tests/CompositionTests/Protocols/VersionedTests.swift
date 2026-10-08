@@ -50,7 +50,7 @@ private func committed(_ body: String, onto parent: Page? = nil, repository: Str
         let branches = [child, root, parent].branches
         #expect(branches.count == 1)
         #expect(branches.first?.map(\.body) == ["Root", "Parent", "Child"])
-        #expect(branches.first?.head.body == "Child")
+        #expect(branches.first?.last?.body == "Child")
         #expect(branches.first?.isComplete == true)
     }
 

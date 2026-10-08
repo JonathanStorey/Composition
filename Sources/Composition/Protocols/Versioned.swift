@@ -86,6 +86,11 @@ public struct Branch<V: Versioned>: RandomAccessCollection {
         values.first?.revision?.parent == nil
     }
 
+    /// The name of the repository every value in the branch belongs to.
+    public var repository: String {
+        head.repository
+    }
+
     /// The position of the oldest value.
     public var startIndex: Int {
         values.startIndex

@@ -6,6 +6,9 @@ import Foundation
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public protocol Digestible {
 
+    /// The SHA-256 checksum of the value's content, identical on every device and every launch.
+    var checksum: Checksum { get }
+
     /// Feeds the value's content into the digester.
     func digest(into digester: inout Digester)
 }
@@ -84,6 +87,9 @@ extension Bool: Digestible {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Checksum: Digestible {
 
+    /// The checksum itself, so a checksum is never hashed again.
+    public var checksum: Checksum { self }
+
     /// Feeds the raw bytes.
     public func digest(into digester: inout Digester) {
         digester.combine(bytes: bytes)
@@ -128,6 +134,11 @@ extension Int: Digestible {
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Optional: Digestible where Wrapped: Digestible {
+
+    /// The wrapped value's checksum, or 32 zero bytes when there is none.
+    public var checksum: Checksum {
+        self?.checksum ?? Checksum(bytes: Data(count: 32))
+    }
 
     /// Feeds the wrapped value unchanged, or 32 zero bytes when there is none.
     public func digest(into digester: inout Digester) {

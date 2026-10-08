@@ -37,8 +37,10 @@ private struct Note: Digestible {
         #expect(first.checksum != second.checksum)
     }
 
-    @Test func checksumIsDigestible() {
-        #expect("abc".checksum.checksum != "abc".checksum)
+    @Test func checksumIsItsOwnChecksum() {
+        let checksum = "abc".checksum
+        #expect(checksum.checksum == checksum)
+        #expect(String?.some("abc").checksum.checksum == checksum)
     }
 
     @Test func checksumIsStableForEqualValues() {
@@ -71,6 +73,15 @@ private struct Note: Digestible {
 
     @Test func nilDiffersFromEmptyValue() {
         #expect(String?.none.checksum != String?.some("").checksum)
+    }
+
+    @Test func nilIsZeroBlock() {
+        #expect(String?.none.checksum.bytes == Data(count: 32))
+    }
+
+    @Test func optionalArrayMatchesPython() {
+        let values: [String?] = [nil, "a"]
+        #expect(values.checksum.description == "8c374a53782642f7514d087d26a3e733f1b806009a03e04a43b288ef2fa9f9c0")
     }
 
     @Test func optionalPositionChangesChecksum() {

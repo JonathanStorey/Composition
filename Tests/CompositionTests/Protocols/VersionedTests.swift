@@ -5,9 +5,7 @@ import Testing
 
 private struct Page: Versioned {
 
-    let timestamp = UUID.timestamp
     var body: String
-    var repository = "Notes"
     var revision: Commit?
 
     func digest(into digester: inout Digester) {
@@ -15,8 +13,8 @@ private struct Page: Versioned {
     }
 }
 
-private func committed(_ body: String, onto parent: Page? = nil, repository: String = "Notes") throws -> Page {
-    var page = Page(body: body, repository: repository)
+private func committed(_ body: String, onto parent: Page? = nil) throws -> Page {
+    var page = Page(body: body)
     page.revision = try page.commit(onto: parent)
     return page
 }
@@ -54,18 +52,13 @@ private func committed(_ body: String, onto parent: Page? = nil, repository: Str
         #expect(branches.first?.isComplete == true)
     }
 
-    @Test func branchesKeepTheirRepository() throws {
-        let notes = try committed("Child", onto: committed("Root", repository: "Notes"), repository: "Notes")
-        let drafts = try committed("Draft", repository: "Drafts")
-        #expect(Set([notes, drafts].branches.map(\.repository)) == ["Notes", "Drafts"])
-    }
-
-    @Test func branchesSplitAtForkNewestHeadFirst() throws {
+    @Test func branchesSortMostCommitsFirst() throws {
         let root = try committed("Root")
-        let older = try committed("Older", onto: root)
-        let newer = try committed("Newer", onto: root)
-        let branches = [root, older, newer].branches
-        #expect(branches.map { $0.map(\.body) } == [["Root", "Newer"], ["Root", "Older"]])
+        let short = try committed("Short", onto: root)
+        let middle = try committed("Middle", onto: root)
+        let long = try committed("Long", onto: middle)
+        let branches = [short, root, long, middle].branches
+        #expect(branches.map { $0.map(\.body) } == [["Root", "Middle", "Long"], ["Root", "Short"]])
     }
 
     @Test func childHashDependsOnParent() throws {
@@ -83,17 +76,6 @@ private func committed(_ body: String, onto parent: Page? = nil, repository: Str
         var parent = try committed("Root")
         parent.body = "Edited"
         #expect(throws: CommitError.expiredParent) { try committed("Child", onto: parent) }
-    }
-
-    @Test func commitOntoParentFromAnotherRepositoryThrows() throws {
-        let parent = try committed("Root", repository: "Other")
-        #expect(throws: CommitError.differentRepository) { try committed("Child", onto: parent) }
-    }
-
-    @Test func commitOntoRenamedParentThrows() throws {
-        var parent = try committed("Root")
-        parent.repository = "Renamed"
-        #expect(throws: CommitError.expiredParent) { try committed("Child", onto: parent, repository: "Renamed") }
     }
 
     @Test func commitOntoUncommittedParentThrows() {
@@ -114,17 +96,6 @@ private func committed(_ body: String, onto parent: Page? = nil, repository: Str
 
     @Test func hashChangesWhenContentChanges() throws {
         #expect(try committed("A").revision?.hash != committed("B").revision?.hash)
-    }
-
-    @Test func hashChangesWhenRepositoryChanges() throws {
-        #expect(try committed("Root", repository: "A").revision?.hash != committed("Root", repository: "B").revision?.hash)
-    }
-
-    @Test func hashIgnoresTimestamp() throws {
-        let first = try committed("Root")
-        let second = try committed("Root")
-        #expect(first.timestamp != second.timestamp)
-        #expect(first.revision?.hash == second.revision?.hash)
     }
 
     @Test func isChildIsFalseForGrandparent() throws {
@@ -158,39 +129,12 @@ private func committed(_ body: String, onto parent: Page? = nil, repository: Str
         #expect(!page.isCommitted)
     }
 
-    @Test func isCommittedIsFalseAfterRepositoryRename() throws {
-        var page = try committed("Root")
-        page.repository = "Renamed"
-        #expect(!page.isCommitted)
-    }
-
     @Test func isCommittedIsFalseBeforeFirstCommit() {
         #expect(!Page(body: "Root").isCommitted)
     }
 
     @Test func isCommittedIsTrueAfterCommit() throws {
         #expect(try committed("Root").isCommitted)
-    }
-
-    @Test func repositoriesGroupsValuesByName() {
-        let pages = [Page(body: "A", repository: "One"), Page(body: "B", repository: "Two"), Page(body: "C", repository: "One")]
-        let repositories = pages.repositories
-        #expect(repositories.keys.sorted() == ["One", "Two"])
-        #expect(repositories["One"]?.map(\.body) == ["A", "C"])
-        #expect(repositories["Two"]?.map(\.body) == ["B"])
-    }
-
-    @Test func repositoriesIsEmptyForEmptyCollection() {
-        #expect([Page]().repositories.isEmpty)
-    }
-
-    @Test func subscriptIsEmptyForUnknownRepository() {
-        #expect([Page(body: "A")][repository: "Missing"].isEmpty)
-    }
-
-    @Test func subscriptReturnsValuesInRepository() {
-        let pages = [Page(body: "A", repository: "One"), Page(body: "B", repository: "Two"), Page(body: "C", repository: "One")]
-        #expect(pages[repository: "One"].map(\.body) == ["A", "C"])
     }
 }
 #endif

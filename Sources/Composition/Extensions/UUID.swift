@@ -12,13 +12,22 @@ public extension UUID {
         self.init(unixTime: unixTime)
     }
 
+    /// The max UUID, with all 128 bits set to one.
+    static let max = UUID(uuid: (0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF))
+
     /// A new version 7 UUID for the current time, with sub-millisecond precision so values sort by creation time.
     static var timestamp: UUID {
-        UUID(unixTime: max(0, Date().timeIntervalSince1970))
+        UUID(unixTime: Swift.max(0, Date().timeIntervalSince1970))
     }
 
     /// The nil UUID, with all 128 bits set to zero.
     static let zero = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+
+    /// The RFC 9562 version number, or `nil` when the UUID does not use the RFC 9562 variant.
+    var version: Int? {
+        guard uuid.8 & 0xC0 == 0x80 else { return nil }
+        return Int(uuid.6 >> 4)
+    }
 }
 
 private extension UUID {

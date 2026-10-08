@@ -113,6 +113,10 @@ extension UUIDTests {
         #expect(try UUID(hash: #require(Decimal(string: "1.50"))).uuidString == "C254C196-2421-5FCB-91B3-D9162B42429B")
     }
 
+    @Test func initHashMatchesPythonForDoubles() throws {
+        #expect(try UUID(hash: 1.0).uuidString == "39F5872F-53B0-5633-A5BE-88647972D3B0")
+    }
+
     @Test func initHashMatchesPythonForStrings() throws {
         #expect(try UUID(hash: "Hello, World!").uuidString == "64DC4AC1-4A83-5B25-AABB-3603762EE2E3")
         #expect(try UUID(hash: "caf\u{E9}").uuidString == "5ACA2037-E489-53A0-8A86-3CAB62A1217C")

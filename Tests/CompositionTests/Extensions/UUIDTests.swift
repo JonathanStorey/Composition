@@ -82,66 +82,66 @@ import Foundation
 #if canImport(CryptoKit) && canImport(Foundation)
 extension UUIDTests {
 
-    @Test func initHashDiffersByNamespace() throws {
-        #expect(try UUID(hash: "Dune") != UUID(hash: "Dune", namespace: UUID(hash: "Book")))
-        #expect(try UUID(hash: "Dune", namespace: UUID(hash: "Author")) != UUID(hash: "Dune", namespace: UUID(hash: "Book")))
+    @Test func initHashDiffersByNamespace() {
+        #expect(UUID(hash: "Dune") != UUID(hash: "Dune", namespace: UUID(hash: "Book")))
+        #expect(UUID(hash: "Dune", namespace: UUID(hash: "Author")) != UUID(hash: "Dune", namespace: UUID(hash: "Book")))
     }
 
-    @Test func initHashDiffersByValue() throws {
-        #expect(try UUID(hash: "Dune") != UUID(hash: "Emma"))
+    @Test func initHashDiffersByValue() {
+        #expect(UUID(hash: "Dune") != UUID(hash: "Emma"))
     }
 
-    @Test func initHashEncodesDatesAsMicroseconds() throws {
-        #expect(try UUID(hash: Date(timeIntervalSince1970: 1_700_000_000.123456)).uuidString == "7EB5B5B3-D6BA-539C-A6B5-47A691626BBA")
+    @Test func initHashEncodesDatesAsMicroseconds() {
+        #expect(UUID(hash: Date(timeIntervalSince1970: 1_700_000_000.123456)).uuidString == "7EB5B5B3-D6BA-539C-A6B5-47A691626BBA")
     }
 
-    @Test func initHashHashesDataBytesDirectly() throws {
+    @Test func initHashHashesDataBytesDirectly() {
         let data = Data("www.example.com".utf8)
-        #expect(try UUID(hash: data).uuidString == "399FC331-BE2B-5B56-B676-D6F38DAE5AAA")
-        #expect(try UUID(hash: data, namespace: UUID(hash: "Image")).uuidString == "B2FB507C-C942-58E2-AB1C-C6A61418C3FB")
+        #expect(UUID(hash: data).uuidString == "399FC331-BE2B-5B56-B676-D6F38DAE5AAA")
+        #expect(UUID(hash: data, namespace: UUID(hash: "Image")).uuidString == "B2FB507C-C942-58E2-AB1C-C6A61418C3FB")
     }
 
-    @Test func initHashIgnoresKeyOrder() throws {
+    @Test func initHashIgnoresKeyOrder() {
         var first = ["a": 1]
         first["b"] = 2
         var second = ["b": 2]
         second["a"] = 1
-        #expect(try UUID(hash: first) == UUID(hash: second))
+        #expect(UUID(hash: first) == UUID(hash: second))
     }
 
     @Test func initHashMatchesPythonForDecimals() throws {
         #expect(try UUID(hash: #require(Decimal(string: "1.50"))).uuidString == "C254C196-2421-5FCB-91B3-D9162B42429B")
     }
 
-    @Test func initHashMatchesPythonForDoubles() throws {
-        #expect(try UUID(hash: 1.0).uuidString == "39F5872F-53B0-5633-A5BE-88647972D3B0")
+    @Test func initHashMatchesPythonForDoubles() {
+        #expect(UUID(hash: 1.0).uuidString == "39F5872F-53B0-5633-A5BE-88647972D3B0")
     }
 
-    @Test func initHashMatchesPythonForStrings() throws {
-        #expect(try UUID(hash: "Hello, World!").uuidString == "64DC4AC1-4A83-5B25-AABB-3603762EE2E3")
-        #expect(try UUID(hash: "caf\u{E9}").uuidString == "5ACA2037-E489-53A0-8A86-3CAB62A1217C")
-        #expect(try UUID(hash: "cafe\u{301}").uuidString == "7BF98B1B-D239-5B21-800B-BC2A5EAD565F")
+    @Test func initHashMatchesPythonForStrings() {
+        #expect(UUID(hash: "Hello, World!").uuidString == "64DC4AC1-4A83-5B25-AABB-3603762EE2E3")
+        #expect(UUID(hash: "caf\u{E9}").uuidString == "5ACA2037-E489-53A0-8A86-3CAB62A1217C")
+        #expect(UUID(hash: "cafe\u{301}").uuidString == "7BF98B1B-D239-5B21-800B-BC2A5EAD565F")
     }
 
-    @Test func initHashMatchesSortedJSON() throws {
-        #expect(try UUID(hash: ["b": 2, "a": 1]).uuidString == "6FB42BB7-64C6-545B-BB52-552962F36259")
+    @Test func initHashMatchesSortedJSON() {
+        #expect(UUID(hash: ["b": 2, "a": 1]).uuidString == "6FB42BB7-64C6-545B-BB52-552962F36259")
     }
 
-    @Test func initHashNamesNamespaceWithString() throws {
-        #expect(try UUID(hash: "Dune", namespace: "Book").uuidString == "3DE9C471-B66E-5911-A3C8-F4DDE71C6576")
-        #expect(try UUID(hash: "Dune", namespace: "Book") == UUID(hash: "Dune", namespace: UUID(hash: "Book")))
-        #expect(try UUID(hash: "Dune", namespace: "") == UUID(hash: "Dune", namespace: UUID(hash: "")))
+    @Test func initHashNamesNamespaceWithString() {
+        #expect(UUID(hash: "Dune", namespace: "Book").uuidString == "3DE9C471-B66E-5911-A3C8-F4DDE71C6576")
+        #expect(UUID(hash: "Dune", namespace: "Book") == UUID(hash: "Dune", namespace: UUID(hash: "Book")))
+        #expect(UUID(hash: "Dune", namespace: "") == UUID(hash: "Dune", namespace: UUID(hash: "")))
     }
 
-    @Test func initHashSetsVersionAndVariant() throws {
-        let characters = try Array(UUID(hash: "Dune").uuidString)
+    @Test func initHashSetsVersionAndVariant() {
+        let characters = Array(UUID(hash: "Dune").uuidString)
         #expect(characters[14] == "5")
         #expect("89AB".contains(characters[19]))
     }
 
     @Test func initHashUsesStandardNamespaces() throws {
         let dns = try #require(UUID(uuidString: "6BA7B810-9DAD-11D1-80B4-00C04FD430C8"))
-        #expect(try UUID(hash: "www.example.com", namespace: dns).uuidString == "2ED6657D-E927-568B-95E1-2665A8AEA6A2")
+        #expect(UUID(hash: "www.example.com", namespace: dns).uuidString == "2ED6657D-E927-568B-95E1-2665A8AEA6A2")
     }
 
     @Test func initNameMatchesRFC9562Example() throws {

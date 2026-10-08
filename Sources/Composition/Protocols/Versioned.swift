@@ -35,6 +35,21 @@ public extension Versioned {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Collection where Element: Versioned {
 
+    /// The lines of committed values from their oldest reachable commit to each head, newest head first.
+    var branches: [Branch<Element>] {
+        let commits = Dictionary(compactMap { value in value.revision.map { ($0.hash, value) } }, uniquingKeysWith: { first, _ in first })
+        let parents = Set(commits.values.compactMap { $0.revision?.parent })
+        let heads = commits.filter { !parents.contains($0.key) }.values.sorted { $0.timestamp.uuidString > $1.timestamp.uuidString }
+        return heads.map { head in
+            var values = [head]
+            var visited: Set<Checksum> = []
+            while let parent = values.last?.revision?.parent, visited.insert(parent).inserted, let value = commits[parent] {
+                values.append(value)
+            }
+            return Branch(values: values.reversed())
+        }
+    }
+
     /// The values grouped by repository name.
     var repositories: [String: [Element]] {
         Dictionary(grouping: self, by: \.repository)
@@ -43,6 +58,42 @@ public extension Collection where Element: Versioned {
     /// The values in the named repository.
     subscript(repository name: String) -> [Element] {
         filter { $0.repository == name }
+    }
+}
+
+/// A line of committed values from the oldest reachable commit to a head.
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+public struct Branch<V: Versioned>: RandomAccessCollection {
+
+    private let values: [V]
+
+    fileprivate init(values: [V]) {
+        self.values = values
+    }
+
+    /// The position one past the last value.
+    public var endIndex: Int {
+        values.endIndex
+    }
+
+    /// The newest value in the branch.
+    public var head: V {
+        values[values.index(before: values.endIndex)]
+    }
+
+    /// A Boolean value indicating whether the branch reaches back to a root commit, with no ancestor missing.
+    public var isComplete: Bool {
+        values.first?.revision?.parent == nil
+    }
+
+    /// The position of the oldest value.
+    public var startIndex: Int {
+        values.startIndex
+    }
+
+    /// Accesses the value at the position, ordered from oldest to newest.
+    public subscript(position: Int) -> V {
+        values[position]
     }
 }
 

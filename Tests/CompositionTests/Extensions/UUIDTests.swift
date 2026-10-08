@@ -113,6 +113,10 @@ extension UUIDTests {
         #expect(try UUID(hash: ["b": 2, "a": 1]).uuidString == "6FB42BB7-64C6-545B-BB52-552962F36259")
     }
 
+    @Test func initHashNormalizesEquivalentStrings() throws {
+        #expect(try UUID(hash: "caf\u{E9}") == UUID(hash: "cafe\u{301}"))
+    }
+
     @Test func initHashSetsVersionAndVariant() throws {
         let characters = try Array(UUID(hash: "Dune").uuidString)
         #expect(characters[14] == "5")

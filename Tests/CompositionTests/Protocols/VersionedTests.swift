@@ -123,7 +123,7 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
         let previous = page.revision
         page.body = "Edited"
         page.commit()
-        #expect(page.commitStatus == .committed)
+        #expect(page.revision?.matches(page) == true)
         #expect(page.revision?.parent == previous?.hash)
     }
 
@@ -138,20 +138,6 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
         let revision = try #require(committed("Root").revision)
         let decoded = try JSONDecoder().decode(Commit.self, from: JSONEncoder().encode(revision))
         #expect(decoded == revision)
-    }
-
-    @Test func commitStatusIsCommittedAfterCommit() {
-        #expect(committed("Root").commitStatus == .committed)
-    }
-
-    @Test func commitStatusIsModifiedAfterEdit() {
-        var page = committed("Root")
-        page.body = "Edited"
-        #expect(page.commitStatus == .modified)
-    }
-
-    @Test func commitStatusIsUncommittedBeforeFirstCommit() {
-        #expect(Page(body: "Root").commitStatus == .uncommitted)
     }
 
     @Test func commitUpdatesValueInPlace() {
@@ -181,14 +167,14 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
         var parent = committed("Root")
         parent.body = "Edited"
         let child = parent.fork { $0.body = "Child" }
-        #expect(parent.commitStatus == .committed)
+        #expect(parent.revision?.matches(parent) == true)
         #expect(child.isChild(of: parent))
     }
 
     @Test func forkCommitsUncommittedParentFirst() {
         var parent = Page(body: "Root")
         let child = parent.fork { $0.body = "Child" }
-        #expect(parent.commitStatus == .committed)
+        #expect(parent.revision?.matches(parent) == true)
         #expect(child.isChild(of: parent))
     }
 
@@ -210,7 +196,7 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
         var root = committed("Root")
         let child = root.fork { $0.body = "Child" }
         #expect(root.body == "Root")
-        #expect(root.commitStatus == .committed)
+        #expect(root.revision?.matches(root) == true)
         #expect(child.isChild(of: root))
     }
 
@@ -247,6 +233,22 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
     @Test func isChildIsTrueForDirectChild() {
         let parent = committed("Root")
         #expect(committed("Child", onto: parent).isChild(of: parent))
+    }
+
+    @Test func matchesIsFalseAfterEdit() {
+        var page = committed("Root")
+        page.body = "Edited"
+        #expect(page.revision?.matches(page) == false)
+    }
+
+    @Test func matchesIsNilBeforeFirstCommit() {
+        let page = Page(body: "Root")
+        #expect(page.revision?.matches(page) == nil)
+    }
+
+    @Test func matchesIsTrueAfterCommit() {
+        let page = committed("Root")
+        #expect(page.revision?.matches(page) == true)
     }
 
     @Test func uncommittedIsEmptyWhenAllCommitted() {

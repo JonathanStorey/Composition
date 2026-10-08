@@ -83,8 +83,8 @@ import Foundation
 extension UUIDTests {
 
     @Test func initHashDiffersByNamespace() throws {
-        #expect(try UUID(hash: "Dune") != UUID(hash: "Dune", namespace: "Book"))
-        #expect(try UUID(hash: "Dune", namespace: "Author") != UUID(hash: "Dune", namespace: "Book"))
+        #expect(try UUID(hash: "Dune") != UUID(hash: "Dune", namespace: UUID(hash: "Book")))
+        #expect(try UUID(hash: "Dune", namespace: UUID(hash: "Author")) != UUID(hash: "Dune", namespace: UUID(hash: "Book")))
     }
 
     @Test func initHashDiffersByValue() throws {
@@ -94,7 +94,7 @@ extension UUIDTests {
     @Test func initHashHashesDataBytesDirectly() throws {
         let data = Data("www.example.com".utf8)
         #expect(try UUID(hash: data).uuidString == "399FC331-BE2B-5B56-B676-D6F38DAE5AAA")
-        #expect(try UUID(hash: data, namespace: "Image").uuidString == "B2FB507C-C942-58E2-AB1C-C6A61418C3FB")
+        #expect(try UUID(hash: data, namespace: UUID(hash: "Image")).uuidString == "B2FB507C-C942-58E2-AB1C-C6A61418C3FB")
     }
 
     @Test func initHashIgnoresKeyOrder() throws {
@@ -119,6 +119,11 @@ extension UUIDTests {
         let characters = try Array(UUID(hash: "Dune").uuidString)
         #expect(characters[14] == "5")
         #expect("89AB".contains(characters[19]))
+    }
+
+    @Test func initHashUsesStandardNamespaces() throws {
+        let dns = try #require(UUID(uuidString: "6BA7B810-9DAD-11D1-80B4-00C04FD430C8"))
+        #expect(try UUID(hash: "www.example.com", namespace: dns).uuidString == "2ED6657D-E927-568B-95E1-2665A8AEA6A2")
     }
 
     @Test func initNameMatchesRFC9562Example() throws {

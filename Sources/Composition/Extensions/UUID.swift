@@ -64,8 +64,7 @@ import Foundation
 public extension UUID {
 
     /// Creates a version 5 UUID from the value's contents, so equal values with the same namespace always give the same UUID.
-    init(hash value: some Encodable, namespace salt: String? = nil) throws {
-        let namespace = salt.map { UUID(name: Data($0.utf8), namespace: .zero) } ?? .zero
+    init(hash value: some Encodable, namespace: UUID = .zero) throws {
         if let data = value as? Data {
             self.init(name: data, namespace: namespace)
         } else if let string = value as? String {

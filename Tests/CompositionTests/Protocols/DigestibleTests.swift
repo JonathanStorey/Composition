@@ -56,8 +56,9 @@ private struct Note: Digestible {
         #expect(date.checksum == date.timeIntervalSince1970.checksum)
     }
 
-    @Test func equivalentUnicodeFormsMatch() {
-        #expect("\u{E9}".checksum == "e\u{301}".checksum)
+    @Test func decomposedStringMatchesPythonBytes() {
+        #expect("caf\u{E9}".checksum.description == "8c348292948bf150158c9b1055e967f25713c372b7f59ba82e083d6290a51087")
+        #expect("cafe\u{301}".checksum.description == "2fa00897b1fd88c07d191c1c259c8c36127bfd0c41d5a8dc87519ce631532e0c")
     }
 
     @Test func intMatchesKnownVector() {

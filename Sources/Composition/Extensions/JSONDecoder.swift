@@ -8,6 +8,7 @@ public extension JSONDecoder {
         let decoder = JSONDecoder()
         switch compatibility {
         case .python:
+            decoder.allowsJSON5 = true
             decoder.dateDecodingStrategy = .custom { dateDecoder in
                 let microseconds = try dateDecoder.singleValueContainer().decode(Int64.self)
                 return Date(timeIntervalSince1970: Double(microseconds) / 1_000_000)

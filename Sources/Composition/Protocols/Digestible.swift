@@ -47,14 +47,13 @@ public struct Digester {
     /// Creates an empty digester.
     public init() {}
 
-    /// Feeds a digestible value into the digester.
+    /// Feeds a value's 32-byte checksum, or the checksum itself, so adjacent values cannot run together.
     public mutating func combine<D: Digestible>(_ value: D) {
-        value.digest(into: &self)
+        hasher.update(data: (value as? Checksum ?? value.checksum).bytes)
     }
 
-    /// Feeds raw bytes into the digester, prefixed with their length so adjacent values cannot run together.
+    /// Feeds raw bytes unchanged, for a leaf value's own encoding.
     public mutating func combine(bytes: Data) {
-        hasher.update(data: withUnsafeBytes(of: UInt64(bytes.count).bigEndian) { Data($0) })
         hasher.update(data: bytes)
     }
 
@@ -67,7 +66,7 @@ public struct Digester {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Array: Digestible where Element: Digestible {
 
-    /// Feeds the count followed by each element in order.
+    /// Feeds the checksum of the count followed by the checksum of each element in order.
     public func digest(into digester: inout Digester) {
         digester.combine(count)
         forEach { digester.combine($0) }
@@ -106,7 +105,7 @@ extension Date: Digestible {
 
     /// Feeds the exact time interval since 1970.
     public func digest(into digester: inout Digester) {
-        digester.combine(timeIntervalSince1970)
+        timeIntervalSince1970.digest(into: &digester)
     }
 }
 
@@ -131,7 +130,7 @@ extension Int: Digestible {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Optional: Digestible where Wrapped: Digestible {
 
-    /// Feeds a presence flag followed by the wrapped value when there is one.
+    /// Feeds the checksum of a presence flag followed by the wrapped value's checksum when there is one.
     public func digest(into digester: inout Digester) {
         digester.combine(self != nil)
         if let value = self { digester.combine(value) }

@@ -21,5 +21,10 @@ import Testing
         let data = try JSONEncoder().encode(PythonSample.example, compatibility: .python)
         #expect(try JSONDecoder().decode(PythonSample.self, from: data, compatibility: .python) == PythonSample.example)
     }
+
+    @Test func decodeCompatibilityRoundTripsJCSValues() throws {
+        let data = try JSONEncoder().encode(PythonSample.example, compatibility: .jcs)
+        #expect(try JSONDecoder().decode(PythonSample.self, from: data, compatibility: .jcs) == PythonSample.example)
+    }
 }
 #endif

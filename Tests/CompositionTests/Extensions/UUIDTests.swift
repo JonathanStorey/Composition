@@ -8,6 +8,13 @@ import Foundation
 
 @Suite struct UUIDTests {
 
+    @Test func comparableSortsTimestampsByCreationTime() throws {
+        let earlier = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.0001)))
+        let later = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.0004)))
+        #expect(earlier < later)
+        #expect(UUID.zero < UUID.max)
+    }
+
     @Test func initTimestampEncodesSubMillisecondPrecision() throws {
         let uuid = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.000_500_1)))
         #expect(uuid.uuidString.hasPrefix("018BCFE5-6800-7800-"))
@@ -30,6 +37,11 @@ import Foundation
         #expect(earlier.uuidString < later.uuidString)
     }
 
+    @Test func maxHasEveryBitSet() {
+        #expect(UUID.max.uuidString == "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF")
+        #expect(UUID.max != UUID.zero)
+    }
+
     @Test func timestampEmbedsCurrentTime() throws {
         let before = Date().addingTimeInterval(-0.001)
         let decoded = try #require(Date(timestamp: UUID.timestamp))
@@ -45,6 +57,17 @@ import Foundation
         let characters = Array(UUID.timestamp.uuidString)
         #expect(characters[14] == "7")
         #expect("89AB".contains(characters[19]))
+    }
+
+    @Test func versionIsNilOutsideRFC9562Variant() {
+        #expect(UUID.max.version == nil)
+        #expect(UUID.zero.version == nil)
+    }
+
+    @Test func versionReadsVersionNumber() throws {
+        #expect(UUID().version == 4)
+        #expect(UUID.timestamp.version == 7)
+        #expect(try #require(UUID(uuidString: "2ED6657D-E927-568B-95E1-2665A8AEA6A2")).version == 5)
     }
 
     @Test func zeroHasEveryBitCleared() {

@@ -67,10 +67,16 @@ public extension UUID {
     init(hash value: some Encodable, namespace: UUID = .zero) throws {
         if let data = value as? Data {
             self.init(name: data, namespace: namespace)
+        } else if let decimal = value as? Decimal {
+            self.init(name: Data(decimal.normalizedDescription.utf8), namespace: namespace)
         } else if let string = value as? String {
             self.init(name: Data(string.utf8), namespace: namespace)
         } else {
             let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .custom { date, dateEncoder in
+                var container = dateEncoder.singleValueContainer()
+                try container.encode(date.microsecondsSince1970)
+            }
             encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
             self.init(name: try encoder.encode(value), namespace: namespace)
         }

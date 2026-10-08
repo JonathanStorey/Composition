@@ -18,4 +18,12 @@ public extension Date {
         formatted(.relative(presentation: .named))
     }
 }
+
+extension Date {
+
+    /// The whole microseconds since 1970, the precision Python's `datetime` holds.
+    var microsecondsSince1970: Int64 {
+        Int64((timeIntervalSince1970 * 1_000_000).rounded())
+    }
+}
 #endif

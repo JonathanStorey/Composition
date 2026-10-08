@@ -1,12 +1,12 @@
 #if canImport(CryptoKit) && canImport(Foundation)
 import Foundation
 
-/// A type whose content, including a stable unique identity, can be committed into linked revisions.
+/// A type whose content can be committed into revisions linked by hash.
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public protocol Versioned: Digestible {
 
     /// The commit that stamps the current content, or `nil` before the first commit.
-    var revision: Commit? { get }
+    var revision: Commit? { get set }
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
@@ -14,12 +14,12 @@ public extension Versioned {
 
     /// A Boolean value indicating whether the revision matches the current content.
     var isCommitted: Bool {
-        revision?.isIntact(for: self) ?? false
+        revision?.content == checksum
     }
 
-    /// Returns a commit of the current content made on the parent's revision, or a first commit when there is no parent.
-    func commit(onto parent: Self? = nil) throws -> Commit {
-        try Commit(content: self, parent: parent)
+    /// Stamps the current content with a commit made on the parent's revision, or a first commit when there is no parent.
+    mutating func commit(onto parent: Self? = nil) throws {
+        revision = try Commit(committing: self, onto: parent)
     }
 
     /// Returns a Boolean value indicating whether the value was committed onto the parent's revision and both are still committed.
@@ -32,20 +32,19 @@ public extension Versioned {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Collection where Element: Versioned {
 
-    /// The lines of committed values from their oldest reachable commit to their newest, the branch with the most commits first.
+    /// The lines of committed values from their oldest reachable commit to their newest, the branch with the most commits first and ties ordered by the newest commit's hash.
     var branches: [Branch<Element>] {
         let commits = Dictionary(compactMap { value in value.revision.map { ($0.hash, value) } }, uniquingKeysWith: { first, _ in first })
         let parents = Set(commits.values.compactMap { $0.revision?.parent })
-        let heads = commits.filter { !parents.contains($0.key) }.values
-        let unsorted: [Branch<Element>] = heads.map { head in
-            var values = [head]
-            var visited: Set<Checksum> = []
-            while let parent = values.last?.revision?.parent, visited.insert(parent).inserted, let value = commits[parent] {
+        let heads = commits.filter { !parents.contains($0.key) }.sorted { $0.key.bytes.lexicographicallyPrecedes($1.key.bytes) }
+        let branches: [Branch<Element>] = heads.map { head in
+            var values = [head.value]
+            while let parent = values.last?.revision?.parent, let value = commits[parent] {
                 values.append(value)
             }
             return Branch(values: values.reversed())
         }
-        return unsorted.sorted { $0.count > $1.count }
+        return branches.sorted { $0.count > $1.count }
     }
 }
 
@@ -86,34 +85,21 @@ public struct Commit: Codable, Hashable, Sendable {
 
     fileprivate let content: Checksum
 
+    /// The hash of the commit this one was made on, or `nil` for a first commit.
+    public let parent: Checksum?
+
+    fileprivate init<V: Versioned>(committing value: V, onto parent: V?) throws {
+        guard parent?.isCommitted ?? true else { throw CommitError.uncommittedParent }
+        self.content = value.checksum
+        self.parent = parent?.revision?.hash
+    }
+
     /// The checksum of the content and the parent's hash.
-    public let hash: Checksum
-
-    fileprivate let parent: Checksum?
-
-    private init(content: Checksum, parent: Checksum?) {
-        self.content = content
-        self.hash = Self.hash(content: content, parent: parent)
-        self.parent = parent
-    }
-
-    fileprivate init<V: Versioned>(content: V, parent: V?) throws {
-        if let parent {
-            guard let base = parent.revision else { throw CommitError.uncommittedParent }
-            guard base.isIntact(for: parent) else { throw CommitError.expiredParent }
-        }
-        self.init(content: content.checksum, parent: parent?.revision?.hash)
-    }
-
-    private static func hash(content: Checksum, parent: Checksum?) -> Checksum {
+    public var hash: Checksum {
         var digester = Digester()
         digester.combine(content)
         digester.combine(parent)
         return digester.finalize()
-    }
-
-    fileprivate func isIntact<V: Versioned>(for value: V) -> Bool {
-        content == value.checksum && hash == Self.hash(content: content, parent: parent)
     }
 }
 
@@ -121,10 +107,7 @@ public struct Commit: Codable, Hashable, Sendable {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public enum CommitError: Error {
 
-    /// The parent's content changed after its revision was made, so its revision no longer matches it.
-    case expiredParent
-
-    /// The parent has no revision, so there is no hash to link to.
+    /// The parent has no revision, or its content changed after its revision was made.
     case uncommittedParent
 }
 #endif

@@ -3,7 +3,7 @@ import Foundation
 import Testing
 @testable import Composition
 
-private struct Page: Versioned {
+private struct Page: Equatable, Versioned {
 
     var body: String
     var revision: Commit?
@@ -48,6 +48,13 @@ private func committed(_ body: String, onto parent: Page? = nil) throws -> Page 
         let first = try committed("Child", onto: root)
         let second = try committed("Child", onto: root)
         #expect([root, first, second].branches.count == 1)
+    }
+
+    @Test func branchesEqualWhenBuiltFromSameValues() throws {
+        let root = try committed("Root")
+        let child = try committed("Child", onto: root)
+        #expect([root, child].branches == [child, root].branches)
+        #expect([root, child].branches != [root].branches)
     }
 
     @Test func branchesFollowParentsFromRootToHead() throws {
@@ -172,6 +179,25 @@ private func committed(_ body: String, onto parent: Page? = nil) throws -> Page 
     @Test func isChildIsTrueForDirectChild() throws {
         let parent = try committed("Root")
         #expect(try committed("Child", onto: parent).isChild(of: parent))
+    }
+
+    @Test func revisedCommitsChangesOntoOriginal() throws {
+        let root = try committed("Root")
+        let child = try #require(try root.revised { $0.body = "Edited" })
+        #expect(child.body == "Edited")
+        #expect(child.isChild(of: root))
+        #expect(root.body == "Root")
+    }
+
+    @Test func revisedIsNilWhenContentIsUnchanged() throws {
+        let root = try committed("Root")
+        #expect(try root.revised { $0.body = "Root" } == nil)
+    }
+
+    @Test func revisedThrowsWhenOriginalIsModified() throws {
+        var root = try committed("Root")
+        root.body = "Edited"
+        #expect(throws: Commit.Error.modifiedParent) { try root.revised { $0.body = "Child" } }
     }
 
     @Test func uncommittedIsEmptyWhenAllCommitted() throws {

@@ -5,7 +5,7 @@ import Foundation
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public protocol Versioned: Digestible {
 
-    /// The commit that stamps the current content, or `nil` before the first commit.
+    /// The commit that stamps the current content, or `nil` before the first commit, which `digest(into:)` must leave out.
     var revision: Commit? { get set }
 }
 
@@ -28,6 +28,16 @@ public extension Versioned {
     func isChild(of parent: Self) -> Bool {
         guard let revision, let base = parent.revision else { return false }
         return revision.parent == base.hash && commitStatus == .committed && parent.commitStatus == .committed
+    }
+
+    /// Returns a copy of this value type with the changes applied and committed onto this value, or `nil` when the changes leave the content unchanged.
+    func revised(_ changes: (inout Self) throws -> Void) throws -> Self? {
+        var child = self
+        child.revision = nil
+        try changes(&child)
+        guard child.checksum != checksum else { return nil }
+        try child.commit(onto: self)
+        return child
     }
 }
 
@@ -91,6 +101,12 @@ public struct Branch<V: Versioned>: RandomAccessCollection {
         values[position]
     }
 }
+
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+extension Branch: Equatable where V: Equatable {}
+
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+extension Branch: Sendable where V: Sendable {}
 
 /// A record of a value's content and the commit it was made on.
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)

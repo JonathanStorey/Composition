@@ -127,6 +127,12 @@ extension UUIDTests {
         #expect(try UUID(hash: ["b": 2, "a": 1]).uuidString == "6FB42BB7-64C6-545B-BB52-552962F36259")
     }
 
+    @Test func initHashNamesNamespaceWithString() throws {
+        #expect(try UUID(hash: "Dune", namespace: "Book").uuidString == "3DE9C471-B66E-5911-A3C8-F4DDE71C6576")
+        #expect(try UUID(hash: "Dune", namespace: "Book") == UUID(hash: "Dune", namespace: UUID(hash: "Book")))
+        #expect(try UUID(hash: "Dune", namespace: "") == UUID(hash: "Dune", namespace: UUID(hash: "")))
+    }
+
     @Test func initHashSetsVersionAndVariant() throws {
         let characters = try Array(UUID(hash: "Dune").uuidString)
         #expect(characters[14] == "5")

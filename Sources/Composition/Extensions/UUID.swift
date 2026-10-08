@@ -63,14 +63,19 @@ import Foundation
 
 public extension UUID {
 
+    /// Creates a version 5 UUID from the value's contents within a namespace that is itself the version 5 UUID of the name.
+    init(hash value: some Encodable, namespace name: String) throws {
+        try self.init(hash: value, namespace: UUID(name: Data(name.utf8), namespace: .zero))
+    }
+
     /// Creates a version 5 UUID from the value's contents, so equal values with the same namespace always give the same UUID.
-    init(hash value: some Encodable, namespace: UUID = .zero) throws {
+    init(hash value: some Encodable, namespace uuid: UUID = .zero) throws {
         if let data = value as? Data {
-            self.init(name: data, namespace: namespace)
+            self.init(name: data, namespace: uuid)
         } else if let string = value as? String {
-            self.init(name: Data(string.utf8), namespace: namespace)
+            self.init(name: Data(string.utf8), namespace: uuid)
         } else {
-            self.init(name: try JSONEncoder().encode(value, compatibility: .python), namespace: namespace)
+            self.init(name: try JSONEncoder().encode(value, compatibility: .python), namespace: uuid)
         }
     }
 }

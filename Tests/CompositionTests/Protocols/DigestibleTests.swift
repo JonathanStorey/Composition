@@ -22,6 +22,10 @@ private struct Note: Digestible {
         #expect(["ab", "c"].checksum != ["a", "bc"].checksum)
     }
 
+    @Test func arrayMatchesPythonChecksumOfChecksums() {
+        #expect(["a", "b"].checksum.description == "abaa71505e04ae17be6779cbc6f3ef1db3efe1e9672cdc424e8b80c2419d32d4")
+    }
+
     @Test func arrayOrderChangesChecksum() {
         #expect([1, 2].checksum != [2, 1].checksum)
     }
@@ -57,20 +61,20 @@ private struct Note: Digestible {
     }
 
     @Test func decomposedStringMatchesPythonBytes() {
-        #expect("caf\u{E9}".checksum.description == "8c348292948bf150158c9b1055e967f25713c372b7f59ba82e083d6290a51087")
-        #expect("cafe\u{301}".checksum.description == "2fa00897b1fd88c07d191c1c259c8c36127bfd0c41d5a8dc87519ce631532e0c")
+        #expect("caf\u{E9}".checksum.description == "850f7dc43910ff890f8879c0ed26fe697c93a067ad93a7d50f466a7028a9bf4e")
+        #expect("cafe\u{301}".checksum.description == "81ef060bcd98adc7824eb5c1ada83c32491b16018e11e79f00ab9d09e04b015a")
     }
 
     @Test func intMatchesKnownVector() {
-        #expect(1.checksum.description == "e1204f7fab020db18a0690d525c4bfebd7ffcd34d6242f3956bc9780d29ff38e")
+        #expect(1.checksum.description == "cd2662154e6d76b2b2b92e70c0cac3ccf534f9b74eb5b89819ec509083d00a50")
     }
 
     @Test func nilDiffersFromEmptyValue() {
         #expect(String?.none.checksum != String?.some("").checksum)
     }
 
-    @Test func stringMatchesKnownVector() {
-        #expect("abc".checksum.description == "c3494ca1a2cf8eeb8a11ded316fb55b83c3bbbedb6313cd50415251e5d09e12f")
+    @Test func stringMatchesPythonSHA256() {
+        #expect("abc".checksum.description == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
     }
 }
 #endif

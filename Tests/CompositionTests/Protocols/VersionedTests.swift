@@ -3,10 +3,32 @@ import Foundation
 import Testing
 @testable import Composition
 
+private final class Note: Versioned {
+
+    var body: String
+    var revision: Commit?
+
+    init(body: String) {
+        self.body = body
+    }
+
+    static func forked(from parent: Note) -> Note {
+        Note(body: parent.body)
+    }
+
+    func digest(into digester: inout Digester) {
+        digester.combine(body)
+    }
+}
+
 private struct Page: Equatable, Versioned {
 
     var body: String
     var revision: Commit?
+
+    static func forked(from parent: Page) -> Page {
+        Page(body: parent.body)
+    }
 
     func digest(into digester: inout Digester) {
         digester.combine(body)
@@ -153,6 +175,34 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
         var second = committed("Child", onto: root)
         second.body = "Edited"
         #expect([root, first, second].duplicates.map(\.body) == ["Edited"])
+    }
+
+    @Test func forkCreatesNewClassInstance() {
+        var note = Note(body: "Root")
+        note.commit()
+        let child = note.fork { $0.body = "Child" }
+        #expect(child !== note)
+        #expect(note.body == "Root")
+        #expect(child.isChild(of: note))
+    }
+
+    @Test func forkKeepsRevisionWhenContentMatches() {
+        let root = committed("Root")
+        #expect(root.fork() == root)
+    }
+
+    @Test func forkLeavesParentUnchanged() {
+        let root = committed("Root")
+        let child = root.fork { $0.body = "Child" }
+        #expect(root.body == "Root")
+        #expect(root.commitStatus == .committed)
+        #expect(child.isChild(of: root))
+    }
+
+    @Test func forkOfUncommittedValueMakesFirstCommit() {
+        let child = Page(body: "Root").fork()
+        #expect(child.commitStatus == .committed)
+        #expect(child.revision?.parent == nil)
     }
 
     @Test func grandchildHashDependsOnGrandparent() {

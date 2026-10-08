@@ -7,6 +7,9 @@ public protocol Versioned: Digestible {
 
     /// The commit that stamps the current content, or `nil` before the first commit, which `digest(into:)` must leave out.
     var revision: Commit? { get set }
+
+    /// Returns a new instance carrying over the fields that make up a version, leaving the revision to `fork(_:)`.
+    static func forked(from parent: Self) -> Self
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
@@ -29,6 +32,14 @@ public extension Versioned {
         }
         self = version
         return version
+    }
+
+    /// Returns a new instance with the changes applied and committed as a child of this value's revision.
+    func fork(_ changes: (inout Self) throws -> Void = { _ in }) rethrows -> Self {
+        var child = Self.forked(from: self)
+        child.revision = revision
+        try child.commit(changes)
+        return child
     }
 
     /// Returns a Boolean value indicating whether the value was committed onto the parent's revision and both are still committed.

@@ -15,6 +15,11 @@ public protocol Versioned: Digestible {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Versioned {
 
+    /// A Boolean value indicating whether `commit()` would make a new commit, because the value has no revision or changed since it.
+    var hasUncommittedChanges: Bool {
+        revision?.matches(self) != true
+    }
+
     /// Commits the current content onto the current revision, keeping the revision when the content still matches it, and returns the result.
     @discardableResult
     mutating func commit() -> Self {

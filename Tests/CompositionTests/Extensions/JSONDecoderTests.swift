@@ -5,6 +5,13 @@ import Testing
 
 @Suite struct JSONDecoderTests {
 
+    @Test func decodeCompatibilityReadsNonFiniteNumbers() throws {
+        let values = try JSONDecoder().decode([Double].self, from: Data("[NaN,Infinity,-Infinity]".utf8), compatibility: .python)
+        #expect(values[0].isNaN)
+        #expect(values[1] == .infinity)
+        #expect(values[2] == -.infinity)
+    }
+
     @Test func decodeCompatibilityReadsPythonDates() throws {
         let date = try JSONDecoder().decode(Date.self, from: Data("1700000000123456".utf8), compatibility: .python)
         #expect(date == Date(timeIntervalSince1970: 1_700_000_000.123456))

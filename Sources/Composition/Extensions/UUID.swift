@@ -16,6 +16,9 @@ public extension UUID {
     static var timestamp: UUID {
         UUID(unixTime: max(0, Date().timeIntervalSince1970))
     }
+
+    /// The nil UUID, with all 128 bits set to zero.
+    static let zero = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
 }
 
 private extension UUID {
@@ -53,9 +56,11 @@ public extension UUID {
 
     /// Creates a version 5 UUID from the value's contents, so equal values with the same namespace always give the same UUID.
     init(hash value: some Encodable, namespace salt: String? = nil) throws {
-        let namespace = salt.map { UUID(name: Data($0.utf8), namespace: .composition) } ?? .composition
+        let namespace = salt.map { UUID(name: Data($0.utf8), namespace: .zero) } ?? .zero
         if let data = value as? Data {
             self.init(name: data, namespace: namespace)
+        } else if let string = value as? String {
+            self.init(name: Data(string.utf8), namespace: namespace)
         } else {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -75,8 +80,5 @@ extension UUID {
         bytes[8] = (bytes[8] & 0x3F) | 0x80
         self.init(uuid: bytes.withUnsafeBytes { $0.load(as: uuid_t.self) })
     }
-
-    /// The namespace used when no salt is given.
-    static let composition = UUID(uuid: (0x63, 0xEE, 0x8B, 0xAF, 0xDB, 0x9B, 0x49, 0xDE, 0xA0, 0x24, 0xEA, 0x73, 0xA4, 0xA2, 0x88, 0x9D))
 }
 #endif

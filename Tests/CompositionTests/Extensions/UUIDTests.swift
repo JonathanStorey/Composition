@@ -46,6 +46,11 @@ import Foundation
         #expect(characters[14] == "7")
         #expect("89AB".contains(characters[19]))
     }
+
+    @Test func zeroHasEveryBitCleared() {
+        #expect(UUID.zero.uuidString == "00000000-0000-0000-0000-000000000000")
+        #expect(UUID.zero != UUID())
+    }
 }
 #endif
 
@@ -65,8 +70,8 @@ extension UUIDTests {
 
     @Test func initHashHashesDataBytesDirectly() throws {
         let data = Data("www.example.com".utf8)
-        #expect(try UUID(hash: data).uuidString == "777E9788-7A2B-549A-8D98-0CCBD4AC0267")
-        #expect(try UUID(hash: data, namespace: "Image").uuidString == "94C1F6AF-1EB4-591B-A2D4-8762230CA9C4")
+        #expect(try UUID(hash: data).uuidString == "399FC331-BE2B-5B56-B676-D6F38DAE5AAA")
+        #expect(try UUID(hash: data, namespace: "Image").uuidString == "B2FB507C-C942-58E2-AB1C-C6A61418C3FB")
     }
 
     @Test func initHashIgnoresKeyOrder() throws {
@@ -77,8 +82,12 @@ extension UUIDTests {
         #expect(try UUID(hash: first) == UUID(hash: second))
     }
 
+    @Test func initHashMatchesPythonForStrings() throws {
+        #expect(try UUID(hash: "Hello, World!").uuidString == "64DC4AC1-4A83-5B25-AABB-3603762EE2E3")
+    }
+
     @Test func initHashMatchesSortedJSON() throws {
-        #expect(try UUID(hash: ["b": 2, "a": 1]).uuidString == "19F08257-1CC3-5052-83AD-251F902C6CE7")
+        #expect(try UUID(hash: ["b": 2, "a": 1]).uuidString == "6FB42BB7-64C6-545B-BB52-552962F36259")
     }
 
     @Test func initHashSetsVersionAndVariant() throws {

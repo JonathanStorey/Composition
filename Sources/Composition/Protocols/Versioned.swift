@@ -15,9 +15,20 @@ public protocol Versioned: Digestible, Timestamped {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Versioned {
 
+    /// A Boolean value indicating whether the revision matches the current content and repository.
+    var isCommitted: Bool {
+        revision?.isIntact(for: self) ?? false
+    }
+
     /// Returns a commit of the current content made on the parent's revision, or a first commit when there is no parent.
     func commit(onto parent: Self? = nil) throws -> Commit {
         try Commit(content: self, parent: parent, repository: repository)
+    }
+
+    /// Returns a Boolean value indicating whether the value was committed onto the parent's revision and both are still committed.
+    func isChild(of parent: Self) -> Bool {
+        guard let revision, let base = parent.revision else { return false }
+        return revision.parent == base.hash && repository == parent.repository && isCommitted && parent.isCommitted
     }
 }
 

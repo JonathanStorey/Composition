@@ -81,5 +81,50 @@ private func committed(_ body: String, onto parent: Page? = nil, repository: Str
         #expect(first.timestamp != second.timestamp)
         #expect(first.revision?.hash == second.revision?.hash)
     }
+
+    @Test func isChildIsFalseForGrandparent() throws {
+        let grandparent = try committed("Root")
+        let child = try committed("Child", onto: committed("Parent", onto: grandparent))
+        #expect(!child.isChild(of: grandparent))
+    }
+
+    @Test func isChildIsFalseWhenChildChanges() throws {
+        let parent = try committed("Root")
+        var child = try committed("Child", onto: parent)
+        child.body = "Edited"
+        #expect(!child.isChild(of: parent))
+    }
+
+    @Test func isChildIsFalseWhenParentChanges() throws {
+        var parent = try committed("Root")
+        let child = try committed("Child", onto: parent)
+        parent.body = "Edited"
+        #expect(!child.isChild(of: parent))
+    }
+
+    @Test func isChildIsTrueForDirectChild() throws {
+        let parent = try committed("Root")
+        #expect(try committed("Child", onto: parent).isChild(of: parent))
+    }
+
+    @Test func isCommittedIsFalseAfterEdit() throws {
+        var page = try committed("Root")
+        page.body = "Edited"
+        #expect(!page.isCommitted)
+    }
+
+    @Test func isCommittedIsFalseAfterRepositoryRename() throws {
+        var page = try committed("Root")
+        page.repository = "Renamed"
+        #expect(!page.isCommitted)
+    }
+
+    @Test func isCommittedIsFalseBeforeFirstCommit() {
+        #expect(!Page(body: "Root").isCommitted)
+    }
+
+    @Test func isCommittedIsTrueAfterCommit() throws {
+        #expect(try committed("Root").isCommitted)
+    }
 }
 #endif

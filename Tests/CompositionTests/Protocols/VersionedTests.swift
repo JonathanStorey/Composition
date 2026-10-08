@@ -54,6 +54,12 @@ private func committed(_ body: String, onto parent: Page? = nil, repository: Str
         #expect(branches.first?.isComplete == true)
     }
 
+    @Test func branchesKeepTheirRepository() throws {
+        let notes = try committed("Child", onto: committed("Root", repository: "Notes"), repository: "Notes")
+        let drafts = try committed("Draft", repository: "Drafts")
+        #expect(Set([notes, drafts].branches.map(\.repository)) == ["Notes", "Drafts"])
+    }
+
     @Test func branchesSplitAtForkNewestHeadFirst() throws {
         let root = try committed("Root")
         let older = try committed("Older", onto: root)

@@ -27,6 +27,18 @@ private struct Deck: PermutableCollection {
         #expect(deck.cards == ["a", "b", "c"])
     }
 
+    @Test func forEachSwapPairsEachOffsetWithItsCycleStart() throws {
+        var pairs: [[Int]] = []
+        try #require(Permutation(cycle: [2, 0, 1, 4, 3])).forEachSwap { pairs.append([$0, $1]) }
+        #expect(pairs == [[2, 0], [2, 1], [4, 3]])
+    }
+
+    @Test func forEachSwapSkipsFixedPoints() throws {
+        var count = 0
+        try #require(Permutation(cycle: [0, 1, 2])).forEachSwap { _, _ in count += 1 }
+        #expect(count == 0)
+    }
+
     @Test func increasingOffsetsAreFixedPoints() throws {
         var deck = Deck(cards: ["a", "b", "c"])
         deck.permute(using: try #require(Permutation(cycle: [0, 1, 2])))
@@ -54,17 +66,5 @@ private struct Deck: PermutableCollection {
         var deck = Deck(cards: ["a", "b", "c", "d"])
         deck.permute(using: try #require(Permutation(cycle: [3, 0, 2])))
         #expect(deck.cards == ["d", "b", "a", "c"])
-    }
-
-    @Test func swappingPairsEachOffsetWithItsCycleStart() throws {
-        var pairs: [[Int]] = []
-        try #require(Permutation(cycle: [2, 0, 1, 4, 3])).swapping { pairs.append([$0, $1]) }
-        #expect(pairs == [[2, 0], [2, 1], [4, 3]])
-    }
-
-    @Test func swappingSkipsFixedPoints() throws {
-        var count = 0
-        try #require(Permutation(cycle: [0, 1, 2])).swapping { _, _ in count += 1 }
-        #expect(count == 0)
     }
 }

@@ -11,7 +11,7 @@ public extension PermutableCollection {
     mutating func permute(using permutation: Permutation) {
         guard let largest = permutation.cycle.max() else { return }
         precondition(largest < count, "Every offset in the cycle must be within the collection.")
-        permutation.swapping { swapAt(index(startIndex, offsetBy: $0), index(startIndex, offsetBy: $1)) }
+        permutation.forEachSwap { swapAt(index(startIndex, offsetBy: $0), index(startIndex, offsetBy: $1)) }
     }
 }
 
@@ -28,7 +28,7 @@ public struct Permutation: Hashable, Sendable {
     }
 
     /// Calls the closure with each pair of offsets to swap, in order, deriving them in one pass with no allocation.
-    public func swapping(_ body: (Int, Int) throws -> Void) rethrows {
+    public func forEachSwap(_ body: (Int, Int) throws -> Void) rethrows {
         var start = -1
         for offset in cycle {
             if offset > start {

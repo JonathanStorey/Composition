@@ -15,12 +15,6 @@ public protocol Versioned: Digestible {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Versioned {
 
-    /// Whether the value has never been committed, was changed after its commit, or still matches its commit.
-    var commitStatus: Commit.Status {
-        guard let revision else { return .uncommitted }
-        return revision.content == checksum ? .committed : .modified
-    }
-
     /// Applies the changes and commits them onto the current revision, keeping the revision when the content still matches it, and returns the result.
     @discardableResult
     mutating func commit(_ changes: (inout Self) throws -> Void = { _ in }) rethrows -> Self {
@@ -46,7 +40,7 @@ public extension Versioned {
     /// Returns a Boolean value indicating whether the value was committed onto the parent's revision and both are still committed.
     func isChild(of parent: Self) -> Bool {
         guard let revision, let base = parent.revision else { return false }
-        return revision.parent == base.hash && commitStatus == .committed && parent.commitStatus == .committed
+        return revision.parent == base.hash && revision.matches(self) && base.matches(parent)
     }
 }
 
@@ -138,22 +132,10 @@ public struct Commit: Codable, Hashable, Sendable {
         digester.combine(parent)
         return digester.finalize()
     }
-}
 
-@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-public extension Commit {
-
-    /// Whether a value has never been committed, was changed after its commit, or still matches its commit.
-    enum Status: Hashable, Sendable {
-
-        /// The revision matches the current content.
-        case committed
-
-        /// The content changed after the revision was made.
-        case modified
-
-        /// The value has no revision.
-        case uncommitted
+    /// Returns a Boolean value indicating whether the content still matches this commit.
+    public func matches(_ content: some Digestible) -> Bool {
+        self.content == content.checksum
     }
 }
 #endif

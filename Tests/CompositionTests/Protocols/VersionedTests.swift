@@ -78,9 +78,9 @@ private func committed(_ body: String, onto parent: Page? = nil) throws -> Page 
 
     @Test func commitAgainThrows() throws {
         var page = try committed("Root")
-        #expect(throws: CommitError.alreadyCommitted) { try page.commit() }
+        #expect(throws: Commit.Error.alreadyCommitted) { try page.commit() }
         page.body = "Edited"
-        #expect(throws: CommitError.alreadyCommitted) { try page.commit() }
+        #expect(throws: Commit.Error.alreadyCommitted) { try page.commit() }
     }
 
     @Test func commitIsStableForEqualContent() throws {
@@ -91,11 +91,11 @@ private func committed(_ body: String, onto parent: Page? = nil) throws -> Page 
     @Test func commitOntoModifiedParentThrows() throws {
         var parent = try committed("Root")
         parent.body = "Edited"
-        #expect(throws: CommitError.modifiedParent) { try committed("Child", onto: parent) }
+        #expect(throws: Commit.Error.modifiedParent) { try committed("Child", onto: parent) }
     }
 
     @Test func commitOntoUncommittedParentThrows() {
-        #expect(throws: CommitError.uncommittedParent) { try committed("Child", onto: Page(body: "Root")) }
+        #expect(throws: Commit.Error.uncommittedParent) { try committed("Child", onto: Page(body: "Root")) }
     }
 
     @Test func commitRecordsParentHash() throws {
@@ -111,18 +111,18 @@ private func committed(_ body: String, onto parent: Page? = nil) throws -> Page 
         #expect(decoded == revision)
     }
 
-    @Test func commitStateIsCommittedAfterCommit() throws {
-        #expect(try committed("Root").commitState == .committed)
+    @Test func commitStatusIsCommittedAfterCommit() throws {
+        #expect(try committed("Root").commitStatus == .committed)
     }
 
-    @Test func commitStateIsModifiedAfterEdit() throws {
+    @Test func commitStatusIsModifiedAfterEdit() throws {
         var page = try committed("Root")
         page.body = "Edited"
-        #expect(page.commitState == .modified)
+        #expect(page.commitStatus == .modified)
     }
 
-    @Test func commitStateIsUncommittedBeforeFirstCommit() {
-        #expect(Page(body: "Root").commitState == .uncommitted)
+    @Test func commitStatusIsUncommittedBeforeFirstCommit() {
+        #expect(Page(body: "Root").commitStatus == .uncommitted)
     }
 
     @Test func duplicatesIsEmptyWithoutRepeatedCommits() throws {

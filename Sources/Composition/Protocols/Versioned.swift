@@ -13,21 +13,21 @@ public protocol Versioned: Digestible {
 public extension Versioned {
 
     /// Whether the value has never been committed, was changed after its commit, or still matches its commit.
-    var commitState: CommitState {
+    var commitStatus: Commit.Status {
         guard let revision else { return .uncommitted }
         return revision.content == checksum ? .committed : .modified
     }
 
     /// Stamps the current content with a commit made on the parent's revision, or a first commit when there is no parent.
     mutating func commit(onto parent: Self? = nil) throws {
-        guard revision == nil else { throw CommitError.alreadyCommitted }
+        guard revision == nil else { throw Commit.Error.alreadyCommitted }
         revision = try Commit(committing: self, onto: parent)
     }
 
     /// Returns a Boolean value indicating whether the value was committed onto the parent's revision and both are still committed.
     func isChild(of parent: Self) -> Bool {
         guard let revision, let base = parent.revision else { return false }
-        return revision.parent == base.hash && commitState == .committed && parent.commitState == .committed
+        return revision.parent == base.hash && commitStatus == .committed && parent.commitStatus == .committed
     }
 }
 
@@ -102,9 +102,9 @@ public struct Commit: Codable, Hashable, Sendable {
     public let parent: Checksum?
 
     fileprivate init<V: Versioned>(committing value: V, onto parent: V?) throws {
-        switch parent?.commitState {
-        case .modified?: throw CommitError.modifiedParent
-        case .uncommitted?: throw CommitError.uncommittedParent
+        switch parent?.commitStatus {
+        case .modified?: throw Error.modifiedParent
+        case .uncommitted?: throw Error.uncommittedParent
         case .committed?, nil: break
         }
         self.content = value.checksum
@@ -120,30 +120,33 @@ public struct Commit: Codable, Hashable, Sendable {
     }
 }
 
-/// An error thrown when a value cannot be committed.
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-public enum CommitError: Error {
+public extension Commit {
 
-    /// The value already has a revision, so committing again would orphan the values made on it.
-    case alreadyCommitted
+    /// An error thrown when a value cannot be committed.
+    enum Error: Swift.Error {
 
-    /// The parent's content changed after its revision was made, so its revision no longer matches it.
-    case modifiedParent
+        /// The value already has a revision, so committing again would orphan the values made on it.
+        case alreadyCommitted
 
-    /// The parent has no revision, so there is no hash to link to.
-    case uncommittedParent
-}
+        /// The parent's content changed after its revision was made, so its revision no longer matches it.
+        case modifiedParent
 
-/// Whether a value has never been committed, was changed after its commit, or still matches its commit.
-public enum CommitState: Hashable, Sendable {
+        /// The parent has no revision, so there is no hash to link to.
+        case uncommittedParent
+    }
 
-    /// The revision matches the current content.
-    case committed
+    /// Whether a value has never been committed, was changed after its commit, or still matches its commit.
+    enum Status: Hashable, Sendable {
 
-    /// The content changed after the revision was made.
-    case modified
+        /// The revision matches the current content.
+        case committed
 
-    /// The value has no revision.
-    case uncommitted
+        /// The content changed after the revision was made.
+        case modified
+
+        /// The value has no revision.
+        case uncommitted
+    }
 }
 #endif

@@ -47,9 +47,9 @@ public struct Digester {
     /// Creates an empty digester.
     public init() {}
 
-    /// Feeds a value's 32-byte checksum, or the checksum itself, so adjacent values cannot run together.
+    /// Feeds the value's 32-byte checksum, so adjacent values cannot run together.
     public mutating func combine<D: Digestible>(_ value: D) {
-        hasher.update(data: (value as? Checksum ?? value.checksum).bytes)
+        hasher.update(data: value.checksum.bytes)
     }
 
     /// Feeds raw bytes unchanged, for a leaf value's own encoding.
@@ -66,9 +66,8 @@ public struct Digester {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Array: Digestible where Element: Digestible {
 
-    /// Feeds the checksum of the count followed by the checksum of each element in order.
+    /// Feeds the checksum of each element in order.
     public func digest(into digester: inout Digester) {
-        digester.combine(count)
         forEach { digester.combine($0) }
     }
 }
@@ -130,10 +129,10 @@ extension Int: Digestible {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Optional: Digestible where Wrapped: Digestible {
 
-    /// Feeds the checksum of a presence flag followed by the wrapped value's checksum when there is one.
+    /// Feeds the wrapped value unchanged, or 32 zero bytes when there is none.
     public func digest(into digester: inout Digester) {
-        digester.combine(self != nil)
-        if let value = self { digester.combine(value) }
+        guard let value = self else { return digester.combine(bytes: Data(count: 32)) }
+        value.digest(into: &digester)
     }
 }
 

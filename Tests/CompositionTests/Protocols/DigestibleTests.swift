@@ -23,7 +23,7 @@ private struct Note: Digestible {
     }
 
     @Test func arrayMatchesPythonChecksumOfChecksums() {
-        #expect(["a", "b"].checksum.description == "abaa71505e04ae17be6779cbc6f3ef1db3efe1e9672cdc424e8b80c2419d32d4")
+        #expect(["a", "b"].checksum.description == "e5a01fee14e0ed5c48714f22180f25ad8365b53f9779f79dc4a3d7e93963f94a")
     }
 
     @Test func arrayOrderChangesChecksum() {
@@ -71,6 +71,16 @@ private struct Note: Digestible {
 
     @Test func nilDiffersFromEmptyValue() {
         #expect(String?.none.checksum != String?.some("").checksum)
+    }
+
+    @Test func optionalPositionChangesChecksum() {
+        let first: [String?] = [nil, "x"]
+        let second: [String?] = ["x", nil]
+        #expect(first.checksum != second.checksum)
+    }
+
+    @Test func someMatchesWrappedValue() {
+        #expect(String?.some("abc").checksum == "abc".checksum)
     }
 
     @Test func stringMatchesPythonSHA256() {

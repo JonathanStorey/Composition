@@ -32,6 +32,20 @@ public extension Versioned {
     }
 }
 
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+public extension Collection where Element: Versioned {
+
+    /// The values grouped by repository name.
+    var repositories: [String: [Element]] {
+        Dictionary(grouping: self, by: \.repository)
+    }
+
+    /// The values in the named repository.
+    subscript(repository name: String) -> [Element] {
+        filter { $0.repository == name }
+    }
+}
+
 /// A record of a value's content, its repository, and the commit it was made on.
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct Commit: Codable, Hashable, Sendable {

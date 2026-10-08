@@ -55,4 +55,16 @@ private struct Deck: PermutableCollection {
         deck.permute(using: try #require(Permutation(cycle: [3, 0, 2])))
         #expect(deck.cards == ["d", "b", "a", "c"])
     }
+
+    @Test func swappingPairsEachOffsetWithItsCycleStart() throws {
+        var pairs: [[Int]] = []
+        try #require(Permutation(cycle: [2, 0, 1, 4, 3])).swapping { pairs.append([$0, $1]) }
+        #expect(pairs == [[2, 0], [2, 1], [4, 3]])
+    }
+
+    @Test func swappingSkipsFixedPoints() throws {
+        var count = 0
+        try #require(Permutation(cycle: [0, 1, 2])).swapping { _, _ in count += 1 }
+        #expect(count == 0)
+    }
 }

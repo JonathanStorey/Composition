@@ -15,7 +15,7 @@ private struct Page: Versioned {
 
 private func committed(_ body: String, onto parent: Page? = nil) throws -> Page {
     var page = Page(body: body)
-    page.revision = try page.commit(onto: parent)
+    try page.commit(onto: parent)
     return page
 }
 
@@ -32,6 +32,15 @@ private func committed(_ body: String, onto parent: Page? = nil) throws -> Page 
         #expect(branches.count == 1)
         #expect(branches.first?.map(\.body) == ["Parent", "Child"])
         #expect(branches.first?.isComplete == false)
+    }
+
+    @Test func branchesBreakTiesByLastHash() throws {
+        let root = try committed("Root")
+        let first = try committed("First", onto: root)
+        let second = try committed("Second", onto: root)
+        let heads = [first, second].sorted { ($0.revision?.hash.bytes ?? Data()).lexicographicallyPrecedes($1.revision?.hash.bytes ?? Data()) }
+        #expect([first, root, second].branches.map { $0.last?.body } == heads.map(\.body))
+        #expect([second, root, first].branches.map { $0.last?.body } == heads.map(\.body))
     }
 
     @Test func branchesCollapseIdenticalCommits() throws {
@@ -75,7 +84,7 @@ private func committed(_ body: String, onto parent: Page? = nil) throws -> Page 
     @Test func commitOntoChangedParentThrows() throws {
         var parent = try committed("Root")
         parent.body = "Edited"
-        #expect(throws: CommitError.expiredParent) { try committed("Child", onto: parent) }
+        #expect(throws: CommitError.uncommittedParent) { try committed("Child", onto: parent) }
     }
 
     @Test func commitOntoUncommittedParentThrows() {
@@ -86,6 +95,13 @@ private func committed(_ body: String, onto parent: Page? = nil) throws -> Page 
         let revision = try #require(try committed("Root").revision)
         let decoded = try JSONDecoder().decode(Commit.self, from: JSONEncoder().encode(revision))
         #expect(decoded == revision)
+    }
+
+    @Test func commitRecordsParentHash() throws {
+        let parent = try committed("Root")
+        let child = try committed("Child", onto: parent)
+        #expect(child.revision?.parent == parent.revision?.hash)
+        #expect(parent.revision?.parent == nil)
     }
 
     @Test func grandchildHashDependsOnGrandparent() throws {

@@ -126,5 +126,26 @@ private func committed(_ body: String, onto parent: Page? = nil, repository: Str
     @Test func isCommittedIsTrueAfterCommit() throws {
         #expect(try committed("Root").isCommitted)
     }
+
+    @Test func repositoriesGroupsValuesByName() {
+        let pages = [Page(body: "A", repository: "One"), Page(body: "B", repository: "Two"), Page(body: "C", repository: "One")]
+        let repositories = pages.repositories
+        #expect(repositories.keys.sorted() == ["One", "Two"])
+        #expect(repositories["One"]?.map(\.body) == ["A", "C"])
+        #expect(repositories["Two"]?.map(\.body) == ["B"])
+    }
+
+    @Test func repositoriesIsEmptyForEmptyCollection() {
+        #expect([Page]().repositories.isEmpty)
+    }
+
+    @Test func subscriptIsEmptyForUnknownRepository() {
+        #expect([Page(body: "A")][repository: "Missing"].isEmpty)
+    }
+
+    @Test func subscriptReturnsValuesInRepository() {
+        let pages = [Page(body: "A", repository: "One"), Page(body: "B", repository: "Two"), Page(body: "C", repository: "One")]
+        #expect(pages[repository: "One"].map(\.body) == ["A", "C"])
+    }
 }
 #endif

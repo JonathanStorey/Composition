@@ -141,9 +141,9 @@ extension Optional: Digestible where Wrapped: Digestible {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension String: Digestible {
 
-    /// Feeds the UTF-8 bytes of the canonically composed form, so strings that compare equal give the same checksum.
+    /// Feeds the UTF-8 bytes unchanged, matching how Python encodes the string.
     public func digest(into digester: inout Digester) {
-        digester.combine(bytes: Data(precomposedStringWithCanonicalMapping.utf8))
+        digester.combine(bytes: Data(utf8))
     }
 }
 

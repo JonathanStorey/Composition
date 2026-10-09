@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Protocols/Timestamped.swift
+// dependencies: [Extensions/Date.swift]
+
 #if canImport(Foundation)
 import Foundation
 

@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Extensions/ButtonTests.swift
+// dependencies: [Extensions/Button.swift]
+
 #if canImport(SwiftUI)
 import SwiftUI
 import Testing

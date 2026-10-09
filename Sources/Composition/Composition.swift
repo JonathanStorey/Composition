@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Composition.swift
+// dependencies: []
+
 /// Namespace for the Composition package.
 public enum Composition {
 

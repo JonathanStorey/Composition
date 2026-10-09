@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Extensions/JSONDecoder.swift
+// dependencies: [Extensions/JSONEncoder.swift]
+
 #if canImport(Foundation)
 import Foundation
 

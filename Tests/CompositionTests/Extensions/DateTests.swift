@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Extensions/DateTests.swift
+// dependencies: [Extensions/Date.swift]
+
 #if canImport(Foundation)
 import Foundation
 import Testing

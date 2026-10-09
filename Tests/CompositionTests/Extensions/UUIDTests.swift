@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Extensions/UUIDTests.swift
+// dependencies: [Extensions/Date.swift, Extensions/UUID.swift]
+
 import Testing
 @testable import Composition
 

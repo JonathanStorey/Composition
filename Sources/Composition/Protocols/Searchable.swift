@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Protocols/Searchable.swift
+// dependencies: [Extensions/String.swift]
+
 #if canImport(Foundation)
 import Foundation
 

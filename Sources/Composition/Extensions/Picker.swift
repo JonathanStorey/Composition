@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Extensions/Picker.swift
+// dependencies: [Extensions/Label.swift, Protocols/LabelRepresentable.swift]
+
 #if canImport(SwiftUI)
 import SwiftUI
 

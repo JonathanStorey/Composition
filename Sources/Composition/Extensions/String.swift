@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Extensions/String.swift
+// dependencies: []
+
 public extension String {
 
     /// A Boolean value indicating whether the string is empty or contains only whitespace and newlines.

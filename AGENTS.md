@@ -25,16 +25,17 @@ Tests/CompositionTests/  Mirrors the Sources folder structure
 
 ### Share code across files
 
-Files may use code from other files in the package. Reuse existing helpers instead of duplicating them, for example `Searchable` uses `String.trimmed`.
+Files may use code from other files in the package. Reuse existing helpers instead of duplicating them, for example `Searchable` uses `String.trimmed`, and list each such file in the header's `dependencies`.
 
 ### Mark access and availability
 
 - Mark everything that callers use as `public`.
+- Give everything else the narrowest access that compiles, preferring `private`, then `fileprivate`, then internal. Use `private` for code used only inside its own declaration, `fileprivate` for code shared within the file, and internal (written without a modifier) only for code used from another file, including tests.
 - When code needs iOS 13 / macOS 10.15 or later, add `@available(iOS x, macOS x, tvOS x, watchOS x, *)` with the correct version for every platform. Put it on the member, or on the whole type or extension when every member needs it.
 
 ### Order members
 
-- Order members as stored `let` properties, stored `var` properties, initializers, static variables, static functions, computed instance variables, then instance functions. Within each group, public members come before private ones, and each of those is alphabetical.
+- Order members as stored `let` properties, stored `var` properties, initializers, static variables, static functions, computed instance variables, then instance functions. Within each group, order members by access as public, internal, fileprivate, then private, and alphabetically within each access level.
 - Do not add `// MARK: - Variables` or `// MARK: - Functions`.
 - Tests follow the same rule: test functions are alphabetical.
 
@@ -98,7 +99,15 @@ Tests follow the same rule. Guard a test file, or a section of it in an extensio
 
 ### Formatting
 
-- Do not add header comments at the top of files.
+- Start every file, including tests, with a three-line header and a blank line after it:
+
+  ```swift
+  // repository: https://github.com/JonathanStorey/Composition
+  // path: Protocols/Searchable.swift
+  // dependencies: [Extensions/String.swift]
+  ```
+
+  `path` is relative to the file's target folder (`Sources/Composition/` or `Tests/CompositionTests/`). `dependencies` lists, alphabetically and relative to `Sources/Composition/`, every source file whose code this file uses directly, or `[]` when there are none. Frameworks are not listed, and source files never list test files.
 - Leave a blank line after the opening brace of every type, protocol, and extension declaration, including in tests.
 
 ### Doc comments

@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Extensions/View.swift
+// dependencies: [ViewModifiers/CardModifier.swift]
+
 #if canImport(SwiftUI)
 import SwiftUI
 

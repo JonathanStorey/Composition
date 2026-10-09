@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Protocols/SearchableTests.swift
+// dependencies: [Protocols/Searchable.swift]
+
 #if canImport(Foundation)
 import Testing
 @testable import Composition

@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: ViewModifiers/CardModifier.swift
+// dependencies: [Extensions/View.swift]
+
 #if canImport(SwiftUI)
 import SwiftUI
 
@@ -5,8 +9,8 @@ import SwiftUI
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 10.0, *)
 public struct CardModifier: ViewModifier {
 
-    let cornerRadius: CGFloat
-    let padding: CGFloat
+    private let cornerRadius: CGFloat
+    private let padding: CGFloat
 
     /// Creates a card modifier with the given corner radius and padding.
     public init(cornerRadius: CGFloat = 12, padding: CGFloat = 16) {

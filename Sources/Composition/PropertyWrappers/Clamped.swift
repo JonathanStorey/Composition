@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: PropertyWrappers/Clamped.swift
+// dependencies: []
+
 /// Keeps a value within a closed range by pulling out-of-range values to the nearest bound.
 @propertyWrapper
 public struct Clamped<Value: Comparable> {

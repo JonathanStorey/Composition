@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Protocols/Digestible.swift
+// dependencies: [Extensions/Date.swift, Extensions/Decimal.swift]
+
 #if canImport(CryptoKit) && canImport(Foundation)
 import CryptoKit
 import Foundation

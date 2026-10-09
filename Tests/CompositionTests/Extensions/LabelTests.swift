@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Extensions/LabelTests.swift
+// dependencies: [Extensions/Label.swift]
+
 #if canImport(SwiftUI)
 import SwiftUI
 import Testing

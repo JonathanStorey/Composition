@@ -10,6 +10,21 @@ public protocol PermutableCollection: Collection {
 
 public extension PermutableCollection {
 
+    /// Moves the elements that satisfy the predicate after those that do not, keeping the relative order within each group, and returns the index of the first moved element.
+    @discardableResult mutating func partition(by belongsInSecondPartition: (Element) throws -> Bool) rethrows -> Index {
+        var first: [Int] = []
+        var second: [Int] = []
+        for (offset, element) in enumerated() {
+            if try belongsInSecondPartition(element) {
+                second.append(offset)
+            } else {
+                first.append(offset)
+            }
+        }
+        permute(using: Permutation(sources: first + second))
+        return index(startIndex, offsetBy: first.count)
+    }
+
     /// Applies the permutation with the minimal number of `swapAt(_:_:)` calls, one per offset that does not start a cycle.
     mutating func permute(using permutation: Permutation) {
         guard let largest = permutation.cycle.max() else { return }
@@ -17,16 +32,51 @@ public extension PermutableCollection {
         permutation.forEachSwap { swapAt(index(startIndex, offsetBy: $0), index(startIndex, offsetBy: $1)) }
     }
 
-    /// Shuffles the elements in place through a permutation shuffled directly in cycle form.
-    mutating func shuffle() {
-        permute(using: Permutation(shuffles: count))
+    /// Reverses the elements in place and returns the permutation applied.
+    @discardableResult mutating func reverse() -> Permutation {
+        permute(sources: Array((0..<count).reversed()))
     }
 
-    /// Shuffles the elements in place through a permutation, giving the same order as `Array.shuffle(using:)` with the same generator state.
-    mutating func shuffle<R: RandomNumberGenerator>(using generator: inout R) {
+    /// Rotates the elements so the element at the given index becomes the first, and returns the permutation applied.
+    @discardableResult mutating func rotate(toStartAt newStart: Index) -> Permutation {
+        let length = count
+        let shift = distance(from: startIndex, to: newStart)
+        return permute(sources: (0..<length).map { ($0 + shift) % length })
+    }
+
+    /// Shuffles the elements in place through a permutation shuffled directly in cycle form, and returns the permutation applied.
+    @discardableResult mutating func shuffle() -> Permutation {
+        let permutation = Permutation(shuffles: count)
+        permute(using: permutation)
+        return permutation
+    }
+
+    /// Shuffles the elements in place, giving the same order as `Array.shuffle(using:)` with the same generator state, and returns the permutation applied.
+    @discardableResult mutating func shuffle<R: RandomNumberGenerator>(using generator: inout R) -> Permutation {
         var sources = Array(0..<count)
         sources.shuffle(using: &generator)
-        permute(using: Permutation(sources: sources))
+        return permute(sources: sources)
+    }
+
+    /// Sorts the elements in place through a single permutation applied with one swap per element that moves within a cycle, and returns the permutation applied.
+    @discardableResult mutating func sort(by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> Permutation {
+        let elements = Array(self)
+        return try permute(sources: elements.indices.sorted { try areInIncreasingOrder(elements[$0], elements[$1]) })
+    }
+
+    /// Applies the permutation built from source offsets and returns it.
+    private mutating func permute(sources: [Int]) -> Permutation {
+        let permutation = Permutation(sources: sources)
+        permute(using: permutation)
+        return permutation
+    }
+}
+
+public extension PermutableCollection where Element: Comparable {
+
+    /// Sorts the elements in ascending order through a single permutation, and returns the permutation applied.
+    @discardableResult mutating func sort() -> Permutation {
+        sort(by: <)
     }
 }
 
@@ -76,6 +126,25 @@ public struct Permutation: Hashable, Sendable {
         }
         line.removeSubrange(..<end)
         cycle = line
+    }
+
+    /// Creates a permutation from a line already in Foata's single-line notation.
+    private init(cycle: [Int]) {
+        self.cycle = cycle
+    }
+
+    /// The permutation that undoes this one, made by reversing each cycle after its largest offset.
+    public var inverted: Permutation {
+        var line = cycle
+        var blockStart = 0
+        var largest = -1
+        for position in line.indices where line[position] > largest {
+            largest = line[position]
+            if position > blockStart + 1 { line[(blockStart + 1)..<position].reverse() }
+            blockStart = position
+        }
+        if line.count > blockStart + 1 { line[(blockStart + 1)...].reverse() }
+        return Permutation(cycle: line)
     }
 
     /// Calls the closure with each pair of offsets to swap, in order, deriving them in one pass with no allocation.

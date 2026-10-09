@@ -35,11 +35,61 @@ private struct Deck: PermutableCollection {
 
 @Suite struct PermutableCollectionTests {
 
+    @Test func invertedOfEmptyPermutationIsEmpty() {
+        #expect(Permutation(shuffles: 0).inverted.cycle.isEmpty)
+    }
+
+    @Test func invertedUndoesShuffle() {
+        let original = (0..<25).map(String.init)
+        var deck = Deck(cards: original)
+        let permutation = deck.shuffle()
+        deck.permute(using: permutation.inverted)
+        #expect(deck.cards == original)
+    }
+
+    @Test func partitionIsStableAndReturnsFirstMovedIndex() {
+        var deck = Deck(cards: (0..<7).map(String.init))
+        let pivot = deck.partition { Int($0)! % 2 == 1 }
+        #expect(deck.cards == ["0", "2", "4", "6", "1", "3", "5"])
+        #expect(pivot == 4)
+    }
+
+    @Test func partitionWithNoMatchesReturnsEndIndex() {
+        var deck = Deck(cards: ["a", "b", "c"])
+        let pivot = deck.partition { $0 == "z" }
+        #expect(deck.cards == ["a", "b", "c"])
+        #expect(pivot == deck.endIndex)
+    }
+
     @Test func permuteLeavesOffsetsBeyondTheCycleInPlace() {
         var deck = Deck(cards: ["a", "b", "c", "d", "e", "f"])
         deck.permute(using: Permutation(shuffles: 3))
         #expect(deck.cards[3...] == ["d", "e", "f"])
         #expect(deck.cards[..<3].sorted() == ["a", "b", "c"])
+    }
+
+    @Test func reverseLeavesMiddleElementInPlace() {
+        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        let permutation = deck.reverse()
+        #expect(deck.cards == ["e", "d", "c", "b", "a"])
+        #expect(!permutation.cycle.contains(2))
+    }
+
+    @Test func reverseOfEmptyCollectionReturnsEmptyPermutation() {
+        var deck = Deck(cards: [])
+        #expect(deck.reverse().cycle.isEmpty)
+    }
+
+    @Test func rotateMovesIndexToFront() {
+        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        deck.rotate(toStartAt: 2)
+        #expect(deck.cards == ["c", "d", "e", "a", "b"])
+    }
+
+    @Test func rotateToStartIndexLeavesOrder() {
+        var deck = Deck(cards: ["a", "b", "c"])
+        #expect(deck.rotate(toStartAt: deck.startIndex).cycle.isEmpty)
+        #expect(deck.cards == ["a", "b", "c"])
     }
 
     @Test func shuffleCycleHasNoFixedPoints() {
@@ -81,4 +131,22 @@ private struct Deck: PermutableCollection {
         deck.shuffle(using: &generator)
         #expect(deck.cards == ["a"])
     }
+
+    @Test func sortByOrdersDescending() {
+        var deck = Deck(cards: ["b", "d", "a", "c"])
+        deck.sort(by: >)
+        #expect(deck.cards == ["d", "c", "b", "a"])
+    }
+
+    @Test func sortOfSortedCollectionReturnsEmptyPermutation() {
+        var deck = Deck(cards: ["a", "b", "c"])
+        #expect(deck.sort().cycle.isEmpty)
+    }
+
+    @Test func sortOrdersAscending() {
+        var deck = Deck(cards: ["d", "b", "e", "a", "c"])
+        deck.sort()
+        #expect(deck.cards == ["a", "b", "c", "d", "e"])
+    }
 }
+

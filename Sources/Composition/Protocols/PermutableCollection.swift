@@ -21,32 +21,6 @@ public struct Permutation: Hashable, Sendable {
     /// The cycles written one after another, each starting with its largest offset, in increasing order of those starting offsets.
     public let cycle: [Int]
 
-    /// Creates a permutation by walking each cycle of a bijection on `0..<count` from its largest offset, filling the line from the back.
-    private init(count: Int, walksBackward: Bool, next: (Int) -> Int) {
-        var isVisited = [Bool](repeating: false, count: count)
-        var line = [Int](repeating: 0, count: count)
-        var end = count
-        for start in stride(from: count - 1, through: 0, by: -1) where !isVisited[start] {
-            isVisited[start] = true
-            var length = 1
-            var offset = next(start)
-            while offset != start {
-                isVisited[offset] = true
-                length += 1
-                offset = next(offset)
-            }
-            guard length > 1 else { continue }
-            end -= length
-            line[end] = start
-            offset = next(start)
-            for step in 1..<length {
-                line[walksBackward ? end + length - step : end + step] = offset
-                offset = next(offset)
-            }
-        }
-        cycle = Array(line[end...])
-    }
-
     /// Creates a permutation where `destinations[i]` is the offset the element at `i` moves to, trapping when it is not a permutation of its indices.
     public init(destinations: [Int]) {
         Permutation.validate(destinations)
@@ -95,6 +69,32 @@ public struct Permutation: Hashable, Sendable {
     public init(sources: [Int: Int]) {
         Permutation.validate(sources)
         self.init(count: (sources.keys.max() ?? -1) + 1, walksBackward: true) { sources[$0] ?? $0 }
+    }
+
+    /// Creates a permutation by walking each cycle of a bijection on `0..<count` from its largest offset, filling the line from the back.
+    private init(count: Int, walksBackward: Bool, next: (Int) -> Int) {
+        var isVisited = [Bool](repeating: false, count: count)
+        var line = [Int](repeating: 0, count: count)
+        var end = count
+        for start in stride(from: count - 1, through: 0, by: -1) where !isVisited[start] {
+            isVisited[start] = true
+            var length = 1
+            var offset = next(start)
+            while offset != start {
+                isVisited[offset] = true
+                length += 1
+                offset = next(offset)
+            }
+            guard length > 1 else { continue }
+            end -= length
+            line[end] = start
+            offset = next(start)
+            for step in 1..<length {
+                line[walksBackward ? end + length - step : end + step] = offset
+                offset = next(offset)
+            }
+        }
+        cycle = Array(line[end...])
     }
 
     /// Traps unless the offsets contain every index of the array exactly once.

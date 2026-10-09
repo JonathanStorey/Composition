@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Extensions/CollectionDifference.swift
-// dependencies: [Protocols/Mergeable.swift, Protocols/Squashable.swift]
+// dependencies: [Protocols/Mergeable.swift, Protocols/Shiftable.swift, Protocols/Squashable.swift]
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension CollectionDifference.Change {
@@ -80,7 +80,7 @@ extension CollectionDifference: Squashable where ChangeElement: Equatable {
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension CollectionDifference: Mergeable where ChangeElement: Equatable {
+extension CollectionDifference: Shiftable where ChangeElement: Equatable {
 
     /// Returns how many values in the sorted list are less than the bound.
     private static func count(of sorted: [Int], below bound: Int) -> Int {
@@ -105,7 +105,7 @@ extension CollectionDifference: Mergeable where ChangeElement: Equatable {
     }
 
     /// Returns only this difference's changes, moved to apply after a prior difference made from the same collection.
-    public func adjusted(for prior: CollectionDifference) throws -> CollectionDifference {
+    public func shifted(by prior: CollectionDifference) throws -> CollectionDifference {
         let removedOffsets = Set(prior.removals.map(\.offset)).union(removals.map(\.offset)).sorted()
         let priorGaps = prior.insertionGaps
         var changes: [Change] = []
@@ -126,6 +126,9 @@ extension CollectionDifference: Mergeable where ChangeElement: Equatable {
         return CollectionDifference(changes)!
     }
 }
+
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+extension CollectionDifference: Mergeable where ChangeElement: Equatable {}
 
 /// An error thrown when a difference does not apply to a collection, carrying the offset of the change that failed.
 public enum CollectionDifferenceError: Error, Equatable, Sendable {

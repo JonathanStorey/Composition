@@ -53,11 +53,12 @@ public extension PermutableCollection {
         return index(startIndex, offsetBy: first.count)
     }
 
-    /// Applies the permutation with the minimal number of `swapAt(_:_:)` calls, one per offset that does not start a cycle.
+    /// Applies the permutation with the minimal number of `swapAt(_:_:)` calls, walking the indices once so each swap is O(1), which requires `swapAt(_:_:)` to keep indices valid.
     mutating func permute(using permutation: Permutation) {
         guard !permutation.cycle.isEmpty else { return }
         precondition(permutation.minimumCount <= count, "Every offset in the cycle must be within the collection.")
-        permutation.forEachSwap { swapAt(index(startIndex, offsetBy: $0), index(startIndex, offsetBy: $1)) }
+        let positions = Array(indices.prefix(permutation.minimumCount))
+        permutation.forEachSwap { swapAt(positions[$0], positions[$1]) }
     }
 
     /// Reverses the elements in place and returns the permutation applied.
@@ -105,6 +106,16 @@ public extension PermutableCollection where Element: Comparable {
     /// Sorts the elements in ascending order through a single permutation, and returns the permutation applied.
     @discardableResult mutating func sort() -> Permutation {
         sort(by: <)
+    }
+}
+
+public extension PermutableCollection where Self: RandomAccessCollection {
+
+    /// Applies the permutation with the minimal number of `swapAt(_:_:)` calls, offsetting each index directly in O(1).
+    mutating func permute(using permutation: Permutation) {
+        guard !permutation.cycle.isEmpty else { return }
+        precondition(permutation.minimumCount <= count, "Every offset in the cycle must be within the collection.")
+        permutation.forEachSwap { swapAt(index(startIndex, offsetBy: $0), index(startIndex, offsetBy: $1)) }
     }
 }
 

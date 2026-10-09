@@ -36,17 +36,11 @@ public struct Permutation: Hashable, Sendable {
     /// The cycles written one after another, each starting with its largest offset, in increasing order of those starting offsets.
     public let cycle: [Int]
 
-    /// Creates a uniformly random permutation of `0..<count` by shuffling the Foata line directly, using the system random number generator.
+    /// Creates a uniformly random permutation of `0..<count` by shuffling the Foata line directly.
     public init(shuffles count: Int) {
-        var generator = SystemRandomNumberGenerator()
-        self.init(shuffles: count, using: &generator)
-    }
-
-    /// Creates a uniformly random permutation of `0..<count` by shuffling the Foata line directly, reproducible for a given generator state.
-    public init<R: RandomNumberGenerator>(shuffles count: Int, using generator: inout R) {
         precondition(count >= 0, "The count must not be negative.")
         var line = Array(0..<count)
-        line.shuffle(using: &generator)
+        line.shuffle()
         var kept = 0
         var largest = -1
         for position in line.indices {

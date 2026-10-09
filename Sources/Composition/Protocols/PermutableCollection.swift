@@ -15,20 +15,29 @@ public extension PermutableCollection {
     }
 }
 
-/// Cycles of offsets in Foata's single-line notation that apply to any collection long enough to contain them, leaving other positions in place.
+// needs description
 public struct Permutation: Hashable, Sendable {
 
-    /// The cycles written one after another, each starting with its largest offset, in increasing order of those starting offsets.
+    /// The cycles written Foata's single-line notation.
     public let cycle: [Int]
 
+    /// Creates a permutation from a mapping input with a mathematically efficient conversion to cycles -- does not recreate the order
+    public init(mapping: [Int:Int], direction: MappingDirection) {}
+
+    /// Creates a permutation from a mapping input with a mathematically efficient conversion to cycles -- does not recreate the order
+    public init(mapping: [Int], direction: MappingDirection) {}
+
+    /// Creates a permutation by a random shuffle -- it shuffles the components of the cycle rather than randomly shuffling objects
+    public init(shuffles count: Int) {}
+    
     /// Creates a permutation from cycles in Foata's single-line notation, or returns nil when an offset is negative or appears more than once.
-    public init?(cycle: [Int]) {
+    private init?(cycle: [Int]) {
         guard cycle.allSatisfy({ $0 >= 0 }), Set(cycle).count == cycle.count else { return nil }
         self.cycle = cycle
     }
 
     /// Calls the closure with each pair of offsets to swap, in order, deriving them in one pass with no allocation.
-    public func forEachSwap(_ body: (Int, Int) throws -> Void) rethrows {
+    fileprivate func forEachSwap(_ body: (Int, Int) throws -> Void) rethrows {
         var start = -1
         for offset in cycle {
             if offset > start {
@@ -38,4 +47,11 @@ public struct Permutation: Hashable, Sendable {
             }
         }
     }
+}
+
+extension Permutation {
+
+    enum MappingDirection {
+        case forward
+        case reverse
 }

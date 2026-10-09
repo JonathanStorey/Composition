@@ -27,6 +27,28 @@ public extension PermutableCollection {
     }
 }
 
+public extension PermutableCollection where Self: RandomAccessCollection {
+
+    /// Shuffles the elements in place with the standard library's Fisher–Yates shuffle, which needs no permutation.
+    mutating func shuffle() {
+        var generator = SystemRandomNumberGenerator()
+        standardShuffle(using: &generator)
+    }
+
+    /// Shuffles the elements in place with the standard library's Fisher–Yates shuffle, matching `Array.shuffle(using:)` for the same generator state.
+    mutating func shuffle<R: RandomNumberGenerator>(using generator: inout R) {
+        standardShuffle(using: &generator)
+    }
+}
+
+fileprivate extension MutableCollection where Self: RandomAccessCollection {
+
+    /// Calls the standard library's shuffle, which a permutable collection's own shuffle would otherwise shadow.
+    mutating func standardShuffle<R: RandomNumberGenerator>(using generator: inout R) {
+        shuffle(using: &generator)
+    }
+}
+
 /// A reordering stored as cycles in Foata's single-line notation, leaving offsets outside the cycles in place so it applies to any collection long enough.
 public struct Permutation: Hashable, Sendable {
 

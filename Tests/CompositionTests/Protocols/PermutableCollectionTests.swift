@@ -32,6 +32,20 @@ private struct Deck: PermutableCollection {
     }
 }
 
+private struct Hand: PermutableCollection, RandomAccessCollection {
+
+    var cards: [String]
+
+    var endIndex: Int { cards.endIndex }
+
+    var startIndex: Int { cards.startIndex }
+
+    subscript(position: Int) -> String {
+        get { cards[position] }
+        set { cards[position] = newValue }
+    }
+}
+
 @Suite struct PermutableCollectionTests {
 
     @Test func destinationsAndSourcesDescribeTheSameMove() {
@@ -107,6 +121,16 @@ private struct Deck: PermutableCollection {
         array.shuffle(using: &arrayGenerator)
         #expect(deck.cards == array)
         #expect(deckGenerator.state == arrayGenerator.state)
+    }
+
+    @Test func shuffleUsingGeneratorOnRandomAccessMatchesArray() {
+        var handGenerator = SeededGenerator(state: 5)
+        var arrayGenerator = SeededGenerator(state: 5)
+        var hand = Hand(cards: (0..<30).map(String.init))
+        var array = (0..<30).map(String.init)
+        hand.shuffle(using: &handGenerator)
+        array.shuffle(using: &arrayGenerator)
+        #expect(hand.cards == array)
     }
 
     @Test func shuffleUsingGeneratorOnSingleElementLeavesItInPlace() {

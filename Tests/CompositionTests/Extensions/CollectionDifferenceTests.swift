@@ -7,6 +7,49 @@ import Testing
 
 @Suite struct CollectionDifferenceTests {
 
+    @Test func adjustForPriorReplacesReceiver() throws {
+        let base = ["milk", "eggs", "bread"]
+        let mine = ["eggs", "bread"].difference(from: base)
+        var partner = ["milk", "eggs"].difference(from: base)
+        try partner.adjust(for: mine)
+        var list = ["eggs", "bread"]
+        try list.apply(partner)
+        #expect(list == ["eggs"])
+    }
+
+    @Test func adjustedForPriorConvergesOnBothDevices() throws {
+        let base = ["Intro", "Song A", "Song B", "Outro"]
+        let mine = ["Bonus", "Intro", "Song B", "Outro"].difference(from: base)
+        let partner = ["Intro", "Song A", "Outro", "Encore"].difference(from: base)
+        var phone = ["Bonus", "Intro", "Song B", "Outro"]
+        try phone.apply(partner.adjusted(for: mine))
+        var laptop = ["Intro", "Song A", "Outro", "Encore"]
+        try laptop.apply(mine.adjusted(for: partner))
+        #expect(phone == ["Bonus", "Intro", "Outro", "Encore"])
+        #expect(laptop == phone)
+    }
+
+    @Test func adjustedForPriorDropsRemovalThePriorAlreadyMade() throws {
+        let base = ["milk", "eggs", "bread"]
+        let removeEggs = ["milk", "bread"].difference(from: base)
+        #expect(try removeEggs.adjusted(for: removeEggs).isEmpty)
+    }
+
+    @Test func adjustedForPriorPlacesPriorInsertionFirstOnTie() throws {
+        let base = ["milk", "eggs"]
+        let mine = ["milk", "eggs", "bread"].difference(from: base)
+        let partner = ["milk", "eggs", "jam"].difference(from: base)
+        var list = ["milk", "eggs", "bread"]
+        try list.apply(partner.adjusted(for: mine))
+        #expect(list == ["milk", "eggs", "bread", "jam"])
+    }
+
+    @Test func adjustedForPriorThrowsWhenBothRemoveDifferentElementsAtOneOffset() throws {
+        let mine = try #require(CollectionDifference([.remove(offset: 1, element: "eggs", associatedWith: nil)]))
+        let partner = try #require(CollectionDifference([.remove(offset: 1, element: "jam", associatedWith: nil)]))
+        #expect(throws: CollectionDifferenceError.elementMismatch(1)) { try partner.adjusted(for: mine) }
+    }
+
     @Test func associatedOffsetIsNilWithoutInferredMoves() {
         let difference = [2, 1].difference(from: [1, 2])
         #expect(!difference.isEmpty)
@@ -32,6 +75,33 @@ import Testing
         #expect(removal.offset == 1 && removal.element == 2)
         #expect(insertion.isInsertion && !insertion.isRemoval)
         #expect(insertion.offset == 1 && insertion.element == 3)
+    }
+
+    @Test func mergeWithReplacesReceiver() throws {
+        let base = ["milk", "eggs"]
+        var mine = ["eggs"].difference(from: base)
+        try mine.merge(with: ["milk", "eggs", "jam"].difference(from: base))
+        var list = base
+        try list.apply(mine)
+        #expect(list == ["eggs", "jam"])
+    }
+
+    @Test func mergedWithMatchesEachDeviceAfterAdjusting() throws {
+        let base = ["Intro", "Song A", "Song B", "Outro"]
+        let mine = ["Bonus", "Intro", "Song B", "Outro"].difference(from: base)
+        let partner = ["Intro", "Song A", "Outro", "Encore"].difference(from: base)
+        var list = base
+        try list.apply(mine.merged(with: partner))
+        #expect(list == ["Bonus", "Intro", "Outro", "Encore"])
+    }
+
+    @Test func mergedWithPlacesReceiverInsertionFirstOnTie() throws {
+        let base = ["milk", "eggs"]
+        let mine = ["milk", "eggs", "bread"].difference(from: base)
+        let partner = ["milk", "eggs", "jam"].difference(from: base)
+        var list = base
+        try list.apply(mine.merged(with: partner))
+        #expect(list == ["milk", "eggs", "bread", "jam"])
     }
 
     @Test func squashedWithCancelsInsertionThatNextRemoves() throws {

@@ -79,6 +79,69 @@ extension CollectionDifference: Squashable where ChangeElement: Equatable {
     }
 }
 
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+public extension CollectionDifference where ChangeElement: Equatable {
+
+    /// Returns how many values in the sorted list are less than the bound.
+    private static func count(of sorted: [Int], below bound: Int) -> Int {
+        var low = 0
+        var high = sorted.count
+        while low < high {
+            let middle = (low + high) / 2
+            if sorted[middle] < bound {
+                low = middle + 1
+            } else {
+                high = middle
+            }
+        }
+        return low
+    }
+
+    /// The offset in the original collection of the element each insertion lands before, counting the removed elements.
+    private var insertionGaps: [Int] {
+        let removedOffsets = removals.map(\.offset)
+        var position = 0
+        return insertions.enumerated().map { index, change in Self.offset(ranked: change.offset - index, skipping: removedOffsets, from: &position) }
+    }
+
+    /// Replaces this difference with its offsets moved to apply after the prior difference, made from the same collection.
+    mutating func adjust(for prior: CollectionDifference) throws {
+        self = try adjusted(for: prior)
+    }
+
+    /// Returns this difference with its offsets moved to apply after the prior difference, made from the same collection, dropping removals the prior already made and placing the prior's insertions first where both insert at the same position.
+    func adjusted(for prior: CollectionDifference) throws -> CollectionDifference {
+        let removedOffsets = Set(prior.removals.map(\.offset)).union(removals.map(\.offset)).sorted()
+        let priorGaps = prior.insertionGaps
+        var changes: [Change] = []
+        var priorRemoval = 0
+        for change in removals {
+            while priorRemoval < prior.removals.count, prior.removals[priorRemoval].offset < change.offset {
+                priorRemoval += 1
+            }
+            if priorRemoval < prior.removals.count, prior.removals[priorRemoval].offset == change.offset {
+                guard prior.removals[priorRemoval].element == change.element else { throw CollectionDifferenceError.elementMismatch(change.offset) }
+            } else {
+                changes.append(.remove(offset: change.offset - priorRemoval + Self.count(of: priorGaps, below: change.offset + 1), element: change.element, associatedWith: nil))
+            }
+        }
+        for (index, gap) in insertionGaps.enumerated() {
+            changes.append(.insert(offset: gap - Self.count(of: removedOffsets, below: gap) + Self.count(of: priorGaps, below: gap + 1) + index, element: insertions[index].element, associatedWith: nil))
+        }
+        return CollectionDifference(changes)!
+    }
+
+    /// Replaces this difference with one making its changes and the other's, both made from the same collection.
+    mutating func merge(with other: CollectionDifference) throws {
+        self = try merged(with: other)
+    }
+
+    /// Returns the difference making this difference's changes and the other's, both made from the same collection, placing this difference's insertions first where both insert at the same position.
+    func merged(with other: CollectionDifference) throws -> CollectionDifference {
+        try squashed(with: other.adjusted(for: self))
+    }
+}
+
 /// An error thrown when a difference does not apply to a collection, carrying the offset of the change that failed.
 public enum CollectionDifferenceError: Error, Equatable, Sendable {
 

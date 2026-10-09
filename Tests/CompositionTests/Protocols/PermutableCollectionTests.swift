@@ -36,16 +36,14 @@ private struct Deck: PermutableCollection {
 @Suite struct PermutableCollectionTests {
 
     @Test func permuteLeavesOffsetsBeyondTheCycleInPlace() {
-        var generator = SeededGenerator(state: 11)
         var deck = Deck(cards: ["a", "b", "c", "d", "e", "f"])
-        deck.permute(using: Permutation(shuffles: 3, using: &generator))
+        deck.permute(using: Permutation(shuffles: 3))
         #expect(deck.cards[3...] == ["d", "e", "f"])
         #expect(deck.cards[..<3].sorted() == ["a", "b", "c"])
     }
 
     @Test func shuffleCycleHasNoFixedPoints() {
-        var generator = SeededGenerator(state: 7)
-        let cycle = Permutation(shuffles: 50, using: &generator).cycle
+        let cycle = Permutation(shuffles: 50).cycle
         #expect(Set(cycle).count == cycle.count && cycle.allSatisfy { (0..<50).contains($0) })
         var largest = -1
         let starts = cycle.map { offset in
@@ -53,12 +51,6 @@ private struct Deck: PermutableCollection {
             return offset > largest
         }
         #expect(zip(starts, starts.dropFirst() + [true]).allSatisfy { !($0 && $1) })
-    }
-
-    @Test func shuffleIsReproducibleWithTheSameGenerator() {
-        var first = SeededGenerator(state: 42)
-        var second = SeededGenerator(state: 42)
-        #expect(Permutation(shuffles: 50, using: &first) == Permutation(shuffles: 50, using: &second))
     }
 
     @Test func shuffleKeepsEveryElement() {

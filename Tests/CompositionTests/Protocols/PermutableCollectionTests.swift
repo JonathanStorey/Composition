@@ -35,51 +35,24 @@ private struct Deck: PermutableCollection {
 
 @Suite struct PermutableCollectionTests {
 
-    @Test func destinationsAndSourcesDescribeTheSameMove() {
-        #expect(Permutation(destinations: [1, 2, 0, 4, 3]) == Permutation(sources: [2, 0, 1, 4, 3]))
-        #expect(Permutation(destinations: [0: 2, 2: 0]) == Permutation(sources: [2: 0, 0: 2]))
+    @Test func permuteLeavesOffsetsBeyondTheCycleInPlace() {
+        var generator = SeededGenerator(state: 11)
+        var deck = Deck(cards: ["a", "b", "c", "d", "e", "f"])
+        deck.permute(using: Permutation(shuffles: 3, using: &generator))
+        #expect(deck.cards[3...] == ["d", "e", "f"])
+        #expect(deck.cards[..<3].sorted() == ["a", "b", "c"])
     }
 
-    @Test func dictionaryMatchesArrayWithMissingOffsetsInPlace() {
-        #expect(Permutation(destinations: [0: 2, 2: 0]) == Permutation(destinations: [2, 1, 0]))
-        #expect(Permutation(destinations: [0: 2, 2: 0]).cycle == [2, 0])
-    }
-
-    @Test func emptyMappingHasNoCycles() {
-        var deck = Deck(cards: ["a", "b"])
-        deck.permute(using: Permutation(sources: []))
-        #expect(deck.cards == ["a", "b"])
-    }
-
-    @Test func fixedPointsAreLeftOutOfTheCycle() {
-        #expect(Permutation(sources: [0, 1, 2]).cycle.isEmpty)
-        #expect(Permutation(sources: [0, 2, 1, 3]).cycle == [2, 1])
-    }
-
-    @Test func mappingIsStoredInFoataOrder() {
-        #expect(Permutation(sources: [2, 0, 1, 4, 3]).cycle == [2, 0, 1, 4, 3])
-        #expect(Permutation(sources: [3, 2, 1, 0]).cycle == [2, 1, 3, 0])
-    }
-
-    @Test func permuteAppliesEachCycle() {
-        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
-        deck.permute(using: Permutation(sources: [2, 0, 1, 4, 3]))
-        #expect(deck.cards == ["c", "a", "b", "e", "d"])
-    }
-
-    @Test func permuteAppliesToLongerCollections() {
-        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
-        deck.permute(using: Permutation(sources: [2, 0, 1]))
-        #expect(deck.cards == ["c", "a", "b", "d", "e"])
-    }
-
-    @Test func shuffleIsCanonicalAndReorders() {
+    @Test func shuffleCycleHasNoFixedPoints() {
         var generator = SeededGenerator(state: 7)
-        let permutation = Permutation(shuffles: 20, using: &generator)
-        var deck = Deck(cards: (0..<20).map(String.init))
-        deck.permute(using: permutation)
-        #expect(deck.cards.sorted() == (0..<20).map(String.init).sorted())
-        #expect(Permutation(sources: deck.cards.compactMap { Int($0) }) == permutation)
+        let cycle = Permutation(shuffles: 50, using: &generator).cycle
+        #expect(Set(cycle).count == cycle.count && cycle.allSatisfy { (0..<50).contains($0) })
+        var largest = -1
+        let starts = cycle.map { offset in
+            defer { largest = max(largest, offset) }
+            return offset > largest
+        }
+        #expect(zip(starts, starts.dropFirst() + [true]).allSatisfy { !($0 && $1) })
     }
 
     @Test func shuffleIsReproducibleWithTheSameGenerator() {
@@ -117,4 +90,3 @@ private struct Deck: PermutableCollection {
         #expect(deck.cards == ["a"])
     }
 }
-

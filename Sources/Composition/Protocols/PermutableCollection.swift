@@ -56,30 +56,26 @@ public struct Permutation: Hashable, Sendable {
         cycle = line
     }
 
-    /// Creates a permutation where `sources[i]` is the offset whose element moves into `i`, walking each cycle from its largest offset and filling the line from the back without validating the mapping.
+    /// Creates a permutation where `sources[i]` is the offset whose element moves into `i`, writing each cycle from the back in one walk without validating the mapping.
     fileprivate init(sources: [Int]) {
         var isVisited = [Bool](repeating: false, count: sources.count)
         var line = [Int](repeating: 0, count: sources.count)
         var end = sources.count
         for start in sources.indices.reversed() where !isVisited[start] {
             isVisited[start] = true
-            var length = 1
             var offset = sources[start]
+            guard offset != start else { continue }
             while offset != start {
                 isVisited[offset] = true
-                length += 1
+                end -= 1
+                line[end] = offset
                 offset = sources[offset]
             }
-            guard length > 1 else { continue }
-            end -= length
+            end -= 1
             line[end] = start
-            offset = sources[start]
-            for step in 1..<length {
-                line[end + length - step] = offset
-                offset = sources[offset]
-            }
         }
-        cycle = Array(line[end...])
+        line.removeSubrange(..<end)
+        cycle = line
     }
 
     /// Calls the closure with each pair of offsets to swap, in order, deriving them in one pass with no allocation.

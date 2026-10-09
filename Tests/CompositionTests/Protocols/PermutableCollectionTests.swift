@@ -33,6 +33,21 @@ private struct Deck: PermutableCollection {
     }
 }
 
+private struct Hand: PermutableCollection, RandomAccessCollection {
+
+    var cards: [String]
+
+    var endIndex: Int { cards.endIndex }
+
+    var startIndex: Int { cards.startIndex }
+
+    subscript(position: Int) -> String { cards[position] }
+
+    mutating func swapAt(_ i: Int, _ j: Int) {
+        cards.swapAt(i, j)
+    }
+}
+
 @Suite struct PermutableCollectionTests {
 
     @Test func invertedOfEmptyPermutationIsEmpty() {
@@ -111,6 +126,14 @@ private struct Deck: PermutableCollection {
         deck.permute(using: Permutation(shuffles: 3))
         #expect(deck.cards[3...] == ["d", "e", "f"])
         #expect(deck.cards[..<3].sorted() == ["a", "b", "c"])
+    }
+
+    @Test func permuteOnRandomAccessCollectionMatchesPlainCollection() {
+        let original = (0..<25).map(String.init)
+        var deck = Deck(cards: original)
+        var hand = Hand(cards: original)
+        hand.permute(using: deck.shuffle())
+        #expect(hand.cards == deck.cards)
     }
 
     @Test func reverseLeavesMiddleElementInPlace() {

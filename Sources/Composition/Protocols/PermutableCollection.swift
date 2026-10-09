@@ -5,7 +5,7 @@ public protocol PermutableCollection: Collection {
     mutating func permute(using permutation: Permutation)
 
     /// Exchanges the elements at the two indices.
-    mutating func swapAt(_ first: Index, _ second: Index)
+    mutating func swapAt(_ i: Index, _ j: Index)
 }
 
 public extension PermutableCollection {

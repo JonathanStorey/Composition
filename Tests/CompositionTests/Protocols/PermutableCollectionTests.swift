@@ -28,8 +28,8 @@ private struct Deck: PermutableCollection {
         cards.index(after: i)
     }
 
-    mutating func swapAt(_ first: Int, _ second: Int) {
-        cards.swapAt(first, second)
+    mutating func swapAt(_ i: Int, _ j: Int) {
+        cards.swapAt(i, j)
     }
 }
 

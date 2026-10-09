@@ -7,7 +7,7 @@ Guidance for AI coding agents working in this repository.
 `Composition` is a Swift package of reusable extensions, protocols, property wrappers, and SwiftUI view modifiers.
 
 - Swift tools version 6.0. Package minimums: iOS 17, macOS 14.
-- Build and test with `swift build` and `swift test`. SwiftUI code only builds on Apple platforms, so run these on macOS.
+- Build and test with `swift build` and `swift test` on macOS, since SwiftUI code only builds on Apple platforms.
 
 ## Layout
 
@@ -23,40 +23,46 @@ Tests/CompositionTests/  Mirrors the Sources folder structure
 
 ## Conventions
 
-### Share code across files
+Every rule applies to test files too.
 
-Files may use code from other files in the package. Reuse existing helpers instead of duplicating them, for example `Searchable` uses `String.trimmed`, and list each such file in the header's `dependencies`.
+### Header
 
-### Mark access and availability
+Start every file with this header and a blank line:
 
-- Mark everything that callers use as `public`.
-- Give everything else the narrowest access that compiles, preferring `private`, then `fileprivate`, then internal. Use `private` for code used only inside its own declaration, `fileprivate` for code shared within the file, and internal (written without a modifier) only for code used from another file, including tests.
-- When code needs iOS 13 / macOS 10.15 or later, add `@available(iOS x, macOS x, tvOS x, watchOS x, *)` with the correct version for every platform. Put it on the member, or on the whole type or extension when every member needs it.
+```swift
+// repository: https://github.com/JonathanStorey/Composition
+// path: Protocols/Searchable.swift
+// dependencies: [Extensions/String.swift]
+```
 
-### Order members
+- `path` is relative to the file's target folder (`Sources/Composition/` or `Tests/CompositionTests/`).
+- `dependencies` lists, alphabetically and relative to `Sources/Composition/`, every source file whose code this file uses directly, or `[]`. Frameworks and test files are never listed.
+- Reuse existing helpers instead of duplicating them, and list their files here.
 
-- Order members as stored `let` properties, stored `var` properties, initializers, static variables, static functions, computed instance variables, then instance functions. Within each group, order members by access as public, internal, fileprivate, then private, and alphabetically within each access level.
+### Access and availability
+
+- Mark everything callers use `public`. Give everything else the narrowest access that compiles: `private` for use inside its own declaration, `fileprivate` for use within the file, and internal (no modifier) only for use from another file, including tests.
+- When code needs iOS 13 / macOS 10.15 or later, add `@available(iOS x, macOS x, tvOS x, watchOS x, *)` with the correct version for every platform, on the member, or on the whole type or extension when every member needs it.
+
+### Member order
+
+- Order members as stored `let`s, stored `var`s, initializers, static variables, static functions, computed instance variables, then instance functions.
+- Within each group, order by access (public, internal, fileprivate, private), then alphabetically. Test functions are alphabetical.
 - Do not add `// MARK: - Variables` or `// MARK: - Functions`.
-- Tests follow the same rule: test functions are alphabetical.
 
-### Separate code by dependency
+### Dependency sections
 
-When some code in a file needs a framework such as Foundation and other code does not, split the file by dependency:
+When only some code in a file needs a framework, split the file:
 
-1. Code that needs only the Swift standard library goes first, with no MARK.
-2. Each dependency gets its own section below, under a MARK named for the dependency. Put the import below the MARK and wrap the section in `#if canImport(...)`.
-3. Order the dependency sections alphabetically by dependency name, for example Foundation before SwiftUI. Sections needing more than one dependency come last, named with `+` (for example `// MARK: - Foundation + SwiftUI`) and wrapped in `#if canImport(A) && canImport(B)`.
-4. Within each section, follow the member ordering above.
+1. Standard-library code first, with no MARK.
+2. Then one section per framework, alphabetically, under `// MARK: - Name`, wrapped in `#if canImport(Name)` with the import inside.
+3. Sections needing several frameworks come last, as `// MARK: - Foundation + SwiftUI` and `#if canImport(Foundation) && canImport(SwiftUI)`.
 
 ```swift
 public extension String {
 
     /// A Boolean value indicating whether the string is empty or contains only whitespace and newlines.
     var isBlank: Bool { ... }
-
-    /// Returns a Boolean value indicating whether the entire string matches a regular expression.
-    @available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, *)
-    func matches(pattern: String) -> Bool { ... }
 }
 
 // MARK: - Foundation
@@ -72,50 +78,25 @@ public extension String {
 #endif
 ```
 
-When everything in a file depends on the same imports, as in `View.swift` and `Searchable.swift`, wrap the whole file in `#if canImport(...)` with the import on the line below it and `#endif` as the last line. Add no MARKs.
+When the whole file needs the same frameworks, wrap it all in one `#if canImport(...)` with the import below it, `#endif` as the last line, and no MARKs. Guard a test file, or an extension of its suite, the same way as the code it tests.
 
-```swift
-#if canImport(SwiftUI)
-import SwiftUI
+### Calls and declarations
 
-public extension View { ... }
-#endif
-```
-
-Tests follow the same rule. Guard a test file, or a section of it in an extension of the suite, with the same `#if canImport(...)` as the code it tests, even when the test file itself imports only `Testing`. Files that need only the Swift standard library get no guard.
-
-### Calls and closures
-
-- Keep every function call's arguments on a single line. Only the body of a trailing closure goes on the lines below.
-- Keep every declaration on a single line, including its generic `where` clause, however long it gets. This applies to functions, initializers, types, and extensions, for example `public extension Picker where Label == Text, SelectionValue: CaseIterable & LabelRepresentable, Content == ForEach<...> {`. Never wrap a `where` clause or its requirements onto following lines.
-- Prefer one argument plus one trailing closure, as in `Label(title) { icon }`. Do not use multiple trailing closures such as `Label { title } icon: { icon }`.
-- When SwiftUI only offers a multi-closure initializer, pass the closures as labeled arguments, as in `self.init(title: { Text(title) }, icon: icon)`, or add a helper initializer in the extension that gives the one-trailing-closure form.
+- Keep every call's arguments, and every declaration including its `where` clause, on a single line however long it gets, for example `public extension Picker where Label == Text, SelectionValue: CaseIterable & LabelRepresentable, Content == ForEach<...> {`.
+- Use at most one trailing closure, as in `Label(title) { icon }`, never `Label { title } icon: { icon }`. When SwiftUI only offers a multi-closure initializer, pass the closures as labeled arguments, as in `self.init(title: { Text(title) }, icon: icon)`, or add a helper initializer with the one-trailing-closure form.
+- Leave a blank line after the opening brace of every type, protocol, and extension.
 
 ### Naming
 
-- Name a generic parameter with a single capital letter taken from its protocol, and name the value for what it is, for example `init<L: LabelRepresentable>(_ label: L)`.
-- Use a named generic parameter instead of `some Protocol` when a `where` clause needs the type's associated type.
-- Give a parameter both an argument label and a parameter name when that reads better at the call site or gives clearer autocomplete hints, for example `init?(timestamp uuid: UUID)`, called as `Date(timestamp: id)`.
-
-### Formatting
-
-- Start every file, including tests, with a three-line header and a blank line after it:
-
-  ```swift
-  // repository: https://github.com/JonathanStorey/Composition
-  // path: Protocols/Searchable.swift
-  // dependencies: [Extensions/String.swift]
-  ```
-
-  `path` is relative to the file's target folder (`Sources/Composition/` or `Tests/CompositionTests/`). `dependencies` lists, alphabetically and relative to `Sources/Composition/`, every source file whose code this file uses directly, or `[]` when there are none. Frameworks are not listed, and source files never list test files.
-- Leave a blank line after the opening brace of every type, protocol, and extension declaration, including in tests.
+- Name a generic parameter with one capital letter from its protocol and the value for what it is, as in `init<L: LabelRepresentable>(_ label: L)`. Use a named generic parameter instead of `some Protocol` when a `where` clause needs its associated type.
+- Give a parameter both an argument label and a parameter name when that reads better at the call site, as in `init?(timestamp uuid: UUID)`, called as `Date(timestamp: id)`.
 
 ### Doc comments
 
-Each public declaration gets a single-line `///` summary. Do not add usage examples, extra detail lines, or notes about minimum versions.
+Each public declaration gets a single-line `///` summary, with no examples, extra lines, or minimum-version notes.
 
 ### Tests
 
-- Use Swift Testing (`import Testing`, `@Suite`, `@Test`, `#expect`). Do not use XCTest.
-- Place tests in the folder matching the source file, for example `Tests/CompositionTests/Extensions/StringTests.swift`.
-- Every new public API gets at least one test covering its main behavior and one edge case.
+- Use Swift Testing (`import Testing`, `@Suite`, `@Test`, `#expect`), never XCTest.
+- Mirror the source path, as in `Tests/CompositionTests/Extensions/StringTests.swift`.
+- Every new public API gets a test of its main behavior and one edge case.

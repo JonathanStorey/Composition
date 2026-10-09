@@ -10,6 +10,34 @@ public protocol PermutableCollection: Collection {
 
 public extension PermutableCollection {
 
+    /// Moves the element at the source index so it ends up at the destination index, shifting the elements between them, and returns the permutation applied.
+    @discardableResult mutating func move(from source: Index, to destination: Index) -> Permutation {
+        var sources = Array(0..<count)
+        let offset = sources.remove(at: distance(from: startIndex, to: source))
+        sources.insert(offset, at: distance(from: startIndex, to: destination))
+        return permute(sources: sources)
+    }
+
+    /// Moves the elements at the given offsets to just before the element at the destination offset, keeping their relative order, and returns the permutation applied.
+    @discardableResult mutating func move(fromOffsets source: some Sequence<Int>, toOffset destination: Int) -> Permutation {
+        let moved = Set(source).sorted()
+        precondition(moved.allSatisfy { (0..<count).contains($0) } && (0...count).contains(destination), "Every offset must be within the collection.")
+        var isMoved = [Bool](repeating: false, count: count)
+        for offset in moved {
+            isMoved[offset] = true
+        }
+        var before: [Int] = []
+        var after: [Int] = []
+        for offset in 0..<count where !isMoved[offset] {
+            if offset < destination {
+                before.append(offset)
+            } else {
+                after.append(offset)
+            }
+        }
+        return permute(sources: before + moved + after)
+    }
+
     /// Moves the elements that satisfy the predicate after those that do not, keeping the relative order within each group, and returns the index of the first moved element.
     @discardableResult mutating func partition(by belongsInSecondPartition: (Element) throws -> Bool) rethrows -> Index {
         var first: [Int] = []
@@ -61,13 +89,13 @@ public extension PermutableCollection {
     }
 
     /// Applies the permutation and returns it.
-    fileprivate mutating func permute(returning permutation: Permutation) -> Permutation {
+    private mutating func permute(returning permutation: Permutation) -> Permutation {
         permute(using: permutation)
         return permutation
     }
 
     /// Applies the permutation built from source offsets and returns it.
-    fileprivate mutating func permute(sources: [Int]) -> Permutation {
+    private mutating func permute(sources: [Int]) -> Permutation {
         permute(returning: Permutation(sources: sources))
     }
 }
@@ -199,27 +227,3 @@ public struct Permutation: Hashable, Sendable {
         }
     }
 }
-
-// MARK: - Foundation
-
-#if canImport(Foundation)
-import Foundation
-
-public extension PermutableCollection {
-
-    /// Moves the elements at the given offsets to just before the element at the destination offset, keeping their relative order, and returns the permutation applied.
-    @discardableResult mutating func move(fromOffsets source: IndexSet, toOffset destination: Int) -> Permutation {
-        precondition(source.allSatisfy { (0..<count).contains($0) } && (0...count).contains(destination), "Every offset must be within the collection.")
-        var before: [Int] = []
-        var after: [Int] = []
-        for offset in 0..<count where !source.contains(offset) {
-            if offset < destination {
-                before.append(offset)
-            } else {
-                after.append(offset)
-            }
-        }
-        return permute(sources: before + source + after)
-    }
-}
-#endif

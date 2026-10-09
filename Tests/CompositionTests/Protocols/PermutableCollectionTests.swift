@@ -57,6 +57,41 @@ private struct Deck: PermutableCollection {
         #expect(Permutation(shuffles: 0).minimumCount == 0)
     }
 
+    @Test func moveFromOffsetsToEndKeepsRelativeOrder() {
+        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        deck.move(fromOffsets: [3, 1], toOffset: 5)
+        #expect(deck.cards == ["a", "c", "e", "b", "d"])
+    }
+
+    @Test func moveFromOffsetsToFrontKeepsRelativeOrder() {
+        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        deck.move(fromOffsets: 2...4, toOffset: 0)
+        #expect(deck.cards == ["c", "d", "e", "a", "b"])
+    }
+
+    @Test func moveFromOffsetsToOwnPositionReturnsEmptyPermutation() {
+        var deck = Deck(cards: ["a", "b", "c"])
+        #expect(deck.move(fromOffsets: [1], toOffset: 2).cycle.isEmpty)
+        #expect(deck.cards == ["a", "b", "c"])
+    }
+
+    @Test func moveLandsElementAtLaterDestination() {
+        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        deck.move(from: 1, to: 3)
+        #expect(deck.cards == ["a", "c", "d", "b", "e"])
+    }
+
+    @Test func moveToEarlierIndexShiftsOthersBack() {
+        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        deck.move(from: 3, to: 0)
+        #expect(deck.cards == ["d", "a", "b", "c", "e"])
+    }
+
+    @Test func moveToSameIndexReturnsEmptyPermutation() {
+        var deck = Deck(cards: ["a", "b", "c"])
+        #expect(deck.move(from: 1, to: 1).cycle.isEmpty)
+    }
+
     @Test func partitionIsStableAndReturnsFirstMovedIndex() {
         var deck = Deck(cards: (0..<7).map(String.init))
         let pivot = deck.partition { Int($0)! % 2 == 1 }
@@ -174,30 +209,3 @@ private struct Deck: PermutableCollection {
         #expect(deck.cards == ["a", "b", "c", "d", "e"])
     }
 }
-
-// MARK: - Foundation
-
-#if canImport(Foundation)
-import Foundation
-
-extension PermutableCollectionTests {
-
-    @Test func moveToEndKeepsRelativeOrder() {
-        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
-        deck.move(fromOffsets: [1, 3], toOffset: 5)
-        #expect(deck.cards == ["a", "c", "e", "b", "d"])
-    }
-
-    @Test func moveToFrontKeepsRelativeOrder() {
-        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
-        deck.move(fromOffsets: [2, 4], toOffset: 0)
-        #expect(deck.cards == ["c", "e", "a", "b", "d"])
-    }
-
-    @Test func moveToOwnPositionReturnsEmptyPermutation() {
-        var deck = Deck(cards: ["a", "b", "c"])
-        #expect(deck.move(fromOffsets: [1], toOffset: 2).cycle.isEmpty)
-        #expect(deck.cards == ["a", "b", "c"])
-    }
-}
-#endif

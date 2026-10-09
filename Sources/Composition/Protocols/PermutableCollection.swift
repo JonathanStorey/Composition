@@ -36,18 +36,6 @@ public struct Permutation: Hashable, Sendable {
     /// The cycles written one after another, each starting with its largest offset, in increasing order of those starting offsets.
     public let cycle: [Int]
 
-    /// Creates a permutation where `destinations[i]` is the offset the element at `i` moves to, trapping when it is not a permutation of its indices.
-    public init(destinations: [Int]) {
-        Permutation.validate(destinations)
-        self.init(count: destinations.count, walksBackward: false) { destinations[$0] }
-    }
-
-    /// Creates a permutation where each key's element moves to its value and missing offsets stay in place, trapping when the values are not a rearrangement of the keys.
-    public init(destinations: [Int: Int]) {
-        Permutation.validate(destinations)
-        self.init(count: (destinations.keys.max() ?? -1) + 1, walksBackward: false) { destinations[$0] ?? $0 }
-    }
-
     /// Creates a uniformly random permutation of `0..<count` by shuffling the Foata line directly, using the system random number generator.
     public init(shuffles count: Int) {
         var generator = SystemRandomNumberGenerator()
@@ -74,56 +62,30 @@ public struct Permutation: Hashable, Sendable {
         cycle = line
     }
 
-    /// Creates a permutation where `sources[i]` is the offset whose element moves into `i`, trapping when it is not a permutation of its indices.
-    public init(sources: [Int]) {
-        Permutation.validate(sources)
-        self.init(count: sources.count, walksBackward: true) { sources[$0] }
-    }
-
-    /// Creates a permutation where each key receives the element at its value and missing offsets stay in place, trapping when the values are not a rearrangement of the keys.
-    public init(sources: [Int: Int]) {
-        Permutation.validate(sources)
-        self.init(count: (sources.keys.max() ?? -1) + 1, walksBackward: true) { sources[$0] ?? $0 }
-    }
-
-    /// Creates a permutation by walking each cycle of a bijection on `0..<count` from its largest offset, filling the line from the back.
-    private init(count: Int, walksBackward: Bool, next: (Int) -> Int) {
-        var isVisited = [Bool](repeating: false, count: count)
-        var line = [Int](repeating: 0, count: count)
-        var end = count
-        for start in stride(from: count - 1, through: 0, by: -1) where !isVisited[start] {
+    /// Creates a permutation where `sources[i]` is the offset whose element moves into `i`, walking each cycle from its largest offset and filling the line from the back without validating the mapping.
+    fileprivate init(sources: [Int]) {
+        var isVisited = [Bool](repeating: false, count: sources.count)
+        var line = [Int](repeating: 0, count: sources.count)
+        var end = sources.count
+        for start in sources.indices.reversed() where !isVisited[start] {
             isVisited[start] = true
             var length = 1
-            var offset = next(start)
+            var offset = sources[start]
             while offset != start {
                 isVisited[offset] = true
                 length += 1
-                offset = next(offset)
+                offset = sources[offset]
             }
             guard length > 1 else { continue }
             end -= length
             line[end] = start
-            offset = next(start)
+            offset = sources[start]
             for step in 1..<length {
-                line[walksBackward ? end + length - step : end + step] = offset
-                offset = next(offset)
+                line[end + length - step] = offset
+                offset = sources[offset]
             }
         }
         cycle = Array(line[end...])
-    }
-
-    /// Traps unless the offsets contain every index of the array exactly once.
-    private static func validate(_ offsets: [Int]) {
-        var isUsed = [Bool](repeating: false, count: offsets.count)
-        for offset in offsets {
-            precondition(offsets.indices.contains(offset) && !isUsed[offset], "The offsets must contain every index exactly once.")
-            isUsed[offset] = true
-        }
-    }
-
-    /// Traps unless the keys are non-negative and the values are exactly the keys rearranged.
-    private static func validate(_ mapping: [Int: Int]) {
-        precondition(mapping.keys.allSatisfy { $0 >= 0 } && Set(mapping.values) == Set(mapping.keys), "The values must be the keys rearranged.")
     }
 
     /// Calls the closure with each pair of offsets to swap, in order, deriving them in one pass with no allocation.

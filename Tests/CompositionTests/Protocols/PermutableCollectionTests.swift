@@ -87,8 +87,33 @@ private struct Deck: PermutableCollection {
         #expect(Permutation(shuffles: 50, using: &first) == Permutation(shuffles: 50, using: &second))
     }
 
+    @Test func shuffleKeepsEveryElement() {
+        var deck = Deck(cards: (0..<20).map(String.init))
+        deck.shuffle()
+        #expect(deck.cards.sorted() == (0..<20).map(String.init).sorted())
+    }
+
     @Test func shuffleOfZeroHasNoCycles() {
         #expect(Permutation(shuffles: 0).cycle.isEmpty)
         #expect(Permutation(shuffles: 1).cycle.isEmpty)
     }
+
+    @Test func shuffleUsingGeneratorMatchesArray() {
+        var deckGenerator = SeededGenerator(state: 99)
+        var arrayGenerator = SeededGenerator(state: 99)
+        var deck = Deck(cards: (0..<30).map(String.init))
+        var array = (0..<30).map(String.init)
+        deck.shuffle(using: &deckGenerator)
+        array.shuffle(using: &arrayGenerator)
+        #expect(deck.cards == array)
+        #expect(deckGenerator.state == arrayGenerator.state)
+    }
+
+    @Test func shuffleUsingGeneratorOnSingleElementLeavesItInPlace() {
+        var generator = SeededGenerator(state: 3)
+        var deck = Deck(cards: ["a"])
+        deck.shuffle(using: &generator)
+        #expect(deck.cards == ["a"])
+    }
 }
+

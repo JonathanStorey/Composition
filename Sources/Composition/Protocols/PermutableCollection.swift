@@ -13,6 +13,18 @@ public extension PermutableCollection {
         precondition(largest < count, "Every offset in the cycle must be within the collection.")
         permutation.forEachSwap { swapAt(index(startIndex, offsetBy: $0), index(startIndex, offsetBy: $1)) }
     }
+
+    /// Shuffles the elements in place through a permutation shuffled directly in cycle form.
+    mutating func shuffle() {
+        permute(using: Permutation(shuffles: count))
+    }
+
+    /// Shuffles the elements in place through a permutation, giving the same order as `Array.shuffle(using:)` with the same generator state.
+    mutating func shuffle<R: RandomNumberGenerator>(using generator: inout R) {
+        var sources = Array(0..<count)
+        sources.shuffle(using: &generator)
+        permute(using: Permutation(sources: sources))
+    }
 }
 
 /// A reordering stored as cycles in Foata's single-line notation, leaving offsets outside the cycles in place so it applies to any collection long enough.

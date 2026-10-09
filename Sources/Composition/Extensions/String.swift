@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Extensions/String.swift
-// dependencies: []
+// dependencies: [Extensions/RangeReplaceableCollection.swift, Protocols/Patchable.swift]
 
 public extension String {
 
@@ -14,6 +14,15 @@ public extension String {
     func matches(pattern: String) -> Bool {
         guard let regex = try? Regex(pattern) else { return false }
         return wholeMatch(of: regex) != nil
+    }
+}
+
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+extension String: Patchable {
+
+    /// Returns the difference that turns the base string into this string.
+    public func difference(from base: String) -> CollectionDifference<Character> {
+        difference(from: base, by: ==)
     }
 }
 

@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Extensions/CollectionDifference.swift
-// dependencies: [Protocols/Squashable.swift]
+// dependencies: [Protocols/Mergeable.swift, Protocols/Squashable.swift]
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension CollectionDifference.Change {
@@ -80,7 +80,7 @@ extension CollectionDifference: Squashable where ChangeElement: Equatable {
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-public extension CollectionDifference where ChangeElement: Equatable {
+extension CollectionDifference: Mergeable where ChangeElement: Equatable {
 
     /// Returns how many values in the sorted list are less than the bound.
     private static func count(of sorted: [Int], below bound: Int) -> Int {
@@ -104,13 +104,8 @@ public extension CollectionDifference where ChangeElement: Equatable {
         return insertions.enumerated().map { index, change in Self.offset(ranked: change.offset - index, skipping: removedOffsets, from: &position) }
     }
 
-    /// Moves this difference's changes to apply after a prior difference made from the same collection.
-    mutating func adjust(for prior: CollectionDifference) throws {
-        self = try adjusted(for: prior)
-    }
-
     /// Returns only this difference's changes, moved to apply after a prior difference made from the same collection.
-    func adjusted(for prior: CollectionDifference) throws -> CollectionDifference {
+    public func adjusted(for prior: CollectionDifference) throws -> CollectionDifference {
         let removedOffsets = Set(prior.removals.map(\.offset)).union(removals.map(\.offset)).sorted()
         let priorGaps = prior.insertionGaps
         var changes: [Change] = []
@@ -129,16 +124,6 @@ public extension CollectionDifference where ChangeElement: Equatable {
             changes.append(.insert(offset: gap - Self.count(of: removedOffsets, below: gap) + Self.count(of: priorGaps, below: gap + 1) + index, element: insertions[index].element, associatedWith: nil))
         }
         return CollectionDifference(changes)!
-    }
-
-    /// Combines the other difference, made from the same collection, into this one.
-    mutating func merge(with other: CollectionDifference) throws {
-        self = try merged(with: other)
-    }
-
-    /// Returns one difference making this difference's changes and the other's, where both were made from the same collection.
-    func merged(with other: CollectionDifference) throws -> CollectionDifference {
-        try squashed(with: other.adjusted(for: self))
     }
 }
 

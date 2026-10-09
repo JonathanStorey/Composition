@@ -1,11 +1,26 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Extensions/StringTests.swift
-// dependencies: [Extensions/String.swift]
+// dependencies: [Extensions/RangeReplaceableCollection.swift, Extensions/String.swift]
 
 import Testing
 @testable import Composition
 
 @Suite struct StringTests {
+
+    @Test func differenceFromBaseRoundTripsThroughApply() throws {
+        var text = "kitten"
+        try text.apply("sitting".difference(from: "kitten"))
+        #expect(text == "sitting")
+        #expect(String.Patch.self == CollectionDifference<Character>.self)
+    }
+
+    @Test func differenceFromEmptyBaseInsertsEveryCharacter() throws {
+        let patch = "abc".difference(from: "")
+        var text = ""
+        try text.apply(patch)
+        #expect(patch.insertions.count == 3 && patch.removals.isEmpty)
+        #expect(text == "abc")
+    }
 
     @Test func isBlankDetectsEmptyAndWhitespaceOnly() {
         #expect("".isBlank)

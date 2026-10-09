@@ -1,21 +1,11 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Extensions/CollectionDifferenceTests.swift
-// dependencies: [Extensions/CollectionDifference.swift, Extensions/RangeReplaceableCollection.swift, Protocols/Squashable.swift]
+// dependencies: [Extensions/CollectionDifference.swift, Extensions/RangeReplaceableCollection.swift, Protocols/Mergeable.swift, Protocols/Squashable.swift]
 
 import Testing
 @testable import Composition
 
 @Suite struct CollectionDifferenceTests {
-
-    @Test func adjustForPriorReplacesReceiver() throws {
-        let base = ["milk", "eggs", "bread"]
-        let mine = ["eggs", "bread"].difference(from: base)
-        var partner = ["milk", "eggs"].difference(from: base)
-        try partner.adjust(for: mine)
-        var list = ["eggs", "bread"]
-        try list.apply(partner)
-        #expect(list == ["eggs"])
-    }
 
     @Test func adjustedForPriorConvergesOnBothDevices() throws {
         let base = ["Intro", "Song A", "Song B", "Outro"]

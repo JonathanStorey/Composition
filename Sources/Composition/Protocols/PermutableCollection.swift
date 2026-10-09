@@ -1,8 +1,11 @@
-/// A mutable collection that can reorder its elements by a permutation.
-public protocol PermutableCollection: MutableCollection {
+/// A collection that reorders its elements only by swapping them, so every reorder passes through `swapAt(_:_:)`.
+public protocol PermutableCollection: Collection {
 
     /// Moves the element at each offset in each cycle to the next offset in that cycle, wrapping from the last offset to the first.
     mutating func permute(using permutation: Permutation)
+
+    /// Exchanges the elements at the two indices.
+    mutating func swapAt(_ first: Index, _ second: Index)
 }
 
 public extension PermutableCollection {
@@ -24,28 +27,6 @@ public extension PermutableCollection {
         var sources = Array(0..<count)
         sources.shuffle(using: &generator)
         permute(using: Permutation(sources: sources))
-    }
-}
-
-public extension PermutableCollection where Self: RandomAccessCollection {
-
-    /// Shuffles the elements in place with the standard library's Fisher–Yates shuffle, which needs no permutation.
-    mutating func shuffle() {
-        var generator = SystemRandomNumberGenerator()
-        standardShuffle(using: &generator)
-    }
-
-    /// Shuffles the elements in place with the standard library's Fisher–Yates shuffle, matching `Array.shuffle(using:)` for the same generator state.
-    mutating func shuffle<R: RandomNumberGenerator>(using generator: inout R) {
-        standardShuffle(using: &generator)
-    }
-}
-
-fileprivate extension MutableCollection where Self: RandomAccessCollection {
-
-    /// Calls the standard library's shuffle, which a permutable collection's own shuffle would otherwise shadow.
-    mutating func standardShuffle<R: RandomNumberGenerator>(using generator: inout R) {
-        shuffle(using: &generator)
     }
 }
 

@@ -245,9 +245,6 @@ public struct Permutation: Hashable, Sendable {
 
 extension Permutation: Squashable {
 
-    /// The permutation that leaves every offset in place.
-    public static let identity = Permutation(cycle: [])
-
     /// Returns the permutation that applies this permutation and then the next, over the larger of their minimum counts.
     public func squashed(with next: Permutation) -> Permutation {
         let count = Swift.max(minimumCount, next.minimumCount)

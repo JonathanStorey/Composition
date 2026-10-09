@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Protocols/LabelRepresentable.swift
+// dependencies: []
+
 #if canImport(SwiftUI)
 import SwiftUI
 

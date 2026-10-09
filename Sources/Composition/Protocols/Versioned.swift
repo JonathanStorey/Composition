@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Protocols/Versioned.swift
+// dependencies: [Protocols/Digestible.swift]
+
 #if canImport(CryptoKit) && canImport(Foundation)
 import Foundation
 
@@ -116,10 +120,10 @@ extension Branch: Sendable where V: Sendable {}
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct Commit: Codable, Hashable, Sendable {
 
-    fileprivate let content: Checksum
-
     /// The hash of the commit this one was made on, or `nil` for a first commit.
     public let parent: Checksum?
+
+    fileprivate let content: Checksum
 
     fileprivate init(content: Checksum, parent: Checksum?) {
         self.content = content

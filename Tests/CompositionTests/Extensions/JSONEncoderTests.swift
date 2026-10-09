@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Extensions/JSONEncoderTests.swift
+// dependencies: [Extensions/JSONEncoder.swift]
+
 #if canImport(Foundation)
 import Foundation
 import Testing

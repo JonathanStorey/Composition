@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: PropertyWrappers/ClampedTests.swift
+// dependencies: [PropertyWrappers/Clamped.swift]
+
 import Testing
 @testable import Composition
 

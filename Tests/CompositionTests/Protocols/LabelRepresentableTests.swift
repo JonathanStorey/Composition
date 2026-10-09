@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Protocols/LabelRepresentableTests.swift
+// dependencies: [Protocols/LabelRepresentable.swift]
+
 #if canImport(SwiftUI)
 import SwiftUI
 import Testing

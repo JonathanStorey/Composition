@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Extensions/UUID.swift
+// dependencies: [Extensions/JSONEncoder.swift]
+
 // MARK: - Foundation
 
 #if canImport(Foundation)

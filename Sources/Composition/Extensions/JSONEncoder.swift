@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Extensions/JSONEncoder.swift
+// dependencies: [Extensions/Date.swift, Extensions/Decimal.swift]
+
 #if canImport(Foundation)
 import Foundation
 
@@ -26,7 +30,7 @@ private struct JSONFormat {
     let compatibility: JSONEncoder.Compatibility
 
     /// Returns the string quoted and escaped as Python's `json.dumps` with `ensure_ascii=False` and RFC 8785 both escape it.
-    static func quoted(_ string: String) -> String {
+    private static func quoted(_ string: String) -> String {
         var result = "\""
         for scalar in string.unicodeScalars {
             switch scalar {
@@ -63,8 +67,20 @@ private struct JSONFormat {
         }
     }
 
+    /// Returns the node rendered as compact JSON, with object keys sorted as the compatibility target sorts them.
+    func text(of node: Node) -> String {
+        if let scalar = node.scalar { return scalar }
+        if let elements = node.elements { return "[" + elements.map { text(of: $0) }.joined(separator: ",") + "]" }
+        let members = node.members ?? [:]
+        let keys = switch compatibility {
+        case .jcs: members.keys.sorted { $0.utf16.lexicographicallyPrecedes($1.utf16) }
+        case .python: members.keys.sorted { $0.unicodeScalars.lexicographicallyPrecedes($1.unicodeScalars) }
+        }
+        return "{" + keys.map { Self.quoted($0) + ":" + (members[$0].map { text(of: $0) } ?? "null") }.joined(separator: ",") + "}"
+    }
+
     /// Returns the number formatted as Python's `repr` or ECMAScript's `Number.prototype.toString` formats it.
-    func number(_ value: Double, codingPath: [any CodingKey]) throws -> String {
+    private func number(_ value: Double, codingPath: [any CodingKey]) throws -> String {
         guard value.isFinite else {
             guard compatibility == .python else { throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: codingPath, debugDescription: "RFC 8785 has no representation for \(value).")) }
             if value.isNaN { return "NaN" }
@@ -101,18 +117,6 @@ private struct JSONFormat {
             let exponentDigits = abs(exponent) < 10 ? "0" + String(abs(exponent)) : String(abs(exponent))
             return sign + significand + "e" + exponentSign + exponentDigits
         }
-    }
-
-    /// Returns the node rendered as compact JSON, with object keys sorted as the compatibility target sorts them.
-    func text(of node: Node) -> String {
-        if let scalar = node.scalar { return scalar }
-        if let elements = node.elements { return "[" + elements.map { text(of: $0) }.joined(separator: ",") + "]" }
-        let members = node.members ?? [:]
-        let keys = switch compatibility {
-        case .jcs: members.keys.sorted { $0.utf16.lexicographicallyPrecedes($1.utf16) }
-        case .python: members.keys.sorted { $0.unicodeScalars.lexicographicallyPrecedes($1.unicodeScalars) }
-        }
-        return "{" + keys.map { Self.quoted($0) + ":" + (members[$0].map { text(of: $0) } ?? "null") }.joined(separator: ",") + "}"
     }
 }
 
@@ -166,12 +170,6 @@ private struct KeyedWriter<K: CodingKey>: KeyedEncodingContainerProtocol {
     let format: JSONFormat
     let node: Node
 
-    func child(named name: String) -> Node {
-        let child = Node()
-        node.members?[name] = child
-        return child
-    }
-
     mutating func encode(_ value: Bool, forKey key: K) throws { try set(value, forKey: key) }
 
     mutating func encode(_ value: Double, forKey key: K) throws { try set(value, forKey: key) }
@@ -214,16 +212,22 @@ private struct KeyedWriter<K: CodingKey>: KeyedEncodingContainerProtocol {
         Writer(codingPath: codingPath + [key], format: format, node: child(named: key.stringValue)).unkeyedContainer()
     }
 
-    func set(_ value: some Encodable, forKey key: K) throws {
-        node.members?[key.stringValue] = try format.node(for: value, codingPath: codingPath + [key])
-    }
-
     mutating func superEncoder() -> any Encoder {
         Writer(codingPath: codingPath, format: format, node: child(named: "super"))
     }
 
     mutating func superEncoder(forKey key: K) -> any Encoder {
         Writer(codingPath: codingPath + [key], format: format, node: child(named: key.stringValue))
+    }
+
+    private func child(named name: String) -> Node {
+        let child = Node()
+        node.members?[name] = child
+        return child
+    }
+
+    private func set(_ value: some Encodable, forKey key: K) throws {
+        node.members?[key.stringValue] = try format.node(for: value, codingPath: codingPath + [key])
     }
 }
 
@@ -268,7 +272,7 @@ private struct SingleValueWriter: SingleValueEncodingContainer {
         node.assign(Node(text: "null"))
     }
 
-    func set(_ value: some Encodable) throws {
+    private func set(_ value: some Encodable) throws {
         node.assign(try format.node(for: value, codingPath: codingPath))
     }
 }
@@ -281,11 +285,6 @@ private struct UnkeyedWriter: UnkeyedEncodingContainer {
     let node: Node
 
     var count: Int { node.elements?.count ?? 0 }
-
-    func append(_ child: Node) -> Node {
-        node.elements?.append(child)
-        return child
-    }
 
     mutating func encode(_ value: Bool) throws { try set(value) }
 
@@ -329,12 +328,17 @@ private struct UnkeyedWriter: UnkeyedEncodingContainer {
         Writer(codingPath: codingPath, format: format, node: append(Node())).unkeyedContainer()
     }
 
-    func set(_ value: some Encodable) throws {
-        _ = append(try format.node(for: value, codingPath: codingPath))
-    }
-
     mutating func superEncoder() -> any Encoder {
         Writer(codingPath: codingPath, format: format, node: append(Node()))
+    }
+
+    private func append(_ child: Node) -> Node {
+        node.elements?.append(child)
+        return child
+    }
+
+    private func set(_ value: some Encodable) throws {
+        _ = append(try format.node(for: value, codingPath: codingPath))
     }
 }
 #endif

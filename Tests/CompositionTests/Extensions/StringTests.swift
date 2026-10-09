@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Extensions/StringTests.swift
+// dependencies: [Extensions/String.swift]
+
 import Testing
 @testable import Composition
 

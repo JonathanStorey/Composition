@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Protocols/VersionedTests.swift
+// dependencies: [Protocols/Digestible.swift, Protocols/Versioned.swift]
+
 #if canImport(CryptoKit) && canImport(Foundation)
 import Foundation
 import Testing

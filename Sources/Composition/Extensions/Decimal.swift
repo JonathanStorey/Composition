@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Extensions/Decimal.swift
+// dependencies: []
+
 #if canImport(Foundation)
 import Foundation
 

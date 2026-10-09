@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Extensions/PickerTests.swift
+// dependencies: [Extensions/Picker.swift]
+
 #if canImport(SwiftUI)
 import SwiftUI
 import Testing

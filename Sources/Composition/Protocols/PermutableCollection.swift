@@ -1,3 +1,7 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Protocols/PermutableCollection.swift
+// dependencies: []
+
 /// A collection that reorders its elements only by swapping them, so every reorder passes through `swapAt(_:_:)`.
 public protocol PermutableCollection: Collection {
 

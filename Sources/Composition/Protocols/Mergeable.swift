@@ -1,28 +1,31 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Protocols/Mergeable.swift
-// dependencies: [Protocols/Squashable.swift]
+// dependencies: [Protocols/Shiftable.swift, Protocols/Squashable.swift]
 
-/// A change that can be combined with another change made concurrently from the same starting point.
-public protocol Mergeable: Squashable {
+/// A value that can combine with another made independently, into one value holding both.
+public protocol Mergeable {
 
-    /// Returns only this change, moved to apply after a prior change made from the same starting point.
-    func adjusted(for prior: Self) throws -> Self
+    /// Returns one value holding both this value and the other, where neither was made from the other.
+    func merged(with other: Self) throws -> Self
 }
 
 public extension Mergeable {
 
-    /// Returns one change making the first change and the other, where both were made from the same starting point.
+    /// Returns one value holding both the first value and the other, where neither was made from the other.
     static func merged(_ first: Self, with other: Self) throws -> Self {
         try first.merged(with: other)
     }
 
-    /// Combines the other change, made from the same starting point, into this one.
+    /// Combines the other value, made independently, into this one.
     mutating func merge(with other: Self) throws {
         self = try merged(with: other)
     }
+}
 
-    /// Returns one change making this change and the other, where both were made from the same starting point.
+public extension Mergeable where Self: Shiftable & Squashable {
+
+    /// Returns this change followed by the other change moved to apply after it.
     func merged(with other: Self) throws -> Self {
-        try squashed(with: other.adjusted(for: self))
+        try squashed(with: other.shifted(by: self))
     }
 }

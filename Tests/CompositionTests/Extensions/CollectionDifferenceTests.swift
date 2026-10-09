@@ -1,44 +1,11 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Extensions/CollectionDifferenceTests.swift
-// dependencies: [Extensions/CollectionDifference.swift, Extensions/RangeReplaceableCollection.swift, Protocols/Mergeable.swift, Protocols/Squashable.swift]
+// dependencies: [Extensions/CollectionDifference.swift, Extensions/RangeReplaceableCollection.swift, Protocols/Mergeable.swift, Protocols/Shiftable.swift, Protocols/Squashable.swift]
 
 import Testing
 @testable import Composition
 
 @Suite struct CollectionDifferenceTests {
-
-    @Test func adjustedForPriorConvergesOnBothDevices() throws {
-        let base = ["Intro", "Song A", "Song B", "Outro"]
-        let mine = ["Bonus", "Intro", "Song B", "Outro"].difference(from: base)
-        let partner = ["Intro", "Song A", "Outro", "Encore"].difference(from: base)
-        var phone = ["Bonus", "Intro", "Song B", "Outro"]
-        try phone.apply(partner.adjusted(for: mine))
-        var laptop = ["Intro", "Song A", "Outro", "Encore"]
-        try laptop.apply(mine.adjusted(for: partner))
-        #expect(phone == ["Bonus", "Intro", "Outro", "Encore"])
-        #expect(laptop == phone)
-    }
-
-    @Test func adjustedForPriorDropsRemovalThePriorAlreadyMade() throws {
-        let base = ["milk", "eggs", "bread"]
-        let removeEggs = ["milk", "bread"].difference(from: base)
-        #expect(try removeEggs.adjusted(for: removeEggs).isEmpty)
-    }
-
-    @Test func adjustedForPriorPlacesPriorInsertionFirstOnTie() throws {
-        let base = ["milk", "eggs"]
-        let mine = ["milk", "eggs", "bread"].difference(from: base)
-        let partner = ["milk", "eggs", "jam"].difference(from: base)
-        var list = ["milk", "eggs", "bread"]
-        try list.apply(partner.adjusted(for: mine))
-        #expect(list == ["milk", "eggs", "bread", "jam"])
-    }
-
-    @Test func adjustedForPriorThrowsWhenBothRemoveDifferentElementsAtOneOffset() throws {
-        let mine = try #require(CollectionDifference([.remove(offset: 1, element: "eggs", associatedWith: nil)]))
-        let partner = try #require(CollectionDifference([.remove(offset: 1, element: "jam", associatedWith: nil)]))
-        #expect(throws: CollectionDifferenceError.elementMismatch(1)) { try partner.adjusted(for: mine) }
-    }
 
     @Test func associatedOffsetIsNilWithoutInferredMoves() {
         let difference = [2, 1].difference(from: [1, 2])
@@ -76,7 +43,7 @@ import Testing
         #expect(list == ["eggs", "jam"])
     }
 
-    @Test func mergedWithMatchesEachDeviceAfterAdjusting() throws {
+    @Test func mergedWithMatchesEachDeviceAfterShifting() throws {
         let base = ["Intro", "Song A", "Song B", "Outro"]
         let mine = ["Bonus", "Intro", "Song B", "Outro"].difference(from: base)
         let partner = ["Intro", "Song A", "Outro", "Encore"].difference(from: base)
@@ -92,6 +59,39 @@ import Testing
         var list = base
         try list.apply(mine.merged(with: partner))
         #expect(list == ["milk", "eggs", "bread", "jam"])
+    }
+
+    @Test func shiftedByPriorConvergesOnBothDevices() throws {
+        let base = ["Intro", "Song A", "Song B", "Outro"]
+        let mine = ["Bonus", "Intro", "Song B", "Outro"].difference(from: base)
+        let partner = ["Intro", "Song A", "Outro", "Encore"].difference(from: base)
+        var phone = ["Bonus", "Intro", "Song B", "Outro"]
+        try phone.apply(partner.shifted(by: mine))
+        var laptop = ["Intro", "Song A", "Outro", "Encore"]
+        try laptop.apply(mine.shifted(by: partner))
+        #expect(phone == ["Bonus", "Intro", "Outro", "Encore"])
+        #expect(laptop == phone)
+    }
+
+    @Test func shiftedByPriorDropsRemovalThePriorAlreadyMade() throws {
+        let base = ["milk", "eggs", "bread"]
+        let removeEggs = ["milk", "bread"].difference(from: base)
+        #expect(try removeEggs.shifted(by: removeEggs).isEmpty)
+    }
+
+    @Test func shiftedByPriorPlacesPriorInsertionFirstOnTie() throws {
+        let base = ["milk", "eggs"]
+        let mine = ["milk", "eggs", "bread"].difference(from: base)
+        let partner = ["milk", "eggs", "jam"].difference(from: base)
+        var list = ["milk", "eggs", "bread"]
+        try list.apply(partner.shifted(by: mine))
+        #expect(list == ["milk", "eggs", "bread", "jam"])
+    }
+
+    @Test func shiftedByPriorThrowsWhenBothRemoveDifferentElementsAtOneOffset() throws {
+        let mine = try #require(CollectionDifference([.remove(offset: 1, element: "eggs", associatedWith: nil)]))
+        let partner = try #require(CollectionDifference([.remove(offset: 1, element: "jam", associatedWith: nil)]))
+        #expect(throws: CollectionDifferenceError.elementMismatch(1)) { try partner.shifted(by: mine) }
     }
 
     @Test func squashedWithCancelsInsertionThatNextRemoves() throws {

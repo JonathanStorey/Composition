@@ -40,11 +40,6 @@ public extension CollectionDifference.Change {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension CollectionDifference: Squashable where ChangeElement: Equatable {
 
-    /// The difference with no changes.
-    public static var identity: CollectionDifference {
-        CollectionDifference([])!
-    }
-
     /// Returns the offset at the rank among the offsets missing from the sorted list, advancing the position in the list so ascending ranks take one pass.
     private static func offset(ranked rank: Int, skipping skipped: [Int], from position: inout Int) -> Int {
         while position < skipped.count, skipped[position] <= rank + position {

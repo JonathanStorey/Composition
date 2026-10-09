@@ -5,14 +5,15 @@
 import Testing
 @testable import Composition
 
-private struct Log: Squashable, Equatable {
+private struct EmptyLog: Error {}
+
+private struct Log: Squashable {
 
     let entries: [String]
 
-    static let identity = Log(entries: [])
-
-    func squashed(with next: Log) -> Log {
-        Log(entries: entries + next.entries)
+    func squashed(with next: Log) throws -> Log {
+        guard !next.entries.isEmpty else { throw EmptyLog() }
+        return Log(entries: entries + next.entries)
     }
 }
 
@@ -24,12 +25,14 @@ private struct Log: Squashable, Equatable {
         #expect(log.entries == ["a", "b"])
     }
 
-    @Test func squashedInOrderFoldsOldestFirst() throws {
-        let logs = [Log(entries: ["a"]), Log(entries: ["b"]), Log(entries: ["c"])]
-        #expect(try Log.squashed(inOrder: logs).entries == ["a", "b", "c"])
+    @Test func squashWithLeavesReceiverUnchangedWhenSquashingThrows() {
+        var log = Log(entries: ["a"])
+        #expect(throws: EmptyLog.self) { try log.squash(with: Log(entries: [])) }
+        #expect(log.entries == ["a"])
     }
 
-    @Test func squashedInOrderOfNoChangesIsIdentity() throws {
-        #expect(try Log.squashed(inOrder: [Log]()) == .identity)
+    @Test func staticSquashedKeepsFirstBeforeNext() throws {
+        let log = try Log.squashed(Log(entries: ["a"]), with: Log(entries: ["b"]))
+        #expect(log.entries == ["a", "b"])
     }
 }

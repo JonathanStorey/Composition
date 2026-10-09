@@ -248,10 +248,10 @@ private struct Hand: PermutableCollection, RandomAccessCollection {
         }
     }
 
-    @Test func squashedWithInvertedIsIdentity() {
+    @Test func squashedWithInvertedIsEmpty() {
         var deck = Deck(cards: ["a", "b", "c", "d", "e"])
         let permutation = deck.shuffle()
-        #expect(permutation.squashed(with: permutation.inverted) == .identity)
+        #expect(permutation.squashed(with: permutation.inverted).cycle.isEmpty)
     }
 
     @Test func squashedWithShorterPermutationLeavesLaterOffsetsToTheLonger() {

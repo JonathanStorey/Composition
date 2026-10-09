@@ -5,61 +5,65 @@
 #if canImport(CryptoKit) && canImport(Foundation)
 import Foundation
 
-/// A type whose content can be committed into revisions linked by hash.
+/// A type whose versions are identified by id, each committed with its content's checksum and the id of the version it was forked from.
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-public protocol Versioned: Digestible {
+public protocol Versioned: Digestible, Identifiable where ID == UUID {
 
-    /// The commit that stamps the current content, or `nil` before the first commit, which `digest(into:)` must leave out.
+    /// The identity of this version, which `fork()` replaces with a new random value and `digest(into:)` must leave out.
+    var id: UUID { get set }
+
+    /// The commit recording this version's content and parent, or `nil` before the first commit, which `digest(into:)` must leave out.
     var revision: Commit? { get set }
 
-    /// Returns a new instance carrying over the fields that make up a version, leaving the revision to `fork()`.
-    static func forked(from parent: Self) -> Self
+    /// Returns a new instance with only the parent's content, leaving the id and revision to `fork()`.
+    static func forked(copying parent: Self) -> Self
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Versioned {
 
-    /// A Boolean value indicating whether `commit()` would make a new commit, because the value has no revision or changed since it.
+    /// A Boolean value indicating whether the content differs from its revision or the value has never been committed.
     var hasUncommittedChanges: Bool {
-        revision?.matches(self) != true
+        revision?.checksum != checksum
     }
 
-    /// Commits the current content onto the current revision, keeping the revision when the content still matches it, and returns the result.
+    /// Records the current content in the revision, keeping its parent, and returns the result.
     @discardableResult
     mutating func commit() -> Self {
         let content = checksum
-        if content != revision?.content {
-            revision = Commit(content: content, parent: revision?.hash)
+        if content != revision?.checksum {
+            revision = Commit(checksum: content, parent: revision?.parent)
         }
         return self
     }
 
-    /// Commits this value, then returns a new instance that shares its revision until the new instance is edited and committed.
+    /// Commits this value, then returns a new version with its content, a new id and this value as its parent.
     mutating func fork() -> Self {
         commit()
-        var child = Self.forked(from: self)
-        child.revision = revision
+        var child = Self.forked(copying: self)
+        child.id = UUID()
+        child.revision = Commit(checksum: child.checksum, parent: id)
         return child
     }
 
-    /// Returns a Boolean value indicating whether the value was committed onto the parent's revision and both are still committed.
+    /// Returns a Boolean value indicating whether the value was forked from the parent and neither has uncommitted changes.
     func isChild(of parent: Self) -> Bool {
-        guard let revision, let base = parent.revision else { return false }
-        return revision.parent == base.hash && revision.matches(self) && base.matches(parent)
+        revision?.parent == parent.id && !hasUncommittedChanges && !parent.hasUncommittedChanges
     }
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Collection where Element: Versioned {
 
-    /// The lines of values with a revision from their oldest reachable commit to their newest, the branch with the most commits first and ties ordered by the newest commit's hash.
+    /// The lines of committed values from their oldest reachable ancestor to their newest, the branch with the most values first and ties ordered by the newest value's id.
     var branches: [Branch<Element>] {
-        let commits = Dictionary(compactMap { value in value.revision.map { ($0.hash, value) } }, uniquingKeysWith: { first, _ in first })
-        let parents = Set(commits.values.compactMap { $0.revision?.parent })
-        let heads = commits.filter { !parents.contains($0.key) }.sorted { $0.key.bytes.lexicographicallyPrecedes($1.key.bytes) }
+        let versions = Dictionary(filter { $0.revision != nil }.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let parents = Set(versions.values.compactMap { $0.revision?.parent })
+        let heads = versions.values.filter { !parents.contains($0.id) }.sorted { $0.id.uuidString < $1.id.uuidString }
         let branches: [Branch<Element>] = heads.map { head in
-            var values = [head.value]
-            while let parent = values.last?.revision?.parent, let value = commits[parent] {
+            var values = [head]
+            var visited: Set<UUID> = [head.id]
+            while let parent = values.last?.revision?.parent, let value = versions[parent], visited.insert(parent).inserted {
                 values.append(value)
             }
             return Branch(values: values.reversed())
@@ -67,10 +71,10 @@ public extension Collection where Element: Versioned {
         return branches.sorted { $0.count > $1.count }
     }
 
-    /// The values whose commit an earlier value in the collection already carries, so they can be deleted.
+    /// The values whose id an earlier value in the collection already has, so they can be deleted.
     var duplicates: [Element] {
-        var hashes: Set<Checksum> = []
-        return filter { value in value.revision.map { !hashes.insert($0.hash).inserted } ?? false }
+        var ids: Set<UUID> = []
+        return filter { !ids.insert($0.id).inserted }
     }
 
     /// The values that have never been committed, so no branch can hold them.
@@ -79,7 +83,7 @@ public extension Collection where Element: Versioned {
     }
 }
 
-/// A line of values with a revision from the oldest reachable commit to the newest.
+/// A line of committed values from the oldest reachable ancestor to the newest.
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct Branch<V: Versioned>: RandomAccessCollection {
 
@@ -94,7 +98,7 @@ public struct Branch<V: Versioned>: RandomAccessCollection {
         values.endIndex
     }
 
-    /// A Boolean value indicating whether the branch reaches back to a root commit, with no ancestor missing.
+    /// A Boolean value indicating whether the branch reaches back to a first version, with no ancestor missing.
     public var isComplete: Bool {
         values.first?.revision?.parent == nil
     }
@@ -116,31 +120,19 @@ extension Branch: Equatable where V: Equatable {}
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Branch: Sendable where V: Sendable {}
 
-/// A record of a value's content and the commit it was made on.
+/// A record of a version's content and the version it was forked from, made only by `commit()` and `fork()`.
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct Commit: Codable, Hashable, Sendable {
 
-    /// The hash of the commit this one was made on, or `nil` for a first commit.
-    public let parent: Checksum?
+    /// The checksum of the content when it was committed.
+    public let checksum: Checksum
 
-    fileprivate let content: Checksum
+    /// The id of the version this one was forked from, or `nil` for a first version.
+    public let parent: UUID?
 
-    fileprivate init(content: Checksum, parent: Checksum?) {
-        self.content = content
+    fileprivate init(checksum: Checksum, parent: UUID?) {
+        self.checksum = checksum
         self.parent = parent
-    }
-
-    /// The checksum of the content and the parent's hash.
-    public var hash: Checksum {
-        var digester = Digester()
-        digester.combine(content)
-        digester.combine(parent)
-        return digester.finalize()
-    }
-
-    /// Returns a Boolean value indicating whether the content still matches this commit.
-    public func matches(_ content: some Digestible) -> Bool {
-        self.content == content.checksum
     }
 }
 #endif

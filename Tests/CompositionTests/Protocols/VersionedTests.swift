@@ -10,13 +10,14 @@ import Testing
 private final class Note: Versioned {
 
     var body: String
+    var id = UUID()
     var revision: Commit?
 
     init(body: String) {
         self.body = body
     }
 
-    static func forked(from parent: Note) -> Note {
+    static func forked(copying parent: Note) -> Note {
         Note(body: parent.body)
     }
 
@@ -28,9 +29,10 @@ private final class Note: Versioned {
 private struct Page: Equatable, Versioned {
 
     var body: String
+    var id = UUID()
     var revision: Commit?
 
-    static func forked(from parent: Page) -> Page {
+    static func forked(copying parent: Page) -> Page {
         Page(body: parent.body)
     }
 
@@ -40,8 +42,11 @@ private struct Page: Equatable, Versioned {
 }
 
 private func committed(_ body: String, onto parent: Page? = nil) -> Page {
-    var page = parent ?? Page(body: body)
-    page.body = body
+    var page = Page(body: body)
+    if var parent {
+        page = parent.fork()
+        page.body = body
+    }
     return page.commit()
 }
 
@@ -60,20 +65,13 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
         #expect(branches.first?.isComplete == false)
     }
 
-    @Test func branchesBreakTiesByLastHash() {
+    @Test func branchesBreakTiesByNewestId() {
         let root = committed("Root")
         let first = committed("First", onto: root)
         let second = committed("Second", onto: root)
-        let heads = [first, second].sorted { ($0.revision?.hash.bytes ?? Data()).lexicographicallyPrecedes($1.revision?.hash.bytes ?? Data()) }
+        let heads = [first, second].sorted { $0.id.uuidString < $1.id.uuidString }
         #expect([first, root, second].branches.map { $0.last?.body } == heads.map(\.body))
         #expect([second, root, first].branches.map { $0.last?.body } == heads.map(\.body))
-    }
-
-    @Test func branchesCollapseIdenticalCommits() {
-        let root = committed("Root")
-        let first = committed("Child", onto: root)
-        let second = committed("Child", onto: root)
-        #expect([root, first, second].branches.count == 1)
     }
 
     @Test func branchesEqualWhenBuiltFromSameValues() {
@@ -90,8 +88,14 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
         let branches = [child, root, parent].branches
         #expect(branches.count == 1)
         #expect(branches.first?.map(\.body) == ["Root", "Parent", "Child"])
-        #expect(branches.first?.last?.body == "Child")
         #expect(branches.first?.isComplete == true)
+    }
+
+    @Test func branchesKeepIdenticalForksSeparate() {
+        let root = committed("Root")
+        let first = committed("Child", onto: root)
+        let second = committed("Child", onto: root)
+        #expect([root, first, second].branches.count == 2)
     }
 
     @Test func branchesSortMostCommitsFirst() {
@@ -103,15 +107,20 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
         #expect(branches.map { $0.map(\.body) } == [["Root", "Middle", "Long"], ["Root", "Short"]])
     }
 
-    @Test func childHashDependsOnParent() {
-        let first = committed("Child", onto: committed("A"))
-        let second = committed("Child", onto: committed("B"))
-        #expect(first.revision?.hash != second.revision?.hash)
-    }
-
     @Test func commitIsStableForEqualContent() {
         let parent = committed("Root")
         #expect(committed("Draft", onto: parent).revision == committed("Draft", onto: parent).revision)
+    }
+
+    @Test func commitKeepsIdAndParentWhenContentChanges() {
+        let root = committed("Root")
+        var page = committed("Child", onto: root)
+        let id = page.id
+        page.body = "Edited"
+        page.commit()
+        #expect(page.id == id)
+        #expect(page.revision?.parent == root.id)
+        #expect(page.revision?.checksum == page.checksum)
     }
 
     @Test func commitKeepsRevisionWhenContentMatches() {
@@ -124,50 +133,44 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
         #expect(page.revision == revision)
     }
 
-    @Test func commitOfModifiedValueChainsOntoItsRevision() {
-        var page = committed("Root")
-        let previous = page.revision
-        page.body = "Edited"
-        page.commit()
-        #expect(page.revision?.matches(page) == true)
-        #expect(page.revision?.parent == previous?.hash)
+    @Test func commitRecordsChecksumOfContent() {
+        let page = committed("Root")
+        #expect(page.revision?.checksum == page.checksum)
+        #expect(page.revision?.parent == nil)
     }
 
-    @Test func commitRecordsParentHash() {
-        let parent = committed("Root")
-        let child = committed("Child", onto: parent)
-        #expect(child.revision?.parent == parent.revision?.hash)
-        #expect(parent.revision?.parent == nil)
+    @Test func commitReturnsUpdatedValue() {
+        var page = Page(body: "Root")
+        let result = page.commit()
+        #expect(result == page)
+        #expect(page.revision != nil)
     }
 
     @Test func commitRoundTripsThroughCodable() throws {
-        let revision = try #require(committed("Root").revision)
+        let revision = try #require(committed("Child", onto: committed("Root")).revision)
         let decoded = try JSONDecoder().decode(Commit.self, from: JSONEncoder().encode(revision))
         #expect(decoded == revision)
     }
 
-    @Test func commitUpdatesValueInPlace() {
-        var page = committed("Root")
-        let root = page
-        page.body = "Child"
-        let result = page.commit()
-        #expect(page.body == "Child")
-        #expect(result == page)
-        #expect(page.isChild(of: root))
-    }
-
-    @Test func duplicatesIsEmptyWithoutRepeatedCommits() {
+    @Test func duplicatesIsEmptyWithoutRepeatedIds() {
         let root = committed("Root")
         let child = committed("Child", onto: root)
         #expect([root, child, Page(body: "Draft")].duplicates.isEmpty)
     }
 
-    @Test func duplicatesListLaterIdenticalCommits() {
+    @Test func duplicatesListLaterValuesWithRepeatedIds() {
         let root = committed("Root")
-        let first = committed("Child", onto: root)
-        var second = committed("Child", onto: root)
-        second.body = "Edited"
-        #expect([root, first, second].duplicates.map(\.body) == ["Edited"])
+        let child = committed("Child", onto: root)
+        var copy = child
+        copy.body = "Edited"
+        #expect([root, child, copy].duplicates.map(\.body) == ["Edited"])
+    }
+
+    @Test func forkAssignsNewIdAndRecordsParent() {
+        var root = committed("Root")
+        let child = root.fork()
+        #expect(child.id != root.id)
+        #expect(child.revision?.parent == root.id)
     }
 
     @Test func forkCommitsModifiedParentFirst() {
@@ -176,7 +179,7 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
         var child = parent.fork()
         child.body = "Child"
         child.commit()
-        #expect(parent.revision?.matches(parent) == true)
+        #expect(!parent.hasUncommittedChanges)
         #expect(child.isChild(of: parent))
     }
 
@@ -185,7 +188,7 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
         var child = parent.fork()
         child.body = "Child"
         child.commit()
-        #expect(parent.revision?.matches(parent) == true)
+        #expect(!parent.hasUncommittedChanges)
         #expect(child.isChild(of: parent))
     }
 
@@ -199,26 +202,21 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
         #expect(child.isChild(of: note))
     }
 
-    @Test func forkKeepsRevisionWhenContentMatches() {
-        var root = committed("Root")
-        let child = root.fork()
-        #expect(child == root)
-    }
-
     @Test func forkLeavesParentContentUnchanged() {
         var root = committed("Root")
         var child = root.fork()
         child.body = "Child"
         child.commit()
         #expect(root.body == "Root")
-        #expect(root.revision?.matches(root) == true)
+        #expect(!root.hasUncommittedChanges)
         #expect(child.isChild(of: root))
     }
 
-    @Test func grandchildHashDependsOnGrandparent() {
-        let first = committed("Child", onto: committed("Parent", onto: committed("A")))
-        let second = committed("Child", onto: committed("Parent", onto: committed("B")))
-        #expect(first.revision?.hash != second.revision?.hash)
+    @Test func forkStartsWithoutUncommittedChanges() {
+        var root = committed("Root")
+        let child = root.fork()
+        #expect(!child.hasUncommittedChanges)
+        #expect(child.isChild(of: root))
     }
 
     @Test func hasUncommittedChangesIsFalseAfterCommit() {
@@ -233,10 +231,6 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
 
     @Test func hasUncommittedChangesIsTrueBeforeFirstCommit() {
         #expect(Page(body: "Root").hasUncommittedChanges)
-    }
-
-    @Test func hashChangesWhenContentChanges() {
-        #expect(committed("A").revision?.hash != committed("B").revision?.hash)
     }
 
     @Test func isChildIsFalseForGrandparent() {
@@ -264,25 +258,8 @@ private func committed(_ body: String, onto parent: Page? = nil) -> Page {
         #expect(committed("Child", onto: parent).isChild(of: parent))
     }
 
-    @Test func matchesIsFalseAfterEdit() {
-        var page = committed("Root")
-        page.body = "Edited"
-        #expect(page.revision?.matches(page) == false)
-    }
-
-    @Test func matchesIsNilBeforeFirstCommit() {
-        let page = Page(body: "Root")
-        #expect(page.revision?.matches(page) == nil)
-    }
-
-    @Test func matchesIsTrueAfterCommit() {
-        let page = committed("Root")
-        #expect(page.revision?.matches(page) == true)
-    }
-
     @Test func uncommittedIsEmptyWhenAllCommitted() {
-        let root = committed("Root")
-        #expect([root].uncommitted.isEmpty)
+        #expect([committed("Root")].uncommitted.isEmpty)
     }
 
     @Test func uncommittedListsValuesWithoutRevision() {

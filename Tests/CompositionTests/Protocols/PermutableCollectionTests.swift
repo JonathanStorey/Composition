@@ -47,6 +47,16 @@ private struct Deck: PermutableCollection {
         #expect(deck.cards == original)
     }
 
+    @Test func minimumCountIsOneMoreThanLargestOffset() {
+        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        #expect(deck.reverse().minimumCount == 5)
+        #expect(deck.rotate(toStartAt: 1).minimumCount == 5)
+    }
+
+    @Test func minimumCountOfEmptyPermutationIsZero() {
+        #expect(Permutation(shuffles: 0).minimumCount == 0)
+    }
+
     @Test func partitionIsStableAndReturnsFirstMovedIndex() {
         var deck = Deck(cards: (0..<7).map(String.init))
         let pivot = deck.partition { Int($0)! % 2 == 1 }
@@ -80,10 +90,25 @@ private struct Deck: PermutableCollection {
         #expect(deck.reverse().cycle.isEmpty)
     }
 
+    @Test func reverseOfEvenCountSwapsEveryPair() {
+        var deck = Deck(cards: ["a", "b", "c", "d"])
+        let permutation = deck.reverse()
+        #expect(deck.cards == ["d", "c", "b", "a"])
+        #expect(permutation.cycle == [2, 1, 3, 0])
+    }
+
     @Test func rotateMovesIndexToFront() {
         var deck = Deck(cards: ["a", "b", "c", "d", "e"])
         deck.rotate(toStartAt: 2)
         #expect(deck.cards == ["c", "d", "e", "a", "b"])
+    }
+
+    @Test func rotateSharingFactorWithCountUndoesWithInverted() {
+        var deck = Deck(cards: ["a", "b", "c", "d", "e", "f"])
+        let permutation = deck.rotate(toStartAt: 2)
+        #expect(deck.cards == ["c", "d", "e", "f", "a", "b"])
+        deck.permute(using: permutation.inverted)
+        #expect(deck.cards == ["a", "b", "c", "d", "e", "f"])
     }
 
     @Test func rotateToStartIndexLeavesOrder() {
@@ -150,3 +175,29 @@ private struct Deck: PermutableCollection {
     }
 }
 
+// MARK: - Foundation
+
+#if canImport(Foundation)
+import Foundation
+
+extension PermutableCollectionTests {
+
+    @Test func moveToEndKeepsRelativeOrder() {
+        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        deck.move(fromOffsets: [1, 3], toOffset: 5)
+        #expect(deck.cards == ["a", "c", "e", "b", "d"])
+    }
+
+    @Test func moveToFrontKeepsRelativeOrder() {
+        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        deck.move(fromOffsets: [2, 4], toOffset: 0)
+        #expect(deck.cards == ["c", "e", "a", "b", "d"])
+    }
+
+    @Test func moveToOwnPositionReturnsEmptyPermutation() {
+        var deck = Deck(cards: ["a", "b", "c"])
+        #expect(deck.move(fromOffsets: [1], toOffset: 2).cycle.isEmpty)
+        #expect(deck.cards == ["a", "b", "c"])
+    }
+}
+#endif

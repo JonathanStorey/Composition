@@ -27,28 +27,24 @@ public extension PermutableCollection {
 
     /// Applies the permutation with the minimal number of `swapAt(_:_:)` calls, one per offset that does not start a cycle.
     mutating func permute(using permutation: Permutation) {
-        guard let largest = permutation.cycle.max() else { return }
-        precondition(largest < count, "Every offset in the cycle must be within the collection.")
+        guard !permutation.cycle.isEmpty else { return }
+        precondition(permutation.minimumCount <= count, "Every offset in the cycle must be within the collection.")
         permutation.forEachSwap { swapAt(index(startIndex, offsetBy: $0), index(startIndex, offsetBy: $1)) }
     }
 
     /// Reverses the elements in place and returns the permutation applied.
     @discardableResult mutating func reverse() -> Permutation {
-        permute(sources: Array((0..<count).reversed()))
+        permute(returning: Permutation(reversing: count))
     }
 
     /// Rotates the elements so the element at the given index becomes the first, and returns the permutation applied.
     @discardableResult mutating func rotate(toStartAt newStart: Index) -> Permutation {
-        let length = count
-        let shift = distance(from: startIndex, to: newStart)
-        return permute(sources: (0..<length).map { ($0 + shift) % length })
+        permute(returning: Permutation(rotating: count, by: distance(from: startIndex, to: newStart)))
     }
 
     /// Shuffles the elements in place through a permutation shuffled directly in cycle form, and returns the permutation applied.
     @discardableResult mutating func shuffle() -> Permutation {
-        let permutation = Permutation(shuffles: count)
-        permute(using: permutation)
-        return permutation
+        permute(returning: Permutation(shuffles: count))
     }
 
     /// Shuffles the elements in place, giving the same order as `Array.shuffle(using:)` with the same generator state, and returns the permutation applied.
@@ -64,11 +60,15 @@ public extension PermutableCollection {
         return try permute(sources: elements.indices.sorted { try areInIncreasingOrder(elements[$0], elements[$1]) })
     }
 
-    /// Applies the permutation built from source offsets and returns it.
-    private mutating func permute(sources: [Int]) -> Permutation {
-        let permutation = Permutation(sources: sources)
+    /// Applies the permutation and returns it.
+    fileprivate mutating func permute(returning permutation: Permutation) -> Permutation {
         permute(using: permutation)
         return permutation
+    }
+
+    /// Applies the permutation built from source offsets and returns it.
+    fileprivate mutating func permute(sources: [Int]) -> Permutation {
+        permute(returning: Permutation(sources: sources))
     }
 }
 
@@ -103,6 +103,41 @@ public struct Permutation: Hashable, Sendable {
             kept += 1
         }
         line.removeLast(line.count - kept)
+        cycle = line
+    }
+
+    /// Creates the permutation that reverses `0..<count`, writing each swapped pair directly with its larger offset first.
+    fileprivate init(reversing count: Int) {
+        var line: [Int] = []
+        line.reserveCapacity(count)
+        for offset in (0..<(count / 2)).reversed() {
+            line.append(count - 1 - offset)
+            line.append(offset)
+        }
+        cycle = line
+    }
+
+    /// Creates the permutation that moves the element at offset `shift` to the front of `0..<count`, writing one cycle per residue class modulo the greatest common divisor.
+    fileprivate init(rotating count: Int, by shift: Int) {
+        guard count > 0, shift % count != 0 else {
+            cycle = []
+            return
+        }
+        let step = (shift % count + count) % count
+        var divisor = count
+        var remainder = step
+        while remainder != 0 {
+            (divisor, remainder) = (remainder, divisor % remainder)
+        }
+        var line: [Int] = []
+        line.reserveCapacity(count)
+        for start in (count - divisor)..<count {
+            var offset = start
+            repeat {
+                line.append(offset)
+                offset = offset >= step ? offset - step : offset + count - step
+            } while offset != start
+        }
         cycle = line
     }
 
@@ -147,6 +182,11 @@ public struct Permutation: Hashable, Sendable {
         return Permutation(cycle: line)
     }
 
+    /// The smallest collection count this permutation can be applied to, one more than its largest offset.
+    public var minimumCount: Int {
+        (cycle.max() ?? -1) + 1
+    }
+
     /// Calls the closure with each pair of offsets to swap, in order, deriving them in one pass with no allocation.
     fileprivate func forEachSwap(_ body: (Int, Int) throws -> Void) rethrows {
         var start = -1
@@ -159,3 +199,27 @@ public struct Permutation: Hashable, Sendable {
         }
     }
 }
+
+// MARK: - Foundation
+
+#if canImport(Foundation)
+import Foundation
+
+public extension PermutableCollection {
+
+    /// Moves the elements at the given offsets to just before the element at the destination offset, keeping their relative order, and returns the permutation applied.
+    @discardableResult mutating func move(fromOffsets source: IndexSet, toOffset destination: Int) -> Permutation {
+        precondition(source.allSatisfy { (0..<count).contains($0) } && (0...count).contains(destination), "Every offset must be within the collection.")
+        var before: [Int] = []
+        var after: [Int] = []
+        for offset in 0..<count where !source.contains(offset) {
+            if offset < destination {
+                before.append(offset)
+            } else {
+                after.append(offset)
+            }
+        }
+        return permute(sources: before + source + after)
+    }
+}
+#endif

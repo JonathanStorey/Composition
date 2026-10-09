@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Protocols/PermutableCollectionTests.swift
-// dependencies: [Protocols/PermutableCollection.swift]
+// dependencies: [Protocols/PermutableCollection.swift, Protocols/Squashable.swift]
 
 import Testing
 @testable import Composition
@@ -234,5 +234,33 @@ private struct Hand: PermutableCollection, RandomAccessCollection {
         var deck = Deck(cards: ["d", "b", "e", "a", "c"])
         deck.sort()
         #expect(deck.cards == ["a", "b", "c", "d", "e"])
+    }
+
+    @Test func squashedWithAppliesBothInOrder() {
+        let original = (0..<8).map(String.init)
+        for _ in 0..<50 {
+            var deck = Deck(cards: original)
+            let first = deck.shuffle()
+            let second = deck.rotate(toStartAt: 3)
+            var replay = Deck(cards: original)
+            replay.permute(using: first.squashed(with: second))
+            #expect(replay.cards == deck.cards)
+        }
+    }
+
+    @Test func squashedWithInvertedIsIdentity() {
+        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        let permutation = deck.shuffle()
+        #expect(permutation.squashed(with: permutation.inverted) == .identity)
+    }
+
+    @Test func squashedWithShorterPermutationLeavesLaterOffsetsToTheLonger() {
+        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        let swap = deck.move(from: 0, to: 1)
+        let reverse = deck.reverse()
+        var replay = Deck(cards: ["a", "b", "c", "d", "e"])
+        replay.permute(using: swap.squashed(with: reverse))
+        #expect(replay.cards == deck.cards)
+        #expect(swap.squashed(with: reverse).minimumCount == 5)
     }
 }

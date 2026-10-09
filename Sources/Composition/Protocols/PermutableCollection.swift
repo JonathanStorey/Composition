@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Protocols/PermutableCollection.swift
-// dependencies: []
+// dependencies: [Protocols/Squashable.swift]
 
 /// A collection that reorders its elements only by swapping them, so every reorder passes through `swapAt(_:_:)`.
 public protocol PermutableCollection: Collection {
@@ -240,5 +240,41 @@ public struct Permutation: Hashable, Sendable {
                 try body(start, offset)
             }
         }
+    }
+}
+
+extension Permutation: Squashable {
+
+    /// The permutation that leaves every offset in place.
+    public static let identity = Permutation(cycle: [])
+
+    /// Returns the permutation that applies this permutation and then the next, over the larger of their minimum counts.
+    public func squashed(with next: Permutation) -> Permutation {
+        let count = Swift.max(minimumCount, next.minimumCount)
+        let first = destinations(count: count)
+        let second = next.destinations(count: count)
+        var sources = Array(0..<count)
+        for offset in sources.indices {
+            sources[second[first[offset]]] = offset
+        }
+        return Permutation(sources: sources)
+    }
+
+    /// Returns the offset each element of `0..<count` moves to, walking the cycles once.
+    private func destinations(count: Int) -> [Int] {
+        var destinations = Array(0..<count)
+        var start = -1
+        var previous = -1
+        for offset in cycle {
+            if offset > start {
+                if start >= 0 { destinations[previous] = start }
+                start = offset
+            } else {
+                destinations[previous] = offset
+            }
+            previous = offset
+        }
+        if start >= 0 { destinations[previous] = start }
+        return destinations
     }
 }

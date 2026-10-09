@@ -89,7 +89,7 @@ When the whole file needs the same frameworks, wrap it all in one `#if canImport
 ### Naming
 
 - Name a generic parameter with one capital letter from its protocol and the value for what it is, as in `init<L: LabelRepresentable>(_ label: L)`. Use a named generic parameter instead of `some Protocol` when a `where` clause needs its associated type.
-- Give a parameter both an argument label and a parameter name when that reads better at the call site, as in `init?(timestamp uuid: UUID)`, called as `Date(timestamp: id)`.
+- Give a parameter both an argument label and a parameter name when the label reads better at the call site and the name gives more context inside the declaration, as in `init?(timestamp uuid: UUID)`, called as `Date(timestamp: id)`, or `squashed(with next: Self)`, where `next` says which change comes second.
 
 ### Doc comments
 

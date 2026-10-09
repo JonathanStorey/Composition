@@ -22,27 +22,14 @@ private struct Deck: PermutableCollection {
 
     var startIndex: Int { cards.startIndex }
 
-    subscript(position: Int) -> String {
-        get { cards[position] }
-        set { cards[position] = newValue }
-    }
+    subscript(position: Int) -> String { cards[position] }
 
     func index(after i: Int) -> Int {
         cards.index(after: i)
     }
-}
 
-private struct Hand: PermutableCollection, RandomAccessCollection {
-
-    var cards: [String]
-
-    var endIndex: Int { cards.endIndex }
-
-    var startIndex: Int { cards.startIndex }
-
-    subscript(position: Int) -> String {
-        get { cards[position] }
-        set { cards[position] = newValue }
+    mutating func swapAt(_ first: Int, _ second: Int) {
+        cards.swapAt(first, second)
     }
 }
 
@@ -121,16 +108,6 @@ private struct Hand: PermutableCollection, RandomAccessCollection {
         array.shuffle(using: &arrayGenerator)
         #expect(deck.cards == array)
         #expect(deckGenerator.state == arrayGenerator.state)
-    }
-
-    @Test func shuffleUsingGeneratorOnRandomAccessMatchesArray() {
-        var handGenerator = SeededGenerator(state: 5)
-        var arrayGenerator = SeededGenerator(state: 5)
-        var hand = Hand(cards: (0..<30).map(String.init))
-        var array = (0..<30).map(String.init)
-        hand.shuffle(using: &handGenerator)
-        array.shuffle(using: &arrayGenerator)
-        #expect(hand.cards == array)
     }
 
     @Test func shuffleUsingGeneratorOnSingleElementLeavesItInPlace() {

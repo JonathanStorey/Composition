@@ -48,7 +48,7 @@ extension CollectionDifference: Squashable where ChangeElement: Equatable {
         return rank + position
     }
 
-    /// Returns the difference that makes this difference's changes and then the next's, without inferred moves, throwing when the next removes an element this one inserted but finds a different element there.
+    /// Returns one difference making this difference's changes and then the next's, where the next was made from this difference's result.
     public func squashed(with next: CollectionDifference) throws -> CollectionDifference {
         var changes = removals.map { Change.remove(offset: $0.offset, element: $0.element, associatedWith: nil) }
         let removedOffsets = removals.map(\.offset)
@@ -104,12 +104,12 @@ public extension CollectionDifference where ChangeElement: Equatable {
         return insertions.enumerated().map { index, change in Self.offset(ranked: change.offset - index, skipping: removedOffsets, from: &position) }
     }
 
-    /// Replaces this difference with its offsets moved to apply after the prior difference, made from the same collection.
+    /// Moves this difference's changes to apply after a prior difference made from the same collection.
     mutating func adjust(for prior: CollectionDifference) throws {
         self = try adjusted(for: prior)
     }
 
-    /// Returns this difference with its offsets moved to apply after the prior difference, made from the same collection, dropping removals the prior already made and placing the prior's insertions first where both insert at the same position.
+    /// Returns only this difference's changes, moved to apply after a prior difference made from the same collection.
     func adjusted(for prior: CollectionDifference) throws -> CollectionDifference {
         let removedOffsets = Set(prior.removals.map(\.offset)).union(removals.map(\.offset)).sorted()
         let priorGaps = prior.insertionGaps
@@ -131,12 +131,12 @@ public extension CollectionDifference where ChangeElement: Equatable {
         return CollectionDifference(changes)!
     }
 
-    /// Replaces this difference with one making its changes and the other's, both made from the same collection.
+    /// Combines the other difference, made from the same collection, into this one.
     mutating func merge(with other: CollectionDifference) throws {
         self = try merged(with: other)
     }
 
-    /// Returns the difference making this difference's changes and the other's, both made from the same collection, placing this difference's insertions first where both insert at the same position.
+    /// Returns one difference making this difference's changes and the other's, where both were made from the same collection.
     func merged(with other: CollectionDifference) throws -> CollectionDifference {
         try squashed(with: other.adjusted(for: self))
     }

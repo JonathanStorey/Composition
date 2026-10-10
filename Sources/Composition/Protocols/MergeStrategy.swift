@@ -3,7 +3,7 @@
 // dependencies: []
 
 /// A way of combining two versions of a value that were each edited from a shared base.
-public protocol MergeStrategy {
+public protocol MergeStrategy<Value> {
 
     /// The type of value the strategy merges.
     associatedtype Value

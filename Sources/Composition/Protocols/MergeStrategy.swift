@@ -1,35 +1,9 @@
 // repository: https://github.com/JonathanStorey/Composition
-// path: Protocols/Strategy.swift
-// dependencies: [Extensions/CollectionDifference.swift, Extensions/RangeReplaceableCollection.swift, Protocols/DifferenceProtocol.swift]
-
-/// A strategy that both finds differences and merges values.
-public typealias DiffableMergeStrategy = DiffStrategy & MergeStrategy
-
-/// A way of working with values of one type, refined by strategies that merge or diff them.
-public protocol Strategy<Value> {
-
-    /// The type of value the strategy works with.
-    associatedtype Value
-}
-
-/// A way of finding how one value differs from another and applying that difference back.
-public protocol DiffStrategy<Value>: Strategy {
-
-    /// The type of difference the strategy produces.
-    associatedtype Difference: DifferenceProtocol
-
-    /// The type of value the strategy compares.
-    associatedtype Value
-
-    /// Returns the value with the difference applied, throwing if the difference does not fit it.
-    func applying(_ difference: Difference, to value: Value) throws -> Value
-
-    /// Returns the difference that turns the original value into the updated one.
-    func difference(from original: Value, to updated: Value) -> Difference
-}
+// path: Protocols/MergeStrategy.swift
+// dependencies: []
 
 /// A way of combining two versions of a value that were each edited from a shared base.
-public protocol MergeStrategy<Value>: Strategy {
+public protocol MergeStrategy<Value> {
 
     /// The type of value the strategy merges.
     associatedtype Value
@@ -38,7 +12,7 @@ public protocol MergeStrategy<Value>: Strategy {
     func merged(_ ours: Value, with theirs: Value, from base: Value) throws -> Value
 }
 
-public extension Strategy {
+public extension MergeStrategy {
 
     /// A strategy that merges collections element by element, keeping the insertions and removals from both sides.
     @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
@@ -54,22 +28,10 @@ public extension Strategy {
 
 /// A strategy that merges collections element by element, keeping the insertions and removals from both sides.
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-public struct ListStrategy<C: BidirectionalCollection & RangeReplaceableCollection>: DiffableMergeStrategy where C.Element: Equatable {
+public struct ListStrategy<C: BidirectionalCollection & RangeReplaceableCollection>: MergeStrategy where C.Element: Equatable {
 
     /// Creates a list strategy.
     public init() {}
-
-    /// Returns the collection with the difference applied, throwing if the difference does not fit it.
-    public func applying(_ difference: CollectionDifference<C.Element>, to value: C) throws -> C {
-        var result: C = value
-        try result.apply(difference)
-        return result
-    }
-
-    /// Returns the insertions and removals that turn the original collection into the updated one.
-    public func difference(from original: C, to updated: C) -> CollectionDifference<C.Element> {
-        updated.difference(from: original)
-    }
 
     /// Returns the base with the insertions and removals of ours and theirs, placing ours first where both insert at one position.
     public func merged(_ ours: C, with theirs: C, from base: C) -> C {

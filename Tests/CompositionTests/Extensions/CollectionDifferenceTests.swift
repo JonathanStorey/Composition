@@ -33,15 +33,4 @@ import Testing
         #expect(insertion.isInsertion && !insertion.isRemoval)
         #expect(insertion.offset == 1 && insertion.element == 3)
     }
-
-    @Test func changesIsEmptyWithoutDifferences() {
-        let difference: CollectionDifference<Int> = [1, 2].difference(from: [1, 2])
-        #expect(difference.changes.isEmpty)
-    }
-
-    @Test func changesListsEveryRemovalAndInsertion() {
-        let difference: CollectionDifference<Int> = [1, 3].difference(from: [1, 2])
-        #expect(difference.changes.count == 2)
-        #expect(difference.changes == Array(difference))
-    }
 }

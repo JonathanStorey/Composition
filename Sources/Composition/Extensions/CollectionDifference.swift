@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Extensions/CollectionDifference.swift
-// dependencies: [Protocols/DifferenceProtocol.swift, Protocols/Mergeable.swift, Protocols/Shiftable.swift, Protocols/Squashable.swift]
+// dependencies: [Protocols/DifferenceProtocol.swift]
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension CollectionDifference.Change {
@@ -36,99 +36,6 @@ public extension CollectionDifference.Change {
         }
     }
 }
-
-@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension CollectionDifference: Squashable where ChangeElement: Equatable {
-
-    /// Returns the offset at the rank among the offsets missing from the sorted list, advancing the position in the list so ascending ranks take one pass.
-    private static func offset(ranked rank: Int, skipping skipped: [Int], from position: inout Int) -> Int {
-        while position < skipped.count, skipped[position] <= rank + position {
-            position += 1
-        }
-        return rank + position
-    }
-
-    /// Returns one difference making this difference's changes and then the next's, where the next was made from this difference's result.
-    public func squashed(with next: CollectionDifference) throws -> CollectionDifference {
-        var changes: [Change] = removals.map { Change.remove(offset: $0.offset, element: $0.element, associatedWith: nil) }
-        let removedOffsets: [Int] = removals.map(\.offset)
-        var insertion: Int = 0
-        var removed: Int = 0
-        for change in next.removals {
-            while insertion < insertions.count, insertions[insertion].offset < change.offset {
-                insertion += 1
-            }
-            if insertion < insertions.count, insertions[insertion].offset == change.offset {
-                guard insertions[insertion].element == change.element else { throw CollectionDifferenceError.elementMismatch(change.offset) }
-            } else {
-                changes.append(.remove(offset: Self.offset(ranked: change.offset - insertion, skipping: removedOffsets, from: &removed), element: change.element, associatedWith: nil))
-            }
-        }
-        let nextInsertedOffsets: [Int] = next.insertions.map(\.offset)
-        var nextRemoval: Int = 0
-        var nextInserted: Int = 0
-        for change in insertions {
-            while nextRemoval < next.removals.count, next.removals[nextRemoval].offset < change.offset {
-                nextRemoval += 1
-            }
-            guard nextRemoval == next.removals.count || next.removals[nextRemoval].offset != change.offset else { continue }
-            changes.append(.insert(offset: Self.offset(ranked: change.offset - nextRemoval, skipping: nextInsertedOffsets, from: &nextInserted), element: change.element, associatedWith: nil))
-        }
-        changes += next.insertions.map { Change.insert(offset: $0.offset, element: $0.element, associatedWith: nil) }
-        return CollectionDifference(changes)!
-    }
-}
-
-@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension CollectionDifference: Shiftable where ChangeElement: Equatable {
-
-    /// Returns how many values in the sorted list are less than the bound.
-    private static func count(of sorted: [Int], below bound: Int) -> Int {
-        var low: Int = 0
-        var high: Int = sorted.count
-        while low < high {
-            let middle: Int = (low + high) / 2
-            if sorted[middle] < bound {
-                low = middle + 1
-            } else {
-                high = middle
-            }
-        }
-        return low
-    }
-
-    /// The offset in the original collection of the element each insertion lands before, counting the removed elements.
-    private var insertionGaps: [Int] {
-        let removedOffsets: [Int] = removals.map(\.offset)
-        var position: Int = 0
-        return insertions.enumerated().map { index, change in Self.offset(ranked: change.offset - index, skipping: removedOffsets, from: &position) }
-    }
-
-    /// Returns only this difference's changes, moved to apply after a prior difference made from the same collection.
-    public func shifted(by prior: CollectionDifference) throws -> CollectionDifference {
-        let removedOffsets: [Int] = Set(prior.removals.map(\.offset)).union(removals.map(\.offset)).sorted()
-        let priorGaps: [Int] = prior.insertionGaps
-        var changes: [Change] = []
-        var priorRemoval: Int = 0
-        for change in removals {
-            while priorRemoval < prior.removals.count, prior.removals[priorRemoval].offset < change.offset {
-                priorRemoval += 1
-            }
-            if priorRemoval < prior.removals.count, prior.removals[priorRemoval].offset == change.offset {
-                guard prior.removals[priorRemoval].element == change.element else { throw CollectionDifferenceError.elementMismatch(change.offset) }
-            } else {
-                changes.append(.remove(offset: change.offset - priorRemoval + Self.count(of: priorGaps, below: change.offset + 1), element: change.element, associatedWith: nil))
-            }
-        }
-        for (index, gap) in insertionGaps.enumerated() {
-            changes.append(.insert(offset: gap - Self.count(of: removedOffsets, below: gap) + Self.count(of: priorGaps, below: gap + 1) + index, element: insertions[index].element, associatedWith: nil))
-        }
-        return CollectionDifference(changes)!
-    }
-}
-
-@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension CollectionDifference: Mergeable where ChangeElement: Equatable {}
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension CollectionDifference: DifferenceProtocol {

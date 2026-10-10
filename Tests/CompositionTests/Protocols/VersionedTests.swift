@@ -11,7 +11,7 @@ private final class Note: Versioned {
 
     var body: String
     var id = UUID()
-    var revision: Commit?
+    var revision = Commit()
 
     init(body: String) {
         self.body = body
@@ -30,7 +30,7 @@ private struct Page: Equatable, Versioned {
 
     var body: String
     var id = UUID()
-    var revision: Commit?
+    var revision = Commit()
 
     static func forked(copying parent: Page) -> Page {
         Page(body: parent.body)
@@ -41,232 +41,261 @@ private struct Page: Equatable, Versioned {
     }
 }
 
-private func committed(_ body: String, onto parent: Page? = nil) -> Page {
-    var page = Page(body: body)
-    if var parent {
-        page = parent.fork()
-        page.body = body
+private extension Repository where V == Page {
+
+    @discardableResult
+    mutating func committed(_ body: String, onto parent: Page? = nil) throws -> Page {
+        guard let parent else { return try commit(Page(body: body)) }
+        var child = try fork(parent)
+        child.body = body
+        return try commit(child)
     }
-    return page.commit()
 }
 
 @Suite struct VersionedTests {
 
     @Test func branchesAreEmptyWithoutCommits() {
-        #expect([Page(body: "A"), Page(body: "B")].branches.isEmpty)
+        #expect(Repository([Page(body: "A"), Page(body: "B")]).branches.isEmpty)
     }
 
-    @Test func branchesAreIncompleteWhenAncestorIsMissing() {
-        let parent = committed("Parent", onto: committed("Root"))
-        let child = committed("Child", onto: parent)
-        let branches = [child, parent].branches
+    @Test func branchesAreIncompleteWhenAncestorIsMissing() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        let parent = try repository.committed("Parent", onto: root)
+        let child = try repository.committed("Child", onto: parent)
+        let branches = Repository([child, parent]).branches
         #expect(branches.count == 1)
         #expect(branches.first?.map(\.body) == ["Parent", "Child"])
         #expect(branches.first?.isComplete == false)
     }
 
-    @Test func branchesBreakTiesByNewestId() {
-        let root = committed("Root")
-        let first = committed("First", onto: root)
-        let second = committed("Second", onto: root)
+    @Test func branchesBreakTiesByNewestId() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        let first = try repository.committed("First", onto: root)
+        let second = try repository.committed("Second", onto: root)
         let heads = [first, second].sorted { $0.id.uuidString < $1.id.uuidString }
-        #expect([first, root, second].branches.map { $0.last?.body } == heads.map(\.body))
-        #expect([second, root, first].branches.map { $0.last?.body } == heads.map(\.body))
+        #expect(Repository([first, root, second]).branches.map { $0.last?.body } == heads.map(\.body))
+        #expect(Repository([second, root, first]).branches.map { $0.last?.body } == heads.map(\.body))
     }
 
-    @Test func branchesEqualWhenBuiltFromSameValues() {
-        let root = committed("Root")
-        let child = committed("Child", onto: root)
-        #expect([root, child].branches == [child, root].branches)
-        #expect([root, child].branches != [root].branches)
+    @Test func branchesFollowParentsFromRootToHead() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        let parent = try repository.committed("Parent", onto: root)
+        try repository.committed("Child", onto: parent)
+        #expect(repository.branches.count == 1)
+        #expect(repository.branches.first?.map(\.body) == ["Root", "Parent", "Child"])
+        #expect(repository.branches.first?.isComplete == true)
     }
 
-    @Test func branchesFollowParentsFromRootToHead() {
-        let root = committed("Root")
-        let parent = committed("Parent", onto: root)
-        let child = committed("Child", onto: parent)
-        let branches = [child, root, parent].branches
-        #expect(branches.count == 1)
-        #expect(branches.first?.map(\.body) == ["Root", "Parent", "Child"])
-        #expect(branches.first?.isComplete == true)
+    @Test func branchesKeepIdenticalForksSeparate() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        try repository.committed("Child", onto: root)
+        try repository.committed("Child", onto: root)
+        #expect(repository.branches.count == 2)
     }
 
-    @Test func branchesKeepIdenticalForksSeparate() {
-        let root = committed("Root")
-        let first = committed("Child", onto: root)
-        let second = committed("Child", onto: root)
-        #expect([root, first, second].branches.count == 2)
+    @Test func branchesLeaveOutUncommittedForks() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        _ = try repository.fork(root)
+        #expect(repository.branches.map { $0.map(\.body) } == [["Root"]])
     }
 
-    @Test func branchesSortMostCommitsFirst() {
-        let root = committed("Root")
-        let short = committed("Short", onto: root)
-        let middle = committed("Middle", onto: root)
-        let long = committed("Long", onto: middle)
-        let branches = [short, root, long, middle].branches
-        #expect(branches.map { $0.map(\.body) } == [["Root", "Middle", "Long"], ["Root", "Short"]])
+    @Test func branchesSortMostVersionsFirst() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        try repository.committed("Short", onto: root)
+        let middle = try repository.committed("Middle", onto: root)
+        try repository.committed("Long", onto: middle)
+        #expect(repository.branches.map { $0.map(\.body) } == [["Root", "Middle", "Long"], ["Root", "Short"]])
     }
 
-    @Test func commitIsStableForEqualContent() {
-        let parent = committed("Root")
-        #expect(committed("Draft", onto: parent).revision == committed("Draft", onto: parent).revision)
+    @Test func commitAddsNewValue() throws {
+        var repository = Repository<Page>()
+        let page = try repository.commit(Page(body: "Root"))
+        #expect(repository.values == [page])
+        #expect(page.revision.isCommitted)
+        #expect(page.revision.checksum == page.checksum)
+        #expect(page.revision.parent == nil)
     }
 
-    @Test func commitKeepsIdAndParentWhenContentChanges() {
-        let root = committed("Root")
-        var page = committed("Child", onto: root)
-        let id = page.id
-        page.body = "Edited"
-        page.commit()
-        #expect(page.id == id)
-        #expect(page.revision?.parent == root.id)
-        #expect(page.revision?.checksum == page.checksum)
+    @Test func commitEmptyInitializerIsUncommitted() {
+        let commit = Commit()
+        #expect(commit.checksum == nil)
+        #expect(!commit.isCommitted)
+        #expect(commit.parent == nil)
     }
 
-    @Test func commitKeepsRevisionWhenContentMatches() {
-        var page = committed("Root")
-        let revision = page.revision
-        page.commit()
-        #expect(page.revision == revision)
-        page.body = "Root"
-        page.commit()
-        #expect(page.revision == revision)
+    @Test func commitKeepsIdAndParentOfFork() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        var child = try repository.fork(root)
+        let id = child.id
+        child.body = "Child"
+        let committed = try repository.commit(child)
+        #expect(committed.id == id)
+        #expect(committed.revision.parent == root.id)
+        #expect(repository.values.count == 2)
+        #expect(repository.uncommitted.isEmpty)
     }
 
-    @Test func commitRecordsChecksumOfContent() {
-        let page = committed("Root")
-        #expect(page.revision?.checksum == page.checksum)
-        #expect(page.revision?.parent == nil)
-    }
-
-    @Test func commitReturnsUpdatedValue() {
-        var page = Page(body: "Root")
-        let result = page.commit()
-        #expect(result == page)
-        #expect(page.revision != nil)
+    @Test func commitKeepsUnchangedCommittedValue() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        let recommitted = try repository.commit(root)
+        #expect(recommitted == root)
+        #expect(repository.values == [root])
     }
 
     @Test func commitRoundTripsThroughCodable() throws {
-        let revision = try #require(committed("Child", onto: committed("Root")).revision)
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        let revision = try repository.committed("Child", onto: root).revision
         let decoded = try JSONDecoder().decode(Commit.self, from: JSONEncoder().encode(revision))
         #expect(decoded == revision)
     }
 
-    @Test func duplicatesIsEmptyWithoutRepeatedIds() {
-        let root = committed("Root")
-        let child = committed("Child", onto: root)
-        #expect([root, child, Page(body: "Draft")].duplicates.isEmpty)
+    @Test func commitThrowsWhenCommittedClassInstanceChanges() throws {
+        var repository = Repository<Note>()
+        let note = try repository.commit(Note(body: "Root"))
+        note.body = "Edited"
+        #expect(throws: VersionedError.committedValueChanged) { try repository.commit(note) }
     }
 
-    @Test func duplicatesListLaterValuesWithRepeatedIds() {
-        let root = committed("Root")
-        let child = committed("Child", onto: root)
-        var copy = child
-        copy.body = "Edited"
-        #expect([root, child, copy].duplicates.map(\.body) == ["Edited"])
+    @Test func commitThrowsWhenCommittedValueChanges() throws {
+        var repository = Repository<Page>()
+        var page = try repository.committed("Root")
+        page.body = "Edited"
+        #expect(throws: VersionedError.committedValueChanged) { try repository.commit(page) }
+        #expect(repository.values.map(\.body) == ["Root"])
     }
 
-    @Test func forkAssignsNewIdAndRecordsParent() {
-        var root = committed("Root")
-        let child = root.fork()
+    @Test func duplicatesListLaterValuesWithRepeatedIds() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        var copy = root
+        copy.body = "Copy"
+        #expect(Repository([root], [copy]).duplicates.map(\.body) == ["Copy"])
+        #expect(repository.duplicates.isEmpty)
+    }
+
+    @Test func forkAssignsNewIdAndRecordsParent() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        let child = try repository.fork(root)
         #expect(child.id != root.id)
-        #expect(child.revision?.parent == root.id)
+        #expect(child.revision.parent == root.id)
+        #expect(child.revision.checksum == child.checksum)
+        #expect(!child.revision.isCommitted)
     }
 
-    @Test func forkCommitsModifiedParentFirst() {
-        var parent = committed("Root")
-        parent.body = "Edited"
-        var child = parent.fork()
-        child.body = "Child"
-        child.commit()
-        #expect(!parent.hasUncommittedChanges)
-        #expect(child.isChild(of: parent))
+    @Test func forkCommitsUncommittedParentFirst() throws {
+        var repository = Repository<Page>()
+        let child = try repository.fork(Page(body: "Root"))
+        let id = try #require(child.revision.parent)
+        let parent = try #require(repository.value(for: id))
+        #expect(parent.revision.isCommitted)
+        #expect(repository.uncommitted == [child])
     }
 
-    @Test func forkCommitsUncommittedParentFirst() {
-        var parent = Page(body: "Root")
-        var child = parent.fork()
+    @Test func forkCreatesNewClassInstance() throws {
+        var repository = Repository<Note>()
+        let note = Note(body: "Root")
+        let child = try repository.fork(note)
         child.body = "Child"
-        child.commit()
-        #expect(!parent.hasUncommittedChanges)
-        #expect(child.isChild(of: parent))
-    }
-
-    @Test func forkCreatesNewClassInstance() {
-        var note = Note(body: "Root")
-        var child = note.fork()
-        child.body = "Child"
-        child.commit()
+        try repository.commit(child)
         #expect(child !== note)
         #expect(note.body == "Root")
-        #expect(child.isChild(of: note))
+        #expect(repository.isAncestor(note, of: child))
     }
 
-    @Test func forkLeavesParentContentUnchanged() {
-        var root = committed("Root")
-        var child = root.fork()
-        child.body = "Child"
-        child.commit()
-        #expect(root.body == "Root")
-        #expect(!root.hasUncommittedChanges)
-        #expect(child.isChild(of: root))
+    @Test func hasUncommittedChangesIsFalseAfterCommit() throws {
+        var repository = Repository<Page>()
+        let page = try repository.committed("Root")
+        #expect(!page.hasUncommittedChanges)
     }
 
-    @Test func forkStartsWithoutUncommittedChanges() {
-        var root = committed("Root")
-        let child = root.fork()
-        #expect(!child.hasUncommittedChanges)
-        #expect(child.isChild(of: root))
-    }
-
-    @Test func hasUncommittedChangesIsFalseAfterCommit() {
-        #expect(!committed("Root").hasUncommittedChanges)
-    }
-
-    @Test func hasUncommittedChangesIsTrueAfterEdit() {
-        var page = committed("Root")
+    @Test func hasUncommittedChangesIsTrueAfterEdit() throws {
+        var repository = Repository<Page>()
+        var page = try repository.committed("Root")
         page.body = "Edited"
         #expect(page.hasUncommittedChanges)
     }
 
-    @Test func hasUncommittedChangesIsTrueBeforeFirstCommit() {
+    @Test func hasUncommittedChangesIsTrueBeforeFirstCommit() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        let child = try repository.fork(root)
         #expect(Page(body: "Root").hasUncommittedChanges)
+        #expect(child.hasUncommittedChanges)
     }
 
-    @Test func isChildIsFalseForGrandparent() {
-        let grandparent = committed("Root")
-        let child = committed("Child", onto: committed("Parent", onto: grandparent))
-        #expect(!child.isChild(of: grandparent))
+    @Test func headsListNewestVersionOfEachBranch() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        try repository.committed("Short", onto: root)
+        let middle = try repository.committed("Middle", onto: root)
+        try repository.committed("Long", onto: middle)
+        #expect(repository.heads.map(\.body) == ["Long", "Short"])
     }
 
-    @Test func isChildIsFalseWhenChildChanges() {
-        let parent = committed("Root")
-        var child = committed("Child", onto: parent)
-        child.body = "Edited"
-        #expect(!child.isChild(of: parent))
+    @Test func isAncestorCoversGrandparents() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        let parent = try repository.committed("Parent", onto: root)
+        let child = try repository.committed("Child", onto: parent)
+        #expect(repository.isAncestor(root, of: child))
+        #expect(repository.isAncestor(parent, of: child))
     }
 
-    @Test func isChildIsFalseWhenParentChanges() {
-        var parent = committed("Root")
-        let child = committed("Child", onto: parent)
-        parent.body = "Edited"
-        #expect(!child.isChild(of: parent))
+    @Test func isAncestorIsFalseForSelfAndDescendants() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        let child = try repository.committed("Child", onto: root)
+        #expect(!repository.isAncestor(child, of: child))
+        #expect(!repository.isAncestor(child, of: root))
     }
 
-    @Test func isChildIsTrueForDirectChild() {
-        let parent = committed("Root")
-        #expect(committed("Child", onto: parent).isChild(of: parent))
+    @Test func logListsVersionsNewestFirst() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        let parent = try repository.committed("Parent", onto: root)
+        let child = try repository.committed("Child", onto: parent)
+        #expect(repository.log(from: child).map(\.body) == ["Child", "Parent", "Root"])
     }
 
-    @Test func uncommittedIsEmptyWhenAllCommitted() {
-        #expect([committed("Root")].uncommitted.isEmpty)
+    @Test func mergeBaseFindsNearestSharedAncestor() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        let shared = try repository.committed("Shared", onto: root)
+        let ours = try repository.committed("Ours", onto: shared)
+        let theirs = try repository.committed("Theirs", onto: shared)
+        #expect(repository.mergeBase(of: ours, and: theirs) == shared)
+        #expect(repository.mergeBase(of: shared, and: theirs) == shared)
     }
 
-    @Test func uncommittedListsValuesWithoutRevision() {
-        let root = committed("Root")
-        var edited = committed("Edited")
-        edited.body = "Changed"
-        #expect([root, Page(body: "Draft"), edited].uncommitted.map(\.body) == ["Draft"])
+    @Test func mergeBaseIsNilForUnrelatedHistories() throws {
+        var repository = Repository<Page>()
+        let first = try repository.committed("First")
+        let second = try repository.committed("Second")
+        #expect(repository.mergeBase(of: first, and: second) == nil)
+    }
+
+    @Test func uncommittedListsNewAndForkedValues() throws {
+        var repository = Repository([Page(body: "Draft")])
+        let root = try repository.committed("Root")
+        _ = try repository.fork(root)
+        #expect(repository.uncommitted.map(\.body) == ["Draft", "Root"])
+    }
+
+    @Test func valueForIdFindsVersionOrReturnsNil() throws {
+        var repository = Repository<Page>()
+        let root = try repository.committed("Root")
+        #expect(repository.value(for: root.id) == root)
+        #expect(repository.value(for: UUID()) == nil)
     }
 }
 #endif

@@ -34,6 +34,17 @@ import Testing
         #expect(insertion.offset == 1 && insertion.element == 3)
     }
 
+    @Test func changesIsEmptyWithoutDifferences() {
+        let difference: CollectionDifference<Int> = [1, 2].difference(from: [1, 2])
+        #expect(difference.changes.isEmpty)
+    }
+
+    @Test func changesListsEveryRemovalAndInsertion() {
+        let difference: CollectionDifference<Int> = [1, 3].difference(from: [1, 2])
+        #expect(difference.changes.count == 2)
+        #expect(difference.changes == Array(difference))
+    }
+
     @Test func mergeWithReplacesReceiver() throws {
         let base = ["milk", "eggs"]
         var mine = ["eggs"].difference(from: base)

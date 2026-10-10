@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Extensions/CollectionDifference.swift
-// dependencies: [Protocols/Mergeable.swift, Protocols/Shiftable.swift, Protocols/Squashable.swift]
+// dependencies: [Protocols/DifferenceProtocol.swift, Protocols/Mergeable.swift, Protocols/Shiftable.swift, Protocols/Squashable.swift]
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension CollectionDifference.Change {
@@ -129,6 +129,15 @@ extension CollectionDifference: Shiftable where ChangeElement: Equatable {
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension CollectionDifference: Mergeable where ChangeElement: Equatable {}
+
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+extension CollectionDifference: DifferenceProtocol {
+
+    /// The removals and insertions that make up the difference, in the order the collection lists them.
+    public var changes: [Change] {
+        Array(self)
+    }
+}
 
 /// An error thrown when a difference does not apply to a collection, carrying the offset of the change that failed.
 public enum CollectionDifferenceError: Error, Equatable, Sendable {

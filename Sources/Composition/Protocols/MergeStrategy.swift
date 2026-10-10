@@ -35,10 +35,10 @@ public struct ListStrategy<C: BidirectionalCollection & RangeReplaceableCollecti
 
     /// Returns the base with the insertions and removals of ours and theirs, placing ours first where both insert at one position.
     public func merged(_ ours: C, with theirs: C, from base: C) -> C {
-        let base = Array(base)
-        let ourEdits = edits(from: base, to: ours)
-        let theirEdits = edits(from: base, to: theirs)
-        var result = C()
+        let base: [C.Element] = Array(base)
+        let ourEdits: (insertions: [[C.Element]], removals: Set<Int>) = edits(from: base, to: ours)
+        let theirEdits: (insertions: [[C.Element]], removals: Set<Int>) = edits(from: base, to: theirs)
+        var result: C = C()
         for position in 0...base.count {
             result.append(contentsOf: ourEdits.insertions[position])
             result.append(contentsOf: theirEdits.insertions[position])
@@ -61,8 +61,8 @@ public struct ListStrategy<C: BidirectionalCollection & RangeReplaceableCollecti
                 removals.insert(offset)
             }
         }
-        var insertions = Array(repeating: [C.Element](), count: base.count + 1)
-        var position = 0
+        var insertions: [[C.Element]] = Array(repeating: [], count: base.count + 1)
+        var position: Int = 0
         for (offset, element) in edited.enumerated() {
             while removals.contains(position) {
                 position += 1

@@ -20,19 +20,19 @@ private struct Log: Squashable {
 @Suite struct SquashableTests {
 
     @Test func squashWithKeepsReceiverFirst() throws {
-        var log = Log(entries: ["a"])
+        var log: Log = Log(entries: ["a"])
         try log.squash(with: Log(entries: ["b"]))
         #expect(log.entries == ["a", "b"])
     }
 
     @Test func squashWithLeavesReceiverUnchangedWhenSquashingThrows() {
-        var log = Log(entries: ["a"])
+        var log: Log = Log(entries: ["a"])
         #expect(throws: EmptyLog.self) { try log.squash(with: Log(entries: [])) }
         #expect(log.entries == ["a"])
     }
 
     @Test func staticSquashedKeepsFirstBeforeNext() throws {
-        let log = try Log.squashed(Log(entries: ["a"]), with: Log(entries: ["b"]))
+        let log: Log = try Log.squashed(Log(entries: ["a"]), with: Log(entries: ["b"]))
         #expect(log.entries == ["a", "b"])
     }
 }

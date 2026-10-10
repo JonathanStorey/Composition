@@ -10,7 +10,7 @@ extension Decimal {
     /// The value in plain notation without trailing fractional zeros, matching Python's `format(d.normalize(), "f")`.
     var normalizedDescription: String {
         guard description.contains(".") else { return description }
-        var text = description
+        var text: String = description
         while text.hasSuffix("0") { text.removeLast() }
         if text.hasSuffix(".") { text.removeLast() }
         return text

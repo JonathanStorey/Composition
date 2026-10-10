@@ -13,14 +13,14 @@ import Foundation
 @Suite struct UUIDTests {
 
     @Test func comparableSortsTimestampsByCreationTime() throws {
-        let earlier = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.0001)))
-        let later = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.0004)))
+        let earlier: UUID = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.0001)))
+        let later: UUID = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.0004)))
         #expect(earlier < later)
         #expect(UUID.zero < UUID.max)
     }
 
     @Test func initTimestampEncodesSubMillisecondPrecision() throws {
-        let uuid = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.000_500_1)))
+        let uuid: UUID = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.000_500_1)))
         #expect(uuid.uuidString.hasPrefix("018BCFE5-6800-7800-"))
     }
 
@@ -29,15 +29,15 @@ import Foundation
     }
 
     @Test func initTimestampRoundTripsThroughDate() throws {
-        let date = Date(timeIntervalSince1970: 1_700_000_000.123456)
-        let uuid = try #require(UUID(timestamp: date))
-        let decoded = try #require(Date(timestamp: uuid))
+        let date: Date = Date(timeIntervalSince1970: 1_700_000_000.123456)
+        let uuid: UUID = try #require(UUID(timestamp: date))
+        let decoded: Date = try #require(Date(timestamp: uuid))
         #expect(abs(decoded.timeIntervalSince(date)) < 0.000_000_5)
     }
 
     @Test func initTimestampSortsWithinOneMillisecond() throws {
-        let earlier = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.0001)))
-        let later = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.0004)))
+        let earlier: UUID = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.0001)))
+        let later: UUID = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.0004)))
         #expect(earlier.uuidString < later.uuidString)
     }
 
@@ -47,9 +47,9 @@ import Foundation
     }
 
     @Test func timestampEmbedsCurrentTime() throws {
-        let before = Date().addingTimeInterval(-0.001)
-        let decoded = try #require(Date(timestamp: UUID.timestamp))
-        let after = Date().addingTimeInterval(0.001)
+        let before: Date = Date().addingTimeInterval(-0.001)
+        let decoded: Date = try #require(Date(timestamp: UUID.timestamp))
+        let after: Date = Date().addingTimeInterval(0.001)
         #expect((before...after).contains(decoded))
     }
 
@@ -58,7 +58,7 @@ import Foundation
     }
 
     @Test func timestampSetsVersionAndVariant() {
-        let characters = Array(UUID.timestamp.uuidString)
+        let characters: [Character] = Array(UUID.timestamp.uuidString)
         #expect(characters[14] == "7")
         #expect("89AB".contains(characters[19]))
     }
@@ -100,15 +100,15 @@ extension UUIDTests {
     }
 
     @Test func initHashHashesDataBytesDirectly() {
-        let data = Data("www.example.com".utf8)
+        let data: Data = Data("www.example.com".utf8)
         #expect(UUID(hash: data).uuidString == "399FC331-BE2B-5B56-B676-D6F38DAE5AAA")
         #expect(UUID(hash: data, namespace: UUID(hash: "Image")).uuidString == "B2FB507C-C942-58E2-AB1C-C6A61418C3FB")
     }
 
     @Test func initHashIgnoresKeyOrder() {
-        var first = ["a": 1]
+        var first: [String: Int] = ["a": 1]
         first["b"] = 2
-        var second = ["b": 2]
+        var second: [String: Int] = ["b": 2]
         second["a"] = 1
         #expect(UUID(hash: first) == UUID(hash: second))
     }
@@ -138,18 +138,18 @@ extension UUIDTests {
     }
 
     @Test func initHashSetsVersionAndVariant() {
-        let characters = Array(UUID(hash: "Dune").uuidString)
+        let characters: [Character] = Array(UUID(hash: "Dune").uuidString)
         #expect(characters[14] == "5")
         #expect("89AB".contains(characters[19]))
     }
 
     @Test func initHashUsesStandardNamespaces() throws {
-        let dns = try #require(UUID(uuidString: "6BA7B810-9DAD-11D1-80B4-00C04FD430C8"))
+        let dns: UUID = try #require(UUID(uuidString: "6BA7B810-9DAD-11D1-80B4-00C04FD430C8"))
         #expect(UUID(hash: "www.example.com", namespace: dns).uuidString == "2ED6657D-E927-568B-95E1-2665A8AEA6A2")
     }
 
     @Test func initNameMatchesRFC9562Example() throws {
-        let dns = try #require(UUID(uuidString: "6BA7B810-9DAD-11D1-80B4-00C04FD430C8"))
+        let dns: UUID = try #require(UUID(uuidString: "6BA7B810-9DAD-11D1-80B4-00C04FD430C8"))
         #expect(UUID(name: Data("www.example.com".utf8), namespace: dns).uuidString == "2ED6657D-E927-568B-95E1-2665A8AEA6A2")
     }
 }

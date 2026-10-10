@@ -25,8 +25,8 @@ private struct Page: Versioned {
 @Suite struct VersionedTests {
 
     @Test func commitDecodesWhatItEncodes() throws {
-        let commit = Commit(checksum: Page(body: "A").checksum, isCommitted: true, parent: UUID())
-        let data = try JSONEncoder().encode(commit)
+        let commit: Commit = Commit(checksum: Page(body: "A").checksum, isCommitted: true, parent: UUID())
+        let data: Data = try JSONEncoder().encode(commit)
         #expect(try JSONDecoder().decode(Commit.self, from: data) == commit)
     }
 
@@ -42,31 +42,31 @@ private struct Page: Versioned {
     }
 
     @Test func commitMatchesOnlyItsChecksum() {
-        let page = Page(body: "A")
-        let commit = Commit(checksum: page.checksum, isCommitted: true, parent: nil)
+        let page: Page = Page(body: "A")
+        let commit: Commit = Commit(checksum: page.checksum, isCommitted: true, parent: nil)
         #expect(commit.matches(page.checksum))
         #expect(!commit.matches(Page(body: "B").checksum))
         #expect(!Commit().matches(page.checksum))
     }
 
     @Test func forkedCopiesOnlyContent() {
-        var parent = Page(body: "A")
+        var parent: Page = Page(body: "A")
         parent.revision = Commit(checksum: parent.checksum, isCommitted: true, parent: nil)
-        let child = Page.forked(copying: parent)
+        let child: Page = Page.forked(copying: parent)
         #expect(child.body == parent.body)
         #expect(child.id != parent.id)
         #expect(child.revision.isEmpty)
     }
 
     @Test func hasUncommittedChangesAfterEdit() {
-        var page = Page(body: "A")
+        var page: Page = Page(body: "A")
         page.revision = Commit(checksum: page.checksum, isCommitted: true, parent: nil)
         page.body = "B"
         #expect(page.hasUncommittedChanges)
     }
 
     @Test func hasUncommittedChangesUntilCommitted() {
-        var page = Page(body: "A")
+        var page: Page = Page(body: "A")
         #expect(page.hasUncommittedChanges)
         page.revision = Commit(checksum: page.checksum, isCommitted: false, parent: UUID())
         #expect(page.hasUncommittedChanges)
@@ -75,8 +75,8 @@ private struct Page: Versioned {
     }
 
     @Test func revisionIsLeftOutOfChecksum() {
-        var page = Page(body: "A")
-        let checksum = page.checksum
+        var page: Page = Page(body: "A")
+        let checksum: Checksum = page.checksum
         page.revision = Commit(checksum: checksum, isCommitted: true, parent: UUID())
         #expect(page.checksum == checksum)
     }

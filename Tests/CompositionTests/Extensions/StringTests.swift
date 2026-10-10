@@ -8,15 +8,15 @@ import Testing
 @Suite struct StringTests {
 
     @Test func differenceFromBaseRoundTripsThroughApply() throws {
-        var text = "kitten"
+        var text: String = "kitten"
         try text.apply("sitting".difference(from: "kitten"))
         #expect(text == "sitting")
         #expect(String.Patch.self == CollectionDifference<Character>.self)
     }
 
     @Test func differenceFromEmptyBaseInsertsEveryCharacter() throws {
-        let patch = "abc".difference(from: "")
-        var text = ""
+        let patch: CollectionDifference<Character> = "abc".difference(from: "")
+        var text: String = ""
         try text.apply(patch)
         #expect(patch.insertions.count == 3 && patch.removals.isEmpty)
         #expect(text == "abc")

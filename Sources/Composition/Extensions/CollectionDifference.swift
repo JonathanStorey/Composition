@@ -50,10 +50,10 @@ extension CollectionDifference: Squashable where ChangeElement: Equatable {
 
     /// Returns one difference making this difference's changes and then the next's, where the next was made from this difference's result.
     public func squashed(with next: CollectionDifference) throws -> CollectionDifference {
-        var changes = removals.map { Change.remove(offset: $0.offset, element: $0.element, associatedWith: nil) }
-        let removedOffsets = removals.map(\.offset)
-        var insertion = 0
-        var removed = 0
+        var changes: [Change] = removals.map { Change.remove(offset: $0.offset, element: $0.element, associatedWith: nil) }
+        let removedOffsets: [Int] = removals.map(\.offset)
+        var insertion: Int = 0
+        var removed: Int = 0
         for change in next.removals {
             while insertion < insertions.count, insertions[insertion].offset < change.offset {
                 insertion += 1
@@ -64,9 +64,9 @@ extension CollectionDifference: Squashable where ChangeElement: Equatable {
                 changes.append(.remove(offset: Self.offset(ranked: change.offset - insertion, skipping: removedOffsets, from: &removed), element: change.element, associatedWith: nil))
             }
         }
-        let nextInsertedOffsets = next.insertions.map(\.offset)
-        var nextRemoval = 0
-        var nextInserted = 0
+        let nextInsertedOffsets: [Int] = next.insertions.map(\.offset)
+        var nextRemoval: Int = 0
+        var nextInserted: Int = 0
         for change in insertions {
             while nextRemoval < next.removals.count, next.removals[nextRemoval].offset < change.offset {
                 nextRemoval += 1
@@ -84,10 +84,10 @@ extension CollectionDifference: Shiftable where ChangeElement: Equatable {
 
     /// Returns how many values in the sorted list are less than the bound.
     private static func count(of sorted: [Int], below bound: Int) -> Int {
-        var low = 0
-        var high = sorted.count
+        var low: Int = 0
+        var high: Int = sorted.count
         while low < high {
-            let middle = (low + high) / 2
+            let middle: Int = (low + high) / 2
             if sorted[middle] < bound {
                 low = middle + 1
             } else {
@@ -99,17 +99,17 @@ extension CollectionDifference: Shiftable where ChangeElement: Equatable {
 
     /// The offset in the original collection of the element each insertion lands before, counting the removed elements.
     private var insertionGaps: [Int] {
-        let removedOffsets = removals.map(\.offset)
-        var position = 0
+        let removedOffsets: [Int] = removals.map(\.offset)
+        var position: Int = 0
         return insertions.enumerated().map { index, change in Self.offset(ranked: change.offset - index, skipping: removedOffsets, from: &position) }
     }
 
     /// Returns only this difference's changes, moved to apply after a prior difference made from the same collection.
     public func shifted(by prior: CollectionDifference) throws -> CollectionDifference {
-        let removedOffsets = Set(prior.removals.map(\.offset)).union(removals.map(\.offset)).sorted()
-        let priorGaps = prior.insertionGaps
+        let removedOffsets: [Int] = Set(prior.removals.map(\.offset)).union(removals.map(\.offset)).sorted()
+        let priorGaps: [Int] = prior.insertionGaps
         var changes: [Change] = []
-        var priorRemoval = 0
+        var priorRemoval: Int = 0
         for change in removals {
             while priorRemoval < prior.removals.count, prior.removals[priorRemoval].offset < change.offset {
                 priorRemoval += 1

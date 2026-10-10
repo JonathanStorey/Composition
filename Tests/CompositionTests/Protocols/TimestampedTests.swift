@@ -19,15 +19,15 @@ private struct Item: Timestamped {
     }
 
     @Test func dateReadsEmbeddedTime() throws {
-        let date = Date(timeIntervalSince1970: 1_700_000_000.25)
-        let item = Item(timestamp: try #require(UUID(timestamp: date)))
-        let decoded = try #require(item.date)
+        let date: Date = Date(timeIntervalSince1970: 1_700_000_000.25)
+        let item: Item = Item(timestamp: try #require(UUID(timestamp: date)))
+        let decoded: Date = try #require(item.date)
         #expect(abs(decoded.timeIntervalSince(date)) < 0.000_001)
     }
 
     @Test func timestampsSortByCreationTime() throws {
-        let earlier = Item(timestamp: try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000))))
-        let later = Item(timestamp: try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_001))))
+        let earlier: Item = Item(timestamp: try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000))))
+        let later: Item = Item(timestamp: try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_001))))
         #expect(earlier.timestamp.uuidString < later.timestamp.uuidString)
     }
 }

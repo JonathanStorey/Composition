@@ -47,7 +47,7 @@ public extension Strategy {
     }
 
     /// A strategy that keeps whichever side changed the value, throwing if both changed it differently.
-    static func replace<V: Equatable>() -> Self where Self == ReplaceStrategy<V> {
+    static func replace<V: Equatable & Sendable>() -> Self where Self == ReplaceStrategy<V> {
         ReplaceStrategy()
     }
 }
@@ -115,25 +115,36 @@ public struct ListStrategy<C: BidirectionalCollection & RangeReplaceableCollecti
     }
 }
 
+/// An error thrown when both sides of a merge changed a value differently, carrying each side's value.
+public struct MergeConflict<V: Sendable>: Error {
+
+    /// The value on our side of the merge.
+    public let ours: V
+
+    /// The value on their side of the merge.
+    public let theirs: V
+
+    /// Creates a conflict between our value and theirs.
+    public init(ours: V, theirs: V) {
+        self.ours = ours
+        self.theirs = theirs
+    }
+}
+
+extension MergeConflict: Equatable where V: Equatable {}
+
 /// A strategy that keeps whichever side changed the value, throwing if both changed it differently.
-public struct ReplaceStrategy<V: Equatable>: MergeStrategy {
+public struct ReplaceStrategy<V: Equatable & Sendable>: MergeStrategy {
 
     /// Creates a replace strategy.
     public init() {}
 
-    /// Returns the side that changed the base, or either side when both made the same change, throwing when they changed it differently.
-    public func merged(_ ours: V, with theirs: V, from base: V) throws -> V {
+    /// Returns the side that changed the base, or either side when both made the same change, throwing both values when they changed it differently.
+    public func merged(_ ours: V, with theirs: V, from base: V) throws(MergeConflict<V>) -> V {
         if ours == base || ours == theirs {
             return theirs
         }
-        guard theirs == base else { throw MergeStrategyError.conflict }
+        guard theirs == base else { throw MergeConflict(ours: ours, theirs: theirs) }
         return ours
     }
-}
-
-/// An error thrown when a strategy cannot combine the two sides of a merge.
-public enum MergeStrategyError: Error, Equatable, Sendable {
-
-    /// Both sides changed the value in ways the strategy cannot combine.
-    case conflict
 }

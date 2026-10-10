@@ -47,8 +47,8 @@ import Testing
         #expect(try ReplaceStrategy<Int>().merged(0, with: 0, from: 0) == 0)
     }
 
-    @Test func replaceThrowsWhenBothChangeDifferently() {
-        #expect(throws: MergeStrategyError.conflict) { try ReplaceStrategy<Int>().merged(1, with: 2, from: 0) }
+    @Test func replaceThrowsBothValuesWhenBothChangeDifferently() {
+        #expect(throws: MergeConflict(ours: 1, theirs: 2)) { try ReplaceStrategy<Int>().merged(1, with: 2, from: 0) }
     }
 
     @Test func replaceWithDotSyntax() throws {

@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Extensions/CollectionDifference.swift
-// dependencies: [Protocols/DifferenceProtocol.swift]
+// dependencies: []
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension CollectionDifference.Change {
@@ -34,15 +34,6 @@ public extension CollectionDifference.Change {
         switch self {
         case .insert(let offset, _, _), .remove(let offset, _, _): offset
         }
-    }
-}
-
-@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension CollectionDifference: DifferenceProtocol {
-
-    /// The removals and insertions that make up the difference, in the order the collection lists them.
-    public var changes: [Change] {
-        Array(self)
     }
 }
 

@@ -12,12 +12,17 @@ public protocol MergeStrategy {
     func merged(_ ours: Value, with theirs: Value, from base: Value) throws -> Value
 }
 
-@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension MergeStrategy {
 
     /// A strategy that merges collections element by element, keeping the insertions and removals from both sides.
+    @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
     static func list<C: BidirectionalCollection & RangeReplaceableCollection>() -> Self where Self == ListStrategy<C>, C.Element: Equatable {
         ListStrategy()
+    }
+
+    /// A strategy that keeps whichever side changed the value, throwing if both changed it differently.
+    static func replace<V: Equatable>() -> Self where Self == ReplaceStrategy<V> {
+        ReplaceStrategy()
     }
 }
 
@@ -70,4 +75,27 @@ public struct ListStrategy<C: BidirectionalCollection & RangeReplaceableCollecti
         }
         return (insertions, removals)
     }
+}
+
+/// A strategy that keeps whichever side changed the value, throwing if both changed it differently.
+public struct ReplaceStrategy<V: Equatable>: MergeStrategy {
+
+    /// Creates a replace strategy.
+    public init() {}
+
+    /// Returns the side that changed the base, or either side when both made the same change, throwing when they changed it differently.
+    public func merged(_ ours: V, with theirs: V, from base: V) throws -> V {
+        if ours == base || ours == theirs {
+            return theirs
+        }
+        guard theirs == base else { throw MergeStrategyError.conflict }
+        return ours
+    }
+}
+
+/// An error thrown when a strategy cannot combine the two sides of a merge.
+public enum MergeStrategyError: Error, Equatable, Sendable {
+
+    /// Both sides changed the value in ways the strategy cannot combine.
+    case conflict
 }

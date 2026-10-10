@@ -86,6 +86,7 @@ When the whole file needs the same frameworks, wrap it all in one `#if canImport
 - Keep every call's arguments, and every declaration including its `where` clause, on a single line however long it gets, for example `public extension Picker where Label == Text, SelectionValue: CaseIterable & LabelRepresentable, Content == ForEach<...> {`.
 - Use at most one trailing closure, as in `Label(title) { icon }`, never `Label { title } icon: { icon }`. When SwiftUI only offers a multi-closure initializer, pass the closures as labeled arguments, as in `self.init(title: { Text(title) }, icon: icon)`, or add a helper initializer with the one-trailing-closure form.
 - Leave a blank line after the opening brace of every type, protocol, and extension.
+- Give every local `let` and `var` an explicit type, as in `let firstName: String = "John"`.
 
 ### Naming
 

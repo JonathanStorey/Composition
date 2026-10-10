@@ -9,6 +9,16 @@ Guidance for AI coding agents working in this repository.
 - Swift tools version 6.0. Package minimums: iOS 17, macOS 14.
 - Build and test with `swift build` and `swift test` on macOS, since SwiftUI code only builds on Apple platforms.
 
+## Design
+
+Write elegant, creative, beautiful code: general enough to serve many use cases, small enough to read at a glance, and shaped like modern Swift.
+
+- Solve the general case. Reach for a protocol with a default implementation, a generic type, or a constrained extension before writing code for one concrete type.
+- Let the type system carry the rules. Constrain generics so misuse fails to compile instead of failing at runtime.
+- Keep the surface small. Prefer one requirement over three, and compose existing pieces before adding new ones.
+- Follow the standard library and the latest Swift releases: static member lookup for dot syntax, primary associated types, `some` and `any`, typed throws, and macros where they remove boilerplate.
+- When elegance and clarity conflict, choose clarity. The beautiful solution is the one a reader understands immediately.
+
 ## Layout
 
 ```

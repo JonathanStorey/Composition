@@ -33,19 +33,19 @@ private struct Tags: Mergeable {
 @Suite struct MergeableTests {
 
     @Test func mergeWithLeavesReceiverUnchangedWhenMergingThrows() {
-        var log = Log(entries: ["a"])
+        var log: Log = Log(entries: ["a"])
         #expect(throws: EmptyLog.self) { try log.merge(with: Log(entries: [])) }
         #expect(log.entries == ["a"])
     }
 
     @Test func mergeWithReplacesReceiver() throws {
-        var tags = Tags(names: ["swift"])
+        var tags: Tags = Tags(names: ["swift"])
         try tags.merge(with: Tags(names: ["ios"]))
         #expect(tags.names == ["ios", "swift"])
     }
 
     @Test func mergedWithDefaultsToSquashingTheOtherShiftedPastReceiver() throws {
-        let log = try Log(entries: ["a"]).merged(with: Log(entries: ["b"]))
+        let log: Log = try Log(entries: ["a"]).merged(with: Log(entries: ["b"]))
         #expect(log.entries == ["a", "b after a"])
     }
 
@@ -54,7 +54,7 @@ private struct Tags: Mergeable {
     }
 
     @Test func staticMergedKeepsFirstAsReceiver() throws {
-        let log = try Log.merged(Log(entries: ["a"]), with: Log(entries: ["b"]))
+        let log: Log = try Log.merged(Log(entries: ["a"]), with: Log(entries: ["b"]))
         #expect(log.entries == ["a", "b after a"])
     }
 }

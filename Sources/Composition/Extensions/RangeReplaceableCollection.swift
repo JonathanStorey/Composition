@@ -25,9 +25,9 @@ private extension RangeReplaceableCollection {
 
     /// Returns the collection with the removals and then the insertions applied, walking each collection once and checking removed elements with the closure when one is given.
     func applying(_ difference: CollectionDifference<Element>, matching areEqual: ((Element, Element) -> Bool)?) throws -> Self {
-        var kept = Self()
-        var index = startIndex
-        var offset = 0
+        var kept: Self = Self()
+        var index: Index = startIndex
+        var offset: Int = 0
         for removal in difference.removals {
             guard let removed = self.index(index, offsetBy: removal.offset - offset, limitedBy: endIndex), removed != endIndex else { throw CollectionDifferenceError.offsetOutOfBounds(removal.offset) }
             if let areEqual, !areEqual(self[removed], removal.element) { throw CollectionDifferenceError.elementMismatch(removal.offset) }
@@ -36,9 +36,9 @@ private extension RangeReplaceableCollection {
             offset = removal.offset + 1
         }
         kept.append(contentsOf: self[index...])
-        var result = Self()
-        var keptIndex = kept.startIndex
-        var placed = 0
+        var result: Self = Self()
+        var keptIndex: Index = kept.startIndex
+        var placed: Int = 0
         for insertion in difference.insertions {
             guard let inserted = kept.index(keptIndex, offsetBy: insertion.offset - placed, limitedBy: kept.endIndex) else { throw CollectionDifferenceError.offsetOutOfBounds(insertion.offset) }
             result.append(contentsOf: kept[keptIndex..<inserted])

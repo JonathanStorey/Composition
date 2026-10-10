@@ -20,13 +20,13 @@ private struct Insertion: Shiftable {
 @Suite struct ShiftableTests {
 
     @Test func shiftByPriorLeavesReceiverUnchangedWhenShiftingThrows() {
-        var insertion = Insertion(offset: 3)
+        var insertion: Insertion = Insertion(offset: 3)
         #expect(throws: NegativeShift.self) { try insertion.shift(by: Insertion(offset: -1)) }
         #expect(insertion.offset == 3)
     }
 
     @Test func shiftByPriorReplacesReceiver() throws {
-        var insertion = Insertion(offset: 3)
+        var insertion: Insertion = Insertion(offset: 3)
         try insertion.shift(by: Insertion(offset: 1))
         #expect(insertion.offset == 4)
     }

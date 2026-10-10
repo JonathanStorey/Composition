@@ -21,7 +21,7 @@ private struct Settings {
     }
 
     @Test func clampsToBounds() {
-        var settings = Settings()
+        var settings: Settings = Settings()
         settings.volume = 150
         #expect(settings.volume == 100)
         settings.volume = -5
@@ -29,7 +29,7 @@ private struct Settings {
     }
 
     @Test func keepsInRangeValues() {
-        var settings = Settings()
+        var settings: Settings = Settings()
         settings.volume = 75
         #expect(settings.volume == 75)
     }

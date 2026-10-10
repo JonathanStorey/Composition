@@ -77,7 +77,7 @@ private struct PlainItem: LabelRepresentable {
 @Suite struct LabelRepresentableTests {
 
     @Test func helpCanBeOverridden() throws {
-        let help = try #require(SampleAction.delete.help)
+        let help: LocalizedStringResource = try #require(SampleAction.delete.help)
         #expect(String(localized: help) == "Permanently removes the item")
         #expect(SampleAction.share.help == nil)
     }

@@ -11,7 +11,7 @@ private struct SeededGenerator: RandomNumberGenerator {
 
     mutating func next() -> UInt64 {
         state &+= 0x9E3779B97F4A7C15
-        var value = state
+        var value: UInt64 = state
         value = (value ^ (value >> 30)) &* 0xBF58476D1CE4E5B9
         value = (value ^ (value >> 27)) &* 0x94D049BB133111EB
         return value ^ (value >> 31)
@@ -59,15 +59,15 @@ private struct Hand: PermutableCollection, RandomAccessCollection {
     }
 
     @Test func invertedUndoesShuffle() {
-        let original = (0..<25).map(String.init)
-        var deck = Deck(cards: original)
-        let permutation = deck.shuffle()
+        let original: [String] = (0..<25).map(String.init)
+        var deck: Deck = Deck(cards: original)
+        let permutation: Permutation = deck.shuffle()
         deck.permute(using: permutation.inverted)
         #expect(deck.cards == original)
     }
 
     @Test func minimumCountIsOneMoreThanLargestOffset() {
-        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        var deck: Deck = Deck(cards: ["a", "b", "c", "d", "e"])
         #expect(deck.reverse().minimumCount == 5)
         #expect(deck.rotate(toStartAt: 1).minimumCount == 5)
     }
@@ -77,113 +77,113 @@ private struct Hand: PermutableCollection, RandomAccessCollection {
     }
 
     @Test func moveFromOffsetsToEndKeepsRelativeOrder() {
-        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        var deck: Deck = Deck(cards: ["a", "b", "c", "d", "e"])
         deck.move(fromOffsets: [3, 1], toOffset: 5)
         #expect(deck.cards == ["a", "c", "e", "b", "d"])
     }
 
     @Test func moveFromOffsetsToFrontKeepsRelativeOrder() {
-        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        var deck: Deck = Deck(cards: ["a", "b", "c", "d", "e"])
         deck.move(fromOffsets: 2...4, toOffset: 0)
         #expect(deck.cards == ["c", "d", "e", "a", "b"])
     }
 
     @Test func moveFromOffsetsToOwnPositionReturnsEmptyPermutation() {
-        var deck = Deck(cards: ["a", "b", "c"])
+        var deck: Deck = Deck(cards: ["a", "b", "c"])
         #expect(deck.move(fromOffsets: [1], toOffset: 2).cycle.isEmpty)
         #expect(deck.cards == ["a", "b", "c"])
     }
 
     @Test func moveLandsElementAtLaterDestination() {
-        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        var deck: Deck = Deck(cards: ["a", "b", "c", "d", "e"])
         deck.move(from: 1, to: 3)
         #expect(deck.cards == ["a", "c", "d", "b", "e"])
     }
 
     @Test func moveToEarlierIndexShiftsOthersBack() {
-        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        var deck: Deck = Deck(cards: ["a", "b", "c", "d", "e"])
         deck.move(from: 3, to: 0)
         #expect(deck.cards == ["d", "a", "b", "c", "e"])
     }
 
     @Test func moveToSameIndexReturnsEmptyPermutation() {
-        var deck = Deck(cards: ["a", "b", "c"])
+        var deck: Deck = Deck(cards: ["a", "b", "c"])
         #expect(deck.move(from: 1, to: 1).cycle.isEmpty)
     }
 
     @Test func partitionIsStableAndReturnsFirstMovedIndex() {
-        var deck = Deck(cards: (0..<7).map(String.init))
-        let pivot = deck.partition { Int($0)! % 2 == 1 }
+        var deck: Deck = Deck(cards: (0..<7).map(String.init))
+        let pivot: Int = deck.partition { Int($0)! % 2 == 1 }
         #expect(deck.cards == ["0", "2", "4", "6", "1", "3", "5"])
         #expect(pivot == 4)
     }
 
     @Test func partitionWithNoMatchesReturnsEndIndex() {
-        var deck = Deck(cards: ["a", "b", "c"])
-        let pivot = deck.partition { $0 == "z" }
+        var deck: Deck = Deck(cards: ["a", "b", "c"])
+        let pivot: Int = deck.partition { $0 == "z" }
         #expect(deck.cards == ["a", "b", "c"])
         #expect(pivot == deck.endIndex)
     }
 
     @Test func permuteLeavesOffsetsBeyondTheCycleInPlace() {
-        var deck = Deck(cards: ["a", "b", "c", "d", "e", "f"])
+        var deck: Deck = Deck(cards: ["a", "b", "c", "d", "e", "f"])
         deck.permute(using: Permutation(shuffles: 3))
         #expect(deck.cards[3...] == ["d", "e", "f"])
         #expect(deck.cards[..<3].sorted() == ["a", "b", "c"])
     }
 
     @Test func permuteOnRandomAccessCollectionMatchesPlainCollection() {
-        let original = (0..<25).map(String.init)
-        var deck = Deck(cards: original)
-        var hand = Hand(cards: original)
+        let original: [String] = (0..<25).map(String.init)
+        var deck: Deck = Deck(cards: original)
+        var hand: Hand = Hand(cards: original)
         hand.permute(using: deck.shuffle())
         #expect(hand.cards == deck.cards)
     }
 
     @Test func reverseLeavesMiddleElementInPlace() {
-        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
-        let permutation = deck.reverse()
+        var deck: Deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        let permutation: Permutation = deck.reverse()
         #expect(deck.cards == ["e", "d", "c", "b", "a"])
         #expect(!permutation.cycle.contains(2))
     }
 
     @Test func reverseOfEmptyCollectionReturnsEmptyPermutation() {
-        var deck = Deck(cards: [])
+        var deck: Deck = Deck(cards: [])
         #expect(deck.reverse().cycle.isEmpty)
     }
 
     @Test func reverseOfEvenCountSwapsEveryPair() {
-        var deck = Deck(cards: ["a", "b", "c", "d"])
-        let permutation = deck.reverse()
+        var deck: Deck = Deck(cards: ["a", "b", "c", "d"])
+        let permutation: Permutation = deck.reverse()
         #expect(deck.cards == ["d", "c", "b", "a"])
         #expect(permutation.cycle == [2, 1, 3, 0])
     }
 
     @Test func rotateMovesIndexToFront() {
-        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        var deck: Deck = Deck(cards: ["a", "b", "c", "d", "e"])
         deck.rotate(toStartAt: 2)
         #expect(deck.cards == ["c", "d", "e", "a", "b"])
     }
 
     @Test func rotateSharingFactorWithCountUndoesWithInverted() {
-        var deck = Deck(cards: ["a", "b", "c", "d", "e", "f"])
-        let permutation = deck.rotate(toStartAt: 2)
+        var deck: Deck = Deck(cards: ["a", "b", "c", "d", "e", "f"])
+        let permutation: Permutation = deck.rotate(toStartAt: 2)
         #expect(deck.cards == ["c", "d", "e", "f", "a", "b"])
         deck.permute(using: permutation.inverted)
         #expect(deck.cards == ["a", "b", "c", "d", "e", "f"])
     }
 
     @Test func rotateToStartIndexLeavesOrder() {
-        var deck = Deck(cards: ["a", "b", "c"])
+        var deck: Deck = Deck(cards: ["a", "b", "c"])
         #expect(deck.rotate(toStartAt: deck.startIndex).cycle.isEmpty)
         #expect(deck.cards == ["a", "b", "c"])
     }
 
     @Test func shuffleCycleHasNoFixedPoints() {
-        let cycle = Permutation(shuffles: 50).cycle
+        let cycle: [Int] = Permutation(shuffles: 50).cycle
         #expect(Set(cycle).count == cycle.count && cycle.allSatisfy { (0..<50).contains($0) })
-        var largest = -1
-        let starts = cycle.map { offset in
+        var largest: Int = -1
+        let starts: [Bool] = cycle.map { offset in
             defer { largest = max(largest, offset) }
             return offset > largest
         }
@@ -191,7 +191,7 @@ private struct Hand: PermutableCollection, RandomAccessCollection {
     }
 
     @Test func shuffleKeepsEveryElement() {
-        var deck = Deck(cards: (0..<20).map(String.init))
+        var deck: Deck = Deck(cards: (0..<20).map(String.init))
         deck.shuffle()
         #expect(deck.cards.sorted() == (0..<20).map(String.init).sorted())
     }
@@ -202,10 +202,10 @@ private struct Hand: PermutableCollection, RandomAccessCollection {
     }
 
     @Test func shuffleUsingGeneratorMatchesArray() {
-        var deckGenerator = SeededGenerator(state: 99)
-        var arrayGenerator = SeededGenerator(state: 99)
-        var deck = Deck(cards: (0..<30).map(String.init))
-        var array = (0..<30).map(String.init)
+        var deckGenerator: SeededGenerator = SeededGenerator(state: 99)
+        var arrayGenerator: SeededGenerator = SeededGenerator(state: 99)
+        var deck: Deck = Deck(cards: (0..<30).map(String.init))
+        var array: [String] = (0..<30).map(String.init)
         deck.shuffle(using: &deckGenerator)
         array.shuffle(using: &arrayGenerator)
         #expect(deck.cards == array)
@@ -213,52 +213,52 @@ private struct Hand: PermutableCollection, RandomAccessCollection {
     }
 
     @Test func shuffleUsingGeneratorOnSingleElementLeavesItInPlace() {
-        var generator = SeededGenerator(state: 3)
-        var deck = Deck(cards: ["a"])
+        var generator: SeededGenerator = SeededGenerator(state: 3)
+        var deck: Deck = Deck(cards: ["a"])
         deck.shuffle(using: &generator)
         #expect(deck.cards == ["a"])
     }
 
     @Test func sortByOrdersDescending() {
-        var deck = Deck(cards: ["b", "d", "a", "c"])
+        var deck: Deck = Deck(cards: ["b", "d", "a", "c"])
         deck.sort(by: >)
         #expect(deck.cards == ["d", "c", "b", "a"])
     }
 
     @Test func sortOfSortedCollectionReturnsEmptyPermutation() {
-        var deck = Deck(cards: ["a", "b", "c"])
+        var deck: Deck = Deck(cards: ["a", "b", "c"])
         #expect(deck.sort().cycle.isEmpty)
     }
 
     @Test func sortOrdersAscending() {
-        var deck = Deck(cards: ["d", "b", "e", "a", "c"])
+        var deck: Deck = Deck(cards: ["d", "b", "e", "a", "c"])
         deck.sort()
         #expect(deck.cards == ["a", "b", "c", "d", "e"])
     }
 
     @Test func squashedWithAppliesBothInOrder() {
-        let original = (0..<8).map(String.init)
+        let original: [String] = (0..<8).map(String.init)
         for _ in 0..<50 {
-            var deck = Deck(cards: original)
-            let first = deck.shuffle()
-            let second = deck.rotate(toStartAt: 3)
-            var replay = Deck(cards: original)
+            var deck: Deck = Deck(cards: original)
+            let first: Permutation = deck.shuffle()
+            let second: Permutation = deck.rotate(toStartAt: 3)
+            var replay: Deck = Deck(cards: original)
             replay.permute(using: first.squashed(with: second))
             #expect(replay.cards == deck.cards)
         }
     }
 
     @Test func squashedWithInvertedIsEmpty() {
-        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
-        let permutation = deck.shuffle()
+        var deck: Deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        let permutation: Permutation = deck.shuffle()
         #expect(permutation.squashed(with: permutation.inverted).cycle.isEmpty)
     }
 
     @Test func squashedWithShorterPermutationLeavesLaterOffsetsToTheLonger() {
-        var deck = Deck(cards: ["a", "b", "c", "d", "e"])
-        let swap = deck.move(from: 0, to: 1)
-        let reverse = deck.reverse()
-        var replay = Deck(cards: ["a", "b", "c", "d", "e"])
+        var deck: Deck = Deck(cards: ["a", "b", "c", "d", "e"])
+        let swap: Permutation = deck.move(from: 0, to: 1)
+        let reverse: Permutation = deck.reverse()
+        var replay: Deck = Deck(cards: ["a", "b", "c", "d", "e"])
         replay.permute(using: swap.squashed(with: reverse))
         #expect(replay.cards == deck.cards)
         #expect(swap.squashed(with: reverse).minimumCount == 5)

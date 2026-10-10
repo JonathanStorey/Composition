@@ -22,7 +22,7 @@ public extension Digestible {
 
     /// The SHA-256 checksum of the value's content, identical on every device and every launch.
     var checksum: Checksum {
-        var digester = Digester()
+        var digester: Digester = Digester()
         digest(into: &digester)
         return digester.finalize()
     }

@@ -9,10 +9,10 @@ public extension Date {
 
     /// Creates the date embedded in a version 7 UUID, or `nil` when the UUID is not version 7.
     init?(timestamp uuid: UUID) {
-        let bytes = uuid.uuid
+        let bytes: uuid_t = uuid.uuid
         guard bytes.6 >> 4 == 7, bytes.8 >> 6 == 0b10 else { return nil }
-        let milliseconds = [bytes.0, bytes.1, bytes.2, bytes.3, bytes.4, bytes.5].reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
-        let fraction = UInt16(bytes.6 & 0x0F) << 8 | UInt16(bytes.7)
+        let milliseconds: UInt64 = [bytes.0, bytes.1, bytes.2, bytes.3, bytes.4, bytes.5].reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+        let fraction: UInt16 = UInt16(bytes.6 & 0x0F) << 8 | UInt16(bytes.7)
         self.init(timeIntervalSince1970: (TimeInterval(milliseconds) + TimeInterval(fraction) / 4096) / 1000)
     }
 

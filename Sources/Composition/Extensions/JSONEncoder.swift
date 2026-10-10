@@ -19,7 +19,7 @@ public extension JSONEncoder {
 
     /// Returns the value's JSON written exactly as the compatibility target writes it, ignoring this encoder's own settings.
     func encode(_ value: some Encodable, compatibility: Compatibility) throws -> Data {
-        let format = JSONFormat(compatibility: compatibility)
+        let format: JSONFormat = JSONFormat(compatibility: compatibility)
         return Data(format.text(of: try format.node(for: value, codingPath: [])).utf8)
     }
 }
@@ -31,7 +31,7 @@ private struct JSONFormat {
 
     /// Returns the string quoted and escaped as Python's `json.dumps` with `ensure_ascii=False` and RFC 8785 both escape it.
     private static func quoted(_ string: String) -> String {
-        var result = "\""
+        var result: String = "\""
         for scalar in string.unicodeScalars {
             switch scalar {
             case "\"": result += "\\\""
@@ -61,7 +61,7 @@ private struct JSONFormat {
         case let string as String: return Node(text: Self.quoted(string))
         case let url as URL: return Node(text: Self.quoted(url.absoluteString))
         default:
-            let node = Node()
+            let node: Node = Node()
             try value.encode(to: Writer(codingPath: codingPath, format: self, node: node))
             return node
         }
@@ -71,8 +71,8 @@ private struct JSONFormat {
     func text(of node: Node) -> String {
         if let scalar = node.scalar { return scalar }
         if let elements = node.elements { return "[" + elements.map { text(of: $0) }.joined(separator: ",") + "]" }
-        let members = node.members ?? [:]
-        let keys = switch compatibility {
+        let members: [String: Node] = node.members ?? [:]
+        let keys: [String] = switch compatibility {
         case .jcs: members.keys.sorted { $0.utf16.lexicographicallyPrecedes($1.utf16) }
         case .python: members.keys.sorted { $0.unicodeScalars.lexicographicallyPrecedes($1.unicodeScalars) }
         }
@@ -86,35 +86,35 @@ private struct JSONFormat {
             if value.isNaN { return "NaN" }
             return value < 0 ? "-Infinity" : "Infinity"
         }
-        let parts = "\(value.magnitude)".split(separator: "e")
-        let mantissa = parts[0].split(separator: ".", omittingEmptySubsequences: false)
-        var digits = mantissa.joined()
-        var point = mantissa[0].count + (parts.count > 1 ? Int(parts[1]) ?? 0 : 0)
+        let parts: [Substring] = "\(value.magnitude)".split(separator: "e")
+        let mantissa: [Substring] = parts[0].split(separator: ".", omittingEmptySubsequences: false)
+        var digits: String = mantissa.joined()
+        var point: Int = mantissa[0].count + (parts.count > 1 ? Int(parts[1]) ?? 0 : 0)
         while digits.hasPrefix("0") {
             digits.removeFirst()
             point -= 1
         }
         while digits.hasSuffix("0") { digits.removeLast() }
-        let exponent = point - 1
-        let significand = digits.count > 1 ? String(digits.prefix(1)) + "." + String(digits.dropFirst()) : digits
-        let exponentSign = exponent < 0 ? "-" : "+"
+        let exponent: Int = point - 1
+        let significand: String = digits.count > 1 ? String(digits.prefix(1)) + "." + String(digits.dropFirst()) : digits
+        let exponentSign: String = exponent < 0 ? "-" : "+"
         switch compatibility {
         case .jcs:
             guard !digits.isEmpty else { return "0" }
-            let sign = value < 0 ? "-" : ""
+            let sign: String = value < 0 ? "-" : ""
             if digits.count <= point && point <= 21 { return sign + digits + String(repeating: "0", count: point - digits.count) }
             if point > 0 && point <= 21 { return sign + String(digits.prefix(point)) + "." + String(digits.dropFirst(point)) }
             if point > -6 && point <= 0 { return sign + "0." + String(repeating: "0", count: -point) + digits }
             return sign + significand + "e" + exponentSign + String(abs(exponent))
         case .python:
-            let sign = value.sign == .minus ? "-" : ""
+            let sign: String = value.sign == .minus ? "-" : ""
             guard !digits.isEmpty else { return sign + "0.0" }
             if point > -4 && point <= 16 {
                 if point <= 0 { return sign + "0." + String(repeating: "0", count: -point) + digits }
                 if point >= digits.count { return sign + digits + String(repeating: "0", count: point - digits.count) + ".0" }
                 return sign + String(digits.prefix(point)) + "." + String(digits.dropFirst(point))
             }
-            let exponentDigits = abs(exponent) < 10 ? "0" + String(abs(exponent)) : String(abs(exponent))
+            let exponentDigits: String = abs(exponent) < 10 ? "0" + String(abs(exponent)) : String(abs(exponent))
             return sign + significand + "e" + exponentSign + exponentDigits
         }
     }
@@ -221,7 +221,7 @@ private struct KeyedWriter<K: CodingKey>: KeyedEncodingContainerProtocol {
     }
 
     private func child(named name: String) -> Node {
-        let child = Node()
+        let child: Node = Node()
         node.members?[name] = child
         return child
     }

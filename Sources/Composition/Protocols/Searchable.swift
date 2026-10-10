@@ -19,7 +19,7 @@ public extension Searchable {
 
     /// Matches when any searchable text contains the query, ignoring case and diacritics. A blank query matches everything.
     func matches(_ query: String) -> Bool {
-        let query = query.trimmed
+        let query: String = query.trimmed
         guard !query.isEmpty else { return true }
         return searchableText.contains { $0.localizedStandardContains(query) }
     }

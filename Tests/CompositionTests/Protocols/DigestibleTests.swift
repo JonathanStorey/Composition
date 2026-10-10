@@ -35,20 +35,20 @@ private struct Note: Digestible {
     }
 
     @Test func checksumChangesWhenParentChanges() {
-        let id = UUID()
-        let first = Note(body: "Draft", id: id, parentChecksum: "A".checksum)
-        let second = Note(body: "Draft", id: id, parentChecksum: "B".checksum)
+        let id: UUID = UUID()
+        let first: Note = Note(body: "Draft", id: id, parentChecksum: "A".checksum)
+        let second: Note = Note(body: "Draft", id: id, parentChecksum: "B".checksum)
         #expect(first.checksum != second.checksum)
     }
 
     @Test func checksumIsItsOwnChecksum() {
-        let checksum = "abc".checksum
+        let checksum: Checksum = "abc".checksum
         #expect(checksum.checksum == checksum)
         #expect(String?.some("abc").checksum.checksum == checksum)
     }
 
     @Test func checksumIsStableForEqualValues() {
-        let id = UUID()
+        let id: UUID = UUID()
         #expect(Note(body: "Draft", id: id, parentChecksum: nil).checksum == Note(body: "Draft", id: id, parentChecksum: nil).checksum)
     }
 
@@ -57,7 +57,7 @@ private struct Note: Digestible {
     }
 
     @Test func checksumRoundTripsThroughCodable() throws {
-        let checksum = "abc".checksum
+        let checksum: Checksum = "abc".checksum
         #expect(try JSONDecoder().decode(Checksum.self, from: JSONEncoder().encode(checksum)) == checksum)
     }
 
@@ -77,7 +77,7 @@ private struct Note: Digestible {
     }
 
     @Test func dictionaryMatchesPythonSortedPairs() {
-        var dictionary = ["b": 2]
+        var dictionary: [String: Int] = ["b": 2]
         dictionary["a"] = 1
         #expect(dictionary.checksum.description == "50d73636681fe21c1f907ba74a5d2157ad808c91057c78fc0ab57a9e0c6527f2")
     }

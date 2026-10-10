@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Protocols/PermutableCollection.swift
-// dependencies: [Protocols/Squashable.swift]
+// dependencies: []
 
 /// A collection that reorders its elements only by swapping them, so every reorder passes through `swapAt(_:_:)`.
 public protocol PermutableCollection: Collection {
@@ -243,7 +243,7 @@ public struct Permutation: Hashable, Sendable {
     }
 }
 
-extension Permutation: Squashable {
+extension Permutation {
 
     /// Returns the permutation that applies this permutation and then the next, over the larger of their minimum counts.
     public func squashed(with next: Permutation) -> Permutation {

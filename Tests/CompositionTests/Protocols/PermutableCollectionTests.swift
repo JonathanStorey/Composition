@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Protocols/PermutableCollectionTests.swift
-// dependencies: [Protocols/PermutableCollection.swift, Protocols/Squashable.swift]
+// dependencies: [Protocols/PermutableCollection.swift]
 
 import Testing
 @testable import Composition

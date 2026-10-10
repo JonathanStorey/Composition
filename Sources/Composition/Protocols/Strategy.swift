@@ -1,12 +1,19 @@
 // repository: https://github.com/JonathanStorey/Composition
-// path: Protocols/DiffableMergeStrategy.swift
-// dependencies: [Extensions/CollectionDifference.swift, Extensions/RangeReplaceableCollection.swift, Protocols/DifferenceProtocol.swift, Protocols/MergeStrategy.swift]
+// path: Protocols/Strategy.swift
+// dependencies: [Extensions/CollectionDifference.swift, Extensions/RangeReplaceableCollection.swift, Protocols/DifferenceProtocol.swift]
 
 /// A strategy that both finds differences and merges values.
 public typealias DiffableMergeStrategy = DiffStrategy & MergeStrategy
 
+/// A way of working with values of one type, refined by strategies that merge or diff them.
+public protocol Strategy<Value> {
+
+    /// The type of value the strategy works with.
+    associatedtype Value
+}
+
 /// A way of finding how one value differs from another and applying that difference back.
-public protocol DiffStrategy<Value> {
+public protocol DiffStrategy<Value>: Strategy {
 
     /// The type of difference the strategy produces.
     associatedtype Difference: DifferenceProtocol
@@ -21,12 +28,27 @@ public protocol DiffStrategy<Value> {
     func difference(from original: Value, to updated: Value) -> Difference
 }
 
-public extension MergeStrategy {
+/// A way of combining two versions of a value that were each edited from a shared base.
+public protocol MergeStrategy<Value>: Strategy {
+
+    /// The type of value the strategy merges.
+    associatedtype Value
+
+    /// Returns one value holding the edits that ours and theirs each made to the base, throwing if they conflict.
+    func merged(_ ours: Value, with theirs: Value, from base: Value) throws -> Value
+}
+
+public extension Strategy {
 
     /// A strategy that merges collections element by element, keeping the insertions and removals from both sides.
     @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
     static func list<C: BidirectionalCollection & RangeReplaceableCollection>() -> Self where Self == ListStrategy<C>, C.Element: Equatable {
         ListStrategy()
+    }
+
+    /// A strategy that keeps whichever side changed the value, throwing if both changed it differently.
+    static func replace<V: Equatable>() -> Self where Self == ReplaceStrategy<V> {
+        ReplaceStrategy()
     }
 }
 
@@ -91,4 +113,27 @@ public struct ListStrategy<C: BidirectionalCollection & RangeReplaceableCollecti
         }
         return (insertions, removals)
     }
+}
+
+/// A strategy that keeps whichever side changed the value, throwing if both changed it differently.
+public struct ReplaceStrategy<V: Equatable>: MergeStrategy {
+
+    /// Creates a replace strategy.
+    public init() {}
+
+    /// Returns the side that changed the base, or either side when both made the same change, throwing when they changed it differently.
+    public func merged(_ ours: V, with theirs: V, from base: V) throws -> V {
+        if ours == base || ours == theirs {
+            return theirs
+        }
+        guard theirs == base else { throw MergeStrategyError.conflict }
+        return ours
+    }
+}
+
+/// An error thrown when a strategy cannot combine the two sides of a merge.
+public enum MergeStrategyError: Error, Equatable, Sendable {
+
+    /// Both sides changed the value in ways the strategy cannot combine.
+    case conflict
 }

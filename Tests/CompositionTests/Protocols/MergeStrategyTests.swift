@@ -7,16 +7,16 @@ import Testing
 
 @Suite struct MergeStrategyTests {
 
-    @Test func listKeepsInsertionsFromBothSides() throws {
-        #expect(try ListStrategy<[Int]>().merged([0, 1, 2, 3], with: [1, 2, 3, 4], from: [1, 2, 3]) == [0, 1, 2, 3, 4])
+    @Test func listKeepsInsertionsFromBothSides() {
+        #expect(ListStrategy<[Int]>().merged([0, 1, 2, 3], with: [1, 2, 3, 4], from: [1, 2, 3]) == [0, 1, 2, 3, 4])
     }
 
-    @Test func listMergesStrings() throws {
-        #expect(try ListStrategy<String>().merged("cats", with: "bat", from: "cat") == "bats")
+    @Test func listMergesStrings() {
+        #expect(ListStrategy<String>().merged("cats", with: "bat", from: "cat") == "bats")
     }
 
-    @Test func listRemovesElementBothSidesRemovedOnce() throws {
-        #expect(try ListStrategy<[Int]>().merged([1, 3], with: [1, 9, 3], from: [1, 2, 3]) == [1, 9, 3])
+    @Test func listRemovesElementBothSidesRemovedOnce() {
+        #expect(ListStrategy<[Int]>().merged([1, 3], with: [1, 9, 3], from: [1, 2, 3]) == [1, 9, 3])
     }
 
     @Test func listWithDotSyntax() throws {

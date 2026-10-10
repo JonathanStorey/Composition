@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Protocols/MergeStrategy.swift
-// dependencies: [Extensions/CollectionDifference.swift, Extensions/RangeReplaceableCollection.swift, Protocols/Mergeable.swift]
+// dependencies: []
 
 /// A way of combining two versions of a value that were each edited from a shared base.
 public protocol MergeStrategy {
@@ -28,10 +28,46 @@ public struct ListStrategy<C: BidirectionalCollection & RangeReplaceableCollecti
     /// Creates a list strategy.
     public init() {}
 
-    /// Returns the base with the insertions and removals of ours and then theirs, placing ours first where both insert at one position.
-    public func merged(_ ours: C, with theirs: C, from base: C) throws -> C {
-        var result = base
-        try result.apply(ours.difference(from: base).merged(with: theirs.difference(from: base)))
+    /// Returns the base with the insertions and removals of ours and theirs, placing ours first where both insert at one position.
+    public func merged(_ ours: C, with theirs: C, from base: C) -> C {
+        let base = Array(base)
+        let ourEdits = edits(from: base, to: ours)
+        let theirEdits = edits(from: base, to: theirs)
+        var result = C()
+        for position in 0...base.count {
+            result.append(contentsOf: ourEdits.insertions[position])
+            result.append(contentsOf: theirEdits.insertions[position])
+            if position < base.count, !ourEdits.removals.contains(position), !theirEdits.removals.contains(position) {
+                result.append(base[position])
+            }
+        }
         return result
+    }
+
+    /// Returns the offsets of the base elements the edit removed and, for each base position, the elements it inserted before that position.
+    private func edits(from base: [C.Element], to edited: C) -> (insertions: [[C.Element]], removals: Set<Int>) {
+        var insertedOffsets: Set<Int> = []
+        var removals: Set<Int> = []
+        for change in edited.difference(from: base) {
+            switch change {
+            case let .insert(offset, _, _):
+                insertedOffsets.insert(offset)
+            case let .remove(offset, _, _):
+                removals.insert(offset)
+            }
+        }
+        var insertions = Array(repeating: [C.Element](), count: base.count + 1)
+        var position = 0
+        for (offset, element) in edited.enumerated() {
+            while removals.contains(position) {
+                position += 1
+            }
+            if insertedOffsets.contains(offset) {
+                insertions[position].append(element)
+            } else {
+                position += 1
+            }
+        }
+        return (insertions, removals)
     }
 }

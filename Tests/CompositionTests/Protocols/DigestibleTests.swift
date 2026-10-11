@@ -48,6 +48,17 @@ private struct Shelf: Digestible, Encodable {
     let tags: Set<String>
 }
 
+private struct Vector: Digestible {
+
+    let x: Int
+    let y: Int
+
+    func digest(into digester: inout Digester) {
+        digester.use(namespace: "Point")
+        ["x": x, "y": y].digest(into: &digester)
+    }
+}
+
 @Suite struct DigestibleTests {
 
     @Test func adjacentStringsDoNotCollide() {
@@ -101,6 +112,12 @@ private struct Shelf: Digestible, Encodable {
         #expect(dictionary.checksum().uuidString.lowercased() == "93bb3ed0-b6a8-5145-8fc5-4cc5210e6002")
     }
 
+    @Test func digesterFinalizesInNilNamespace() {
+        var digester: Digester = Digester()
+        digester.combine("abc")
+        #expect(digester.finalize().uuidString.lowercased() == "a8cf195d-0d19-5d6f-a042-d4653dbc5d98")
+    }
+
     @Test func encodableEnumMatchesPythonRawValue() {
         #expect(Kind.draft.checksum().uuidString.lowercased() == "fc3d2af7-f659-548b-800f-8c3dbeacebd3")
     }
@@ -126,8 +143,8 @@ private struct Shelf: Digestible, Encodable {
         #expect(1.checksum().uuidString.lowercased() == "4930d598-5c4b-5d4f-942d-c01ac82b3998")
     }
 
-    @Test func namespaceIsVersionFiveUUIDOfTypeName() {
-        #expect(String.namespace.uuidString.lowercased() == "f309902d-5749-51f6-8cc5-deec421aa994")
+    @Test func namespaceSurvivesRename() {
+        #expect(Vector(x: 1, y: 2).checksum() == Point(x: 1, y: 2).checksum())
     }
 
     @Test func nilDiffersFromEmptyValue() {

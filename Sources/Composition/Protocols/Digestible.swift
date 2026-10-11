@@ -10,9 +10,6 @@ import Foundation
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public protocol Digestible {
 
-    /// The namespace that keeps equal content in different types from sharing a checksum.
-    static var namespace: UUID { get }
-
     /// Feeds the value's content into the digester.
     func digest(into digester: inout Digester)
 }
@@ -20,14 +17,12 @@ public protocol Digestible {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Digestible {
 
-    /// The version 5 UUID of the type's unqualified name, so each type has its own namespace.
-    static var namespace: UUID {
-        UUID(name: Data(String(describing: Self.self).utf8), namespace: .zero)
-    }
-
-    /// Returns the version 5 UUID of the content's digest within the type's namespace, identical on every device and every launch.
+    /// Returns the version 5 UUID of the content's digest in the namespace of the type's name, identical on every device and every launch.
     func checksum() -> UUID {
-        UUID(name: Digester.digest(of: self), namespace: Self.namespace)
+        var digester: Digester = Digester()
+        digester.use(namespace: String(describing: Self.self))
+        digest(into: &digester)
+        return digester.finalize()
     }
 }
 
@@ -43,13 +38,15 @@ public extension Digestible where Self: Encodable {
     }
 }
 
-/// Accumulates digestible values into a SHA-256 digest.
+/// Accumulates digestible values into a checksum, as `Hasher` accumulates hashable values into a hash value.
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct Digester {
 
-    private var hasher = SHA256()
+    private var hasher: SHA256 = SHA256()
+    private var namespace: UUID = .zero
 
-    private init() {}
+    /// Creates a digester whose checksum falls in the nil namespace until `use(namespace:)` names one.
+    public init() {}
 
     /// Returns the 32-byte SHA-256 digest of the value's content, which a parent feeds in place of the content itself.
     fileprivate static func digest(of value: some Digestible) -> Data {
@@ -66,6 +63,16 @@ public struct Digester {
     /// Feeds raw bytes unchanged, for a leaf value's own encoding.
     public mutating func combine(bytes: Data) {
         hasher.update(data: bytes)
+    }
+
+    /// Returns the version 5 UUID of the SHA-256 digest of everything fed in so far, within the digester's namespace.
+    public func finalize() -> UUID {
+        UUID(name: Data(hasher.finalize()), namespace: namespace)
+    }
+
+    /// Places the checksum in the version 5 namespace of the name, so a type can keep its checksums through a rename.
+    public mutating func use(namespace name: String) {
+        namespace = UUID(name: Data(name.utf8), namespace: .zero)
     }
 }
 

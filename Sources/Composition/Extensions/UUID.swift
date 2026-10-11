@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Extensions/UUID.swift
-// dependencies: [Extensions/JSONEncoder.swift]
+// dependencies: [Protocols/Digestible.swift]
 
 // MARK: - Foundation
 
@@ -65,23 +65,20 @@ private extension UUID {
 import CryptoKit
 import Foundation
 
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension UUID {
 
-    /// Creates a version 5 UUID from the value's contents within a namespace that is itself the version 5 UUID of the name.
-    init(hash value: some Encodable, namespace name: String) {
-        self.init(hash: value, namespace: UUID(name: Data(name.utf8), namespace: .zero))
-    }
-
-    /// Creates a version 5 UUID from the value's contents, so equal values with the same namespace always give the same UUID.
-    init(hash value: some Encodable, namespace uuid: UUID = .zero) {
-        if let data = value as? Data {
-            self.init(name: data, namespace: uuid)
-        } else if let string = value as? String {
-            self.init(name: Data(string.utf8), namespace: uuid)
+    /// Creates the value's checksum, the same UUID as `checksum()`, in the namespace of the given name or else of the value's type name.
+    init<E: Encodable>(digest value: E, namespace name: String? = nil) {
+        var digester: Digester = Digester()
+        digester.namespace = String(describing: E.self)
+        if let digestible = value as? any Digestible {
+            digestible.digest(into: &digester)
         } else {
-            // The Python format never throws, so only a custom encode(to:) that throws on purpose can trap here.
-            self.init(name: try! JSONEncoder().encode(value, compatibility: .python), namespace: uuid)
+            Encoded(value: value).digest(into: &digester)
         }
+        if let name { digester.namespace = name }
+        self = digester.finalize()
     }
 }
 
@@ -95,6 +92,17 @@ extension UUID {
         bytes[6] = (bytes[6] & 0x0F) | 0x50
         bytes[8] = (bytes[8] & 0x3F) | 0x80
         self.init(uuid: bytes.withUnsafeBytes { $0.load(as: uuid_t.self) })
+    }
+}
+
+/// Wraps an Encodable value so it digests through the Encodable default of Digestible.
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+private struct Encoded<E: Encodable>: Digestible, Encodable {
+
+    let value: E
+
+    func encode(to encoder: any Encoder) throws {
+        try value.encode(to: encoder)
     }
 }
 #endif

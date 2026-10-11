@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
-// path: PropertyWrappers/KeychainStorageTests.swift
-// dependencies: [PropertyWrappers/KeychainStorage.swift]
+// path: PropertyWrappers/EncryptedStorageTests.swift
+// dependencies: [PropertyWrappers/EncryptedStorage.swift]
 
 // MARK: - Foundation + Observation + Security
 
@@ -10,15 +10,19 @@ import Observation
 import Testing
 @testable import Composition
 
-@Suite struct KeychainStorageTests {
+@Suite struct EncryptedStorageTests {
 
-    @Test func initDefaultsToLocal() {
-        #expect(KeychainStorage<String?>("token").location == .local)
+    @Test func initDefaultsToLocalOnly() {
+        #expect(EncryptedStorage<String?>("token").location == .localOnly)
+    }
+
+    @Test func initTakesLocationAsSecondArgument() {
+        #expect(EncryptedStorage<String?>("token", .iCloud).location == .iCloud)
     }
 
     @Test func wrappedValueChangeIgnoresOtherKeys() async {
-        let reader: KeychainStorage<Int?> = KeychainStorage(UUID().uuidString, service: "CompositionTests")
-        let writer: KeychainStorage<Int?> = KeychainStorage(UUID().uuidString, service: "CompositionTests")
+        let reader: EncryptedStorage<Int?> = EncryptedStorage(UUID().uuidString, service: "CompositionTests")
+        let writer: EncryptedStorage<Int?> = EncryptedStorage(UUID().uuidString, service: "CompositionTests")
         await confirmation(expectedCount: 0) { changed in
             withObservationTracking({ _ = reader.wrappedValue }, onChange: { changed() })
             writer.wrappedValue = 1
@@ -28,8 +32,8 @@ import Testing
 
     @Test func wrappedValueChangeNotifiesOtherWrappersForTheSameKey() async {
         let key: String = UUID().uuidString
-        let reader: KeychainStorage<Int?> = KeychainStorage(key, service: "CompositionTests")
-        let writer: KeychainStorage<Int?> = KeychainStorage(key, service: "CompositionTests")
+        let reader: EncryptedStorage<Int?> = EncryptedStorage(key, service: "CompositionTests")
+        let writer: EncryptedStorage<Int?> = EncryptedStorage(key, service: "CompositionTests")
         await confirmation { changed in
             withObservationTracking({ _ = reader.wrappedValue }, onChange: { changed() })
             writer.wrappedValue = 1
@@ -39,18 +43,18 @@ import Testing
     }
 
     @Test func wrappedValueIsDefaultWhenNothingIsStored() {
-        let storage: KeychainStorage<Int> = KeychainStorage(wrappedValue: 7, UUID().uuidString, service: "CompositionTests")
+        let storage: EncryptedStorage<Int> = EncryptedStorage(wrappedValue: 7, UUID().uuidString, service: "CompositionTests")
         #expect(storage.wrappedValue == 7)
         storage.wrappedValue = 8
         #expect(storage.wrappedValue == 8)
     }
 
     @Test func wrappedValueIsNilWhenNothingIsStored() {
-        #expect(KeychainStorage<String?>(UUID().uuidString, service: "CompositionTests").wrappedValue == nil)
+        #expect(EncryptedStorage<String?>(UUID().uuidString, service: "CompositionTests").wrappedValue == nil)
     }
 
     @Test func wrappedValueOverwritesStoredValue() {
-        let storage: KeychainStorage<Int?> = KeychainStorage(UUID().uuidString, service: "CompositionTests")
+        let storage: EncryptedStorage<Int?> = EncryptedStorage(UUID().uuidString, service: "CompositionTests")
         storage.wrappedValue = 1
         storage.wrappedValue = 2
         #expect(storage.wrappedValue == 2)
@@ -58,7 +62,7 @@ import Testing
     }
 
     @Test func wrappedValueStoresReadsAndRemovesValue() {
-        let storage: KeychainStorage<UUID?> = KeychainStorage(UUID().uuidString, service: "CompositionTests")
+        let storage: EncryptedStorage<UUID?> = EncryptedStorage(UUID().uuidString, service: "CompositionTests")
         let identifier: UUID = UUID()
         storage.wrappedValue = identifier
         #expect(storage.wrappedValue == identifier)
@@ -73,10 +77,10 @@ import Testing
 #if canImport(Foundation) && canImport(Observation) && canImport(Security) && canImport(SwiftUI)
 import SwiftUI
 
-extension KeychainStorageTests {
+extension EncryptedStorageTests {
 
-    @Test func projectedValueWritesThroughToKeychain() {
-        let storage: KeychainStorage<Bool> = KeychainStorage(wrappedValue: false, UUID().uuidString, service: "CompositionTests")
+    @Test func projectedValueWritesThrough() {
+        let storage: EncryptedStorage<Bool> = EncryptedStorage(wrappedValue: false, UUID().uuidString, service: "CompositionTests")
         storage.projectedValue.wrappedValue = true
         #expect(storage.wrappedValue)
     }

@@ -387,6 +387,7 @@ extension Date: Digestible {
     }
 }
 
+// Decimal is a typealias of NSDecimal on Apple platforms, so its default checksum namespace is "NSDecimal", not "Decimal".
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Decimal: Digestible {
 

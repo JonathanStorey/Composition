@@ -7,6 +7,23 @@ import Foundation
 import Testing
 @testable import Composition
 
+private struct Book: Digestible, Encodable {
+
+    let title: String
+    let year: Int?
+}
+
+private enum Kind: String, Digestible, Encodable {
+
+    case draft
+}
+
+private struct Line: Digestible, Encodable {
+
+    let end: Point
+    let start: Point
+}
+
 private struct Note: Digestible {
 
     let body: String
@@ -18,6 +35,17 @@ private struct Note: Digestible {
         digester.combine(parentChecksum)
         digester.combine(body)
     }
+}
+
+private struct Point: Digestible, Encodable {
+
+    let x: Int
+    let y: Int
+}
+
+private struct Shelf: Digestible, Encodable {
+
+    let tags: Set<String>
 }
 
 @Suite struct DigestibleTests {
@@ -80,6 +108,30 @@ private struct Note: Digestible {
         var dictionary: [String: Int] = ["b": 2]
         dictionary["a"] = 1
         #expect(dictionary.checksum.description == "50d73636681fe21c1f907ba74a5d2157ad808c91057c78fc0ab57a9e0c6527f2")
+    }
+
+    @Test func encodableEnumMatchesRawValue() {
+        #expect(Kind.draft.checksum == "draft".checksum)
+    }
+
+    @Test func encodableNestedStructMatchesDictionaryOfStructs() {
+        let start: Point = Point(x: 0, y: 0)
+        let end: Point = Point(x: 1, y: 2)
+        #expect(Line(end: end, start: start).checksum == ["end": end, "start": start].checksum)
+    }
+
+    @Test func encodableNilPropertyIsLeftOut() {
+        #expect(Book(title: "Dune", year: nil).checksum == ["title": "Dune"].checksum)
+        #expect(Book(title: "Dune", year: nil).checksum != Book(title: "Dune", year: 1965).checksum)
+    }
+
+    @Test func encodableSetUsesSortedDigests() {
+        #expect(Shelf(tags: ["b", "a"]).checksum == ["tags": Set(["a", "b"])].checksum)
+    }
+
+    @Test func encodableStructMatchesPythonDictionary() {
+        #expect(Point(x: 1, y: 2).checksum.description == "f99c010e4c7f305fd562b60874896352e7fd49c214917c302b2d8e47e4dfac6b")
+        #expect(Point(x: 1, y: 2).checksum == ["x": 1, "y": 2].checksum)
     }
 
     @Test func intMatchesKnownVector() {

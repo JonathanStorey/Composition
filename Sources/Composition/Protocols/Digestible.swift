@@ -28,6 +28,18 @@ public extension Digestible {
     }
 }
 
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+public extension Digestible where Self: Encodable {
+
+    /// Feeds the encoded properties as a dictionary of names to values, using each digestible property's own digest and leaving out nil properties.
+    func digest(into digester: inout Digester) {
+        let node: Digester.Encoder.Node = Digester.Encoder.Node()
+        // Only a custom encode(to:) that throws on purpose, or an integer beyond Int64, can trap here.
+        try! encode(to: Digester.Encoder(codingPath: [], node: node))
+        node.digest(into: &digester)
+    }
+}
+
 /// A SHA-256 checksum, compared, hashed and stored by value.
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct Checksum: Codable, Hashable, Sendable {
@@ -68,6 +80,281 @@ public struct Digester {
     public func finalize() -> Checksum {
         Checksum(bytes: Data(hasher.finalize()))
     }
+}
+
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+fileprivate extension Digester {
+
+    /// Encodes a value into a tree of nodes whose checksums follow the standard conformances: keyed containers as dictionaries and unkeyed containers as arrays.
+    struct Encoder: Swift.Encoder {
+
+        let codingPath: [any CodingKey]
+        let node: Node
+
+        /// Returns the node for a value, `nil` for a nil optional, a leaf for a digestible value, and the encoded contents for everything else.
+        static func node(for value: some Encodable, codingPath: [any CodingKey]) throws -> Node? {
+            switch value {
+            case let optional as any OptionalValue where optional.isNone: return nil
+            case let digestible as any Digestible: return Node(leaf: digestible)
+            case let float as Float: return Node(leaf: Double(float))
+            case let integer as any BinaryInteger:
+                guard let int: Int = Int(exactly: integer) else { throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: codingPath, debugDescription: "\(integer) does not fit in the 64-bit integer a checksum feeds.")) }
+                return Node(leaf: int)
+            default:
+                let node: Node = Node()
+                try value.encode(to: Encoder(codingPath: codingPath, node: node))
+                return node
+            }
+        }
+
+        var userInfo: [CodingUserInfoKey: Any] { [:] }
+
+        func container<K: CodingKey>(keyedBy type: K.Type) -> KeyedEncodingContainer<K> {
+            if node.members == nil { node.members = [:] }
+            return KeyedEncodingContainer(KeyedContainer<K>(codingPath: codingPath, node: node))
+        }
+
+        func singleValueContainer() -> any SingleValueEncodingContainer {
+            SingleValueContainer(codingPath: codingPath, node: node)
+        }
+
+        func unkeyedContainer() -> any UnkeyedEncodingContainer {
+            if node.elements == nil { node.elements = [] }
+            return UnkeyedContainer(codingPath: codingPath, node: node)
+        }
+    }
+}
+
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+fileprivate extension Digester.Encoder {
+
+    /// Writes keyed values into a node's members, removing a key whose value is nil.
+    struct KeyedContainer<K: CodingKey>: KeyedEncodingContainerProtocol {
+
+        let codingPath: [any CodingKey]
+        let node: Node
+
+        mutating func encode(_ value: Bool, forKey key: K) throws { try set(value, forKey: key) }
+
+        mutating func encode(_ value: Double, forKey key: K) throws { try set(value, forKey: key) }
+
+        mutating func encode(_ value: Float, forKey key: K) throws { try set(value, forKey: key) }
+
+        mutating func encode(_ value: Int, forKey key: K) throws { try set(value, forKey: key) }
+
+        mutating func encode(_ value: Int8, forKey key: K) throws { try set(value, forKey: key) }
+
+        mutating func encode(_ value: Int16, forKey key: K) throws { try set(value, forKey: key) }
+
+        mutating func encode(_ value: Int32, forKey key: K) throws { try set(value, forKey: key) }
+
+        mutating func encode(_ value: Int64, forKey key: K) throws { try set(value, forKey: key) }
+
+        mutating func encode(_ value: String, forKey key: K) throws { try set(value, forKey: key) }
+
+        mutating func encode(_ value: UInt, forKey key: K) throws { try set(value, forKey: key) }
+
+        mutating func encode(_ value: UInt8, forKey key: K) throws { try set(value, forKey: key) }
+
+        mutating func encode(_ value: UInt16, forKey key: K) throws { try set(value, forKey: key) }
+
+        mutating func encode(_ value: UInt32, forKey key: K) throws { try set(value, forKey: key) }
+
+        mutating func encode(_ value: UInt64, forKey key: K) throws { try set(value, forKey: key) }
+
+        mutating func encode<T: Encodable>(_ value: T, forKey key: K) throws { try set(value, forKey: key) }
+
+        mutating func encodeNil(forKey key: K) throws {
+            node.members?[key.stringValue] = nil
+        }
+
+        mutating func nestedContainer<N: CodingKey>(keyedBy keyType: N.Type, forKey key: K) -> KeyedEncodingContainer<N> {
+            Digester.Encoder(codingPath: codingPath + [key], node: child(named: key.stringValue)).container(keyedBy: keyType)
+        }
+
+        mutating func nestedUnkeyedContainer(forKey key: K) -> any UnkeyedEncodingContainer {
+            Digester.Encoder(codingPath: codingPath + [key], node: child(named: key.stringValue)).unkeyedContainer()
+        }
+
+        mutating func superEncoder() -> any Swift.Encoder {
+            Digester.Encoder(codingPath: codingPath, node: child(named: "super"))
+        }
+
+        mutating func superEncoder(forKey key: K) -> any Swift.Encoder {
+            Digester.Encoder(codingPath: codingPath + [key], node: child(named: key.stringValue))
+        }
+
+        private func child(named name: String) -> Node {
+            let child: Node = Node()
+            node.members?[name] = child
+            return child
+        }
+
+        private func set(_ value: some Encodable, forKey key: K) throws {
+            node.members?[key.stringValue] = try Digester.Encoder.node(for: value, codingPath: codingPath + [key])
+        }
+    }
+
+    /// A value under construction: a digestible leaf, the members of a keyed container, or the elements of an unkeyed one.
+    final class Node: Digestible {
+
+        var elements: [Node]?
+        var leaf: (any Digestible)?
+        var members: [String: Node]?
+
+        init(leaf: (any Digestible)? = nil) {
+            self.leaf = leaf
+        }
+
+        /// A nil value, which digests as 32 zero bytes like `Optional.none`.
+        static var null: Node {
+            Node(leaf: Checksum(bytes: Data(count: 32)))
+        }
+
+        /// The leaf's own checksum, so a leaf node checksums exactly like the value it holds.
+        var checksum: Checksum {
+            if let leaf { return leaf.checksum }
+            var digester: Digester = Digester()
+            digest(into: &digester)
+            return digester.finalize()
+        }
+
+        /// Copies another node's contents into this one.
+        func assign(_ node: Node) {
+            elements = node.elements
+            leaf = node.leaf
+            members = node.members
+        }
+
+        /// Feeds the leaf unchanged, the elements as an array, or the members as a dictionary.
+        func digest(into digester: inout Digester) {
+            if let leaf { return leaf.digest(into: &digester) }
+            if let elements { return elements.digest(into: &digester) }
+            members?.digest(into: &digester)
+        }
+    }
+
+    /// Writes a single value into a node.
+    struct SingleValueContainer: SingleValueEncodingContainer {
+
+        let codingPath: [any CodingKey]
+        let node: Node
+
+        mutating func encode(_ value: Bool) throws { try set(value) }
+
+        mutating func encode(_ value: Double) throws { try set(value) }
+
+        mutating func encode(_ value: Float) throws { try set(value) }
+
+        mutating func encode(_ value: Int) throws { try set(value) }
+
+        mutating func encode(_ value: Int8) throws { try set(value) }
+
+        mutating func encode(_ value: Int16) throws { try set(value) }
+
+        mutating func encode(_ value: Int32) throws { try set(value) }
+
+        mutating func encode(_ value: Int64) throws { try set(value) }
+
+        mutating func encode(_ value: String) throws { try set(value) }
+
+        mutating func encode(_ value: UInt) throws { try set(value) }
+
+        mutating func encode(_ value: UInt8) throws { try set(value) }
+
+        mutating func encode(_ value: UInt16) throws { try set(value) }
+
+        mutating func encode(_ value: UInt32) throws { try set(value) }
+
+        mutating func encode(_ value: UInt64) throws { try set(value) }
+
+        mutating func encode<T: Encodable>(_ value: T) throws { try set(value) }
+
+        mutating func encodeNil() throws {
+            node.assign(.null)
+        }
+
+        private func set(_ value: some Encodable) throws {
+            node.assign(try Digester.Encoder.node(for: value, codingPath: codingPath) ?? .null)
+        }
+    }
+
+    /// Appends values to a node's elements, with a nil value as 32 zero bytes like `Optional.none`.
+    struct UnkeyedContainer: UnkeyedEncodingContainer {
+
+        let codingPath: [any CodingKey]
+        let node: Node
+
+        var count: Int { node.elements?.count ?? 0 }
+
+        mutating func encode(_ value: Bool) throws { try set(value) }
+
+        mutating func encode(_ value: Double) throws { try set(value) }
+
+        mutating func encode(_ value: Float) throws { try set(value) }
+
+        mutating func encode(_ value: Int) throws { try set(value) }
+
+        mutating func encode(_ value: Int8) throws { try set(value) }
+
+        mutating func encode(_ value: Int16) throws { try set(value) }
+
+        mutating func encode(_ value: Int32) throws { try set(value) }
+
+        mutating func encode(_ value: Int64) throws { try set(value) }
+
+        mutating func encode(_ value: String) throws { try set(value) }
+
+        mutating func encode(_ value: UInt) throws { try set(value) }
+
+        mutating func encode(_ value: UInt8) throws { try set(value) }
+
+        mutating func encode(_ value: UInt16) throws { try set(value) }
+
+        mutating func encode(_ value: UInt32) throws { try set(value) }
+
+        mutating func encode(_ value: UInt64) throws { try set(value) }
+
+        mutating func encode<T: Encodable>(_ value: T) throws { try set(value) }
+
+        mutating func encodeNil() throws {
+            _ = append(.null)
+        }
+
+        mutating func nestedContainer<N: CodingKey>(keyedBy keyType: N.Type) -> KeyedEncodingContainer<N> {
+            Digester.Encoder(codingPath: codingPath, node: append(Node())).container(keyedBy: keyType)
+        }
+
+        mutating func nestedUnkeyedContainer() -> any UnkeyedEncodingContainer {
+            Digester.Encoder(codingPath: codingPath, node: append(Node())).unkeyedContainer()
+        }
+
+        mutating func superEncoder() -> any Swift.Encoder {
+            Digester.Encoder(codingPath: codingPath, node: append(Node()))
+        }
+
+        private func append(_ child: Node) -> Node {
+            node.elements?.append(child)
+            return child
+        }
+
+        private func set(_ value: some Encodable) throws {
+            _ = append(try Digester.Encoder.node(for: value, codingPath: codingPath) ?? .null)
+        }
+    }
+}
+
+/// A type that can say whether it holds a nil optional, so the encoder can leave nil properties out.
+private protocol OptionalValue {
+
+    /// A Boolean value indicating whether the value is nil.
+    var isNone: Bool { get }
+}
+
+extension Optional: OptionalValue {
+
+    /// A Boolean value indicating whether the value is nil.
+    fileprivate var isNone: Bool { self == nil }
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)

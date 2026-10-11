@@ -69,9 +69,7 @@ public extension UUID {
 
     /// Creates the value's checksum in the namespace of the given name, or of the value's type name when there is none.
     init<D: Digestible>(digest value: D, namespace name: String? = nil) {
-        var digester: Digester = Digester(namespace: name ?? String(describing: D.self))
-        value.digest(into: &digester)
-        self = digester.finalize()
+        self = value.checksum(namespace: name)
     }
 }
 #endif

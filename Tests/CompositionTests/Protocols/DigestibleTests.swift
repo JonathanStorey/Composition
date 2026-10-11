@@ -176,5 +176,11 @@ private struct Vector: Digestible {
     @Test func stringMatchesPython() {
         #expect("abc".checksum().uuidString.lowercased() == "b0a3bad5-67e3-5474-ba39-f091c769cd7c")
     }
+
+    @Test func versionFiveMatchesRFC9562Example() {
+        let dns: Data = Data([0x6B, 0xA7, 0xB8, 0x10, 0x9D, 0xAD, 0x11, 0xD1, 0x80, 0xB4, 0x00, 0xC0, 0x4F, 0xD4, 0x30, 0xC8])
+        let expected: Data = Data([0x2E, 0xD6, 0x65, 0x7D, 0xE9, 0x27, 0x56, 0x8B, 0x95, 0xE1, 0x26, 0x65, 0xA8, 0xAE, 0xA6, 0xA2])
+        #expect(Digester.versionFive(name: Data("www.example.com".utf8), namespace: dns) == expected)
+    }
 }
 #endif

@@ -17,21 +17,21 @@ public struct UserStorage<Value: Codable & Sendable>: Sendable {
     public let defaultValue: Value
     /// The key the value is stored under.
     public let key: String
-    /// The user defaults the value is stored in.
-    public let store: UserDefaults
+    /// The name of the user defaults suite the value is stored in, or `nil` for the standard user defaults.
+    public let suite: String?
     private let changes: StorageChanges
 
     /// Creates storage for the key that returns the default value until something is stored.
-    public init(wrappedValue: Value, _ key: String, store: UserDefaults = .standard) {
+    public init(wrappedValue: Value, _ key: String, suite: String? = nil) {
         self.defaultValue = wrappedValue
         self.key = key
-        self.store = store
-        self.changes = StorageChanges(item: ["UserDefaults", "\(ObjectIdentifier(store))", key], observing: [UserDefaults.didChangeNotification])
+        self.suite = suite
+        self.changes = StorageChanges(item: ["UserDefaults", suite ?? "", key], observing: [UserDefaults.didChangeNotification])
     }
 
     /// Creates storage for the key that returns `nil` until something is stored.
-    public init(_ key: String, store: UserDefaults = .standard) where Value: ExpressibleByNilLiteral {
-        self.init(wrappedValue: nil, key, store: store)
+    public init(_ key: String, suite: String? = nil) where Value: ExpressibleByNilLiteral {
+        self.init(wrappedValue: nil, key, suite: suite)
     }
 
     /// Whether the value is a property-list type that user defaults stores as is, so `AppStorage` can share its key.
@@ -57,6 +57,11 @@ public struct UserStorage<Value: Codable & Sendable>: Sendable {
             guard let data: Data = try? JSONEncoder().encode(newValue), data != Data("null".utf8) else { return store.removeObject(forKey: key) }
             store.set(Self.isPropertyList(newValue) ? newValue : data, forKey: key)
         }
+    }
+
+    /// The user defaults for the suite.
+    private var store: UserDefaults {
+        suite.flatMap(UserDefaults.init(suiteName:)) ?? .standard
     }
 }
 #endif

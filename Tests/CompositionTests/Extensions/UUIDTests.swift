@@ -138,10 +138,5 @@ extension UUIDTests {
         #expect(characters[14] == "5")
         #expect("89AB".contains(characters[19]))
     }
-
-    @Test func initNameMatchesRFC9562Example() throws {
-        let dns: UUID = try #require(UUID(uuidString: "6BA7B810-9DAD-11D1-80B4-00C04FD430C8"))
-        #expect(UUID(name: Data("www.example.com".utf8), namespace: dns).uuidString == "2ED6657D-E927-568B-95E1-2665A8AEA6A2")
-    }
 }
 #endif

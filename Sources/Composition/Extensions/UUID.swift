@@ -62,7 +62,6 @@ private extension UUID {
 // MARK: - CryptoKit + Foundation
 
 #if canImport(CryptoKit) && canImport(Foundation)
-import CryptoKit
 import Foundation
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
@@ -73,19 +72,6 @@ public extension UUID {
         var digester: Digester = Digester(namespace: name ?? String(describing: D.self))
         value.digest(into: &digester)
         self = digester.finalize()
-    }
-}
-
-extension UUID {
-
-    /// Builds an RFC 9562 version 5 UUID from the SHA-1 digest of a namespace followed by a name.
-    init(name: Data, namespace: UUID) {
-        var data: Data = withUnsafeBytes(of: namespace.uuid) { Data($0) }
-        data.append(name)
-        var bytes: [UInt8] = Array(Insecure.SHA1.hash(data: data).prefix(16))
-        bytes[6] = (bytes[6] & 0x0F) | 0x50
-        bytes[8] = (bytes[8] & 0x3F) | 0x80
-        self.init(uuid: bytes.withUnsafeBytes { $0.load(as: uuid_t.self) })
     }
 }
 #endif

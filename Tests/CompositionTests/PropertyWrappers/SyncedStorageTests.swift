@@ -69,6 +69,13 @@ import Observation
         #expect(storage.syncedValue == 0)
     }
 
+    @Test func wrappedValueChangeLeavesStatusUnknown() {
+        let storage: SyncedStorage<Int?> = SyncedStorage(UUID().uuidString)
+        storage.wrappedValue = 3
+        #expect(storage.status == .unknown)
+        storage.wrappedValue = nil
+    }
+
     @Test func wrappedValueChangeNotifiesObservers() async {
         let storage: SyncedStorage<Int?> = SyncedStorage(UUID().uuidString)
         await confirmation { changed in

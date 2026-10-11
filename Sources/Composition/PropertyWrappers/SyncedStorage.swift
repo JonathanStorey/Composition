@@ -130,12 +130,12 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
     private let entries: OSAllocatedUnfairLock<[String: SyncEntry]>
     private let registrar: ObservationRegistrar = ObservationRegistrar()
 
-    /// Restores the values kept on the device, each syncing when a write still waits to reach iCloud, else at its last success, or unknown when it never synced.
+    /// Restores the values kept on the device, each starting at its last success, or unknown when it never synced.
     private init() {
         let stored: [String: SyncEntry] = UserDefaults.standard.data(forKey: Self.entriesKey).flatMap { try? JSONDecoder().decode([String: SyncEntry].self, from: $0) } ?? [:]
         self.entries = OSAllocatedUnfairLock(initialState: stored.mapValues { entry in
             var restored: SyncEntry = entry
-            restored.status = entry.isPending ? .syncing : entry.synced.map(SyncStatus.success) ?? .unknown
+            restored.status = entry.synced.map(SyncStatus.success) ?? .unknown
             return restored
         })
     }
@@ -266,14 +266,13 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         return entries.withLock { $0[key]?.value }
     }
 
-    /// Keeps the value on the device and queues it for iCloud, or records why it can't sync.
+    /// Keeps the value on the device and queues it for iCloud, leaving the status to the sync's result or the next refresh.
     func write(_ data: Data?, _ key: String) {
-        guard let engine: CKSyncEngine = start() else { return update(key) { $0.modified = .now; $0.status = .failure(.unavailable); $0.value = data } }
         let date: Date = .now
+        guard let engine: CKSyncEngine = start() else { return update(key) { $0.modified = date; $0.value = data } }
         update(key) { entry in
             entry.isPending = true
             entry.modified = date
-            entry.status = .syncing
             entry.value = data
         }
         let id: CKRecord.ID = CKRecord.ID(recordName: key, zoneID: zoneID)

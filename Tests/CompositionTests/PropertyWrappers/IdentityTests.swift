@@ -27,6 +27,13 @@ import Testing
         #expect(try url.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
     }
 
+    @Test func seededKeepsAnExistingIdentity() {
+        let storage: SyncedStorage<UUID?> = SyncedStorage(UUID().uuidString)
+        let identity: UUID? = Identities.seeded(storage).wrappedValue
+        #expect(identity?.version == 7)
+        #expect(Identities.seeded(storage).wrappedValue == identity)
+    }
+
     @Test func storedScopesAreVersion7AndDistinct() {
         #expect([Identities.launch, Identities.install, Identities.device].allSatisfy { $0.version == 7 })
         #expect(Identities.launch != Identities.install)

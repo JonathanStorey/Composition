@@ -1,41 +1,12 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/Identity.swift
-// dependencies: [Extensions/Date.swift, Extensions/String.swift, Extensions/UUID.swift, PropertyWrappers/EncryptedStorage.swift]
+// dependencies: [Extensions/Date.swift, Extensions/String.swift, Extensions/UUID.swift, PropertyWrappers/EncryptedStorage.swift, PropertyWrappers/SyncedStorage.swift]
 
 // MARK: - Foundation + Observation + Security
 
 #if canImport(Foundation) && canImport(Observation) && canImport(Security)
 import Foundation
 import Security
-
-/// The state of a value's last sync, shaped like `Result`, with the date of the last success.
-public enum SyncStatus: Hashable, Sendable {
-
-    /// Not synced since launch, and no earlier success is known.
-    case unknown
-
-    /// Waiting on a sync that is under way.
-    case syncing
-
-    /// Synced successfully at the date.
-    case success(Date)
-
-    /// The last sync failed for the reason.
-    case failure(SyncError)
-}
-
-/// Why a sync with iCloud failed.
-public enum SyncError: Error, Hashable, Sendable {
-
-    /// No iCloud account is signed in, or iCloud is turned off for the app.
-    case noAccount
-
-    /// The app has used up its iCloud storage.
-    case quotaExceeded
-
-    /// iCloud refused the sync, such as when the app lacks the iCloud entitlement.
-    case unavailable
-}
 
 /// The identities for scopes that outlive views and scenes, each created on first read.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)

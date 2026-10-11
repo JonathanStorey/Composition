@@ -27,18 +27,7 @@ public extension Digestible {
 
     /// Returns the version 5 UUID of the content's digest within the type's namespace, identical on every device and every launch.
     func checksum() -> UUID {
-        UUID(name: digest, namespace: Self.namespace)
-    }
-}
-
-@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension Digestible {
-
-    /// The 32-byte SHA-256 digest of the value's content, which a parent feeds in place of the content itself.
-    var digest: Data {
-        var digester: Digester = Digester()
-        digest(into: &digester)
-        return digester.finalize()
+        UUID(name: Digester.digest(of: self), namespace: Self.namespace)
     }
 }
 
@@ -60,22 +49,23 @@ public struct Digester {
 
     private var hasher = SHA256()
 
-    /// Creates an empty digester.
-    public init() {}
+    private init() {}
+
+    /// Returns the 32-byte SHA-256 digest of the value's content, which a parent feeds in place of the content itself.
+    fileprivate static func digest(of value: some Digestible) -> Data {
+        var digester: Digester = Digester()
+        value.digest(into: &digester)
+        return Data(digester.hasher.finalize())
+    }
 
     /// Feeds the value's 32-byte digest, so adjacent values cannot run together.
     public mutating func combine<D: Digestible>(_ value: D) {
-        hasher.update(data: value.digest)
+        hasher.update(data: Self.digest(of: value))
     }
 
     /// Feeds raw bytes unchanged, for a leaf value's own encoding.
     public mutating func combine(bytes: Data) {
         hasher.update(data: bytes)
-    }
-
-    /// Returns the 32-byte digest of everything fed in so far.
-    func finalize() -> Data {
-        Data(hasher.finalize())
     }
 }
 
@@ -396,7 +386,7 @@ extension Dictionary: Digestible where Key: Digestible, Value: Digestible {
 
     /// Feeds each key's digest followed by its value's digest, with the pairs sorted so insertion order does not matter.
     public func digest(into digester: inout Digester) {
-        map { $0.key.digest + $0.value.digest }.sorted { $0.lexicographicallyPrecedes($1) }.forEach { digester.combine(bytes: $0) }
+        map { Digester.digest(of: $0.key) + Digester.digest(of: $0.value) }.sorted { $0.lexicographicallyPrecedes($1) }.forEach { digester.combine(bytes: $0) }
     }
 }
 
@@ -433,7 +423,7 @@ extension Set: Digestible where Element: Digestible {
 
     /// Feeds each element's digest, sorted so iteration order does not matter.
     public func digest(into digester: inout Digester) {
-        map(\.digest).sorted { $0.lexicographicallyPrecedes($1) }.forEach { digester.combine(bytes: $0) }
+        map { Digester.digest(of: $0) }.sorted { $0.lexicographicallyPrecedes($1) }.forEach { digester.combine(bytes: $0) }
     }
 }
 

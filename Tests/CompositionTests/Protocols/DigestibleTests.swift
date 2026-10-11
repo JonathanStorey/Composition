@@ -48,26 +48,18 @@ private struct Shelf: Digestible, Encodable {
     let tags: Set<String>
 }
 
-private extension Data {
-
-    /// The bytes as lowercase hexadecimal.
-    var hex: String {
-        map { String(format: "%02x", $0) }.joined()
-    }
-}
-
 @Suite struct DigestibleTests {
 
     @Test func adjacentStringsDoNotCollide() {
-        #expect(["ab", "c"].digest != ["a", "bc"].digest)
+        #expect(["ab", "c"].checksum() != ["a", "bc"].checksum())
     }
 
-    @Test func arrayMatchesPythonDigestOfDigests() {
-        #expect(["a", "b"].digest.hex == "e5a01fee14e0ed5c48714f22180f25ad8365b53f9779f79dc4a3d7e93963f94a")
+    @Test func arrayMatchesPython() {
+        #expect(["a", "b"].checksum().uuidString.lowercased() == "237a0c21-426f-5a65-b17d-715c239bc1d9")
     }
 
-    @Test func arrayOrderChangesDigest() {
-        #expect([1, 2].digest != [2, 1].digest)
+    @Test func arrayOrderChangesChecksum() {
+        #expect([1, 2].checksum() != [2, 1].checksum())
     }
 
     @Test func checksumChangesWhenParentChanges() {
@@ -82,68 +74,56 @@ private extension Data {
         #expect(Note(body: "Draft", id: id, parentChecksum: nil).checksum() == Note(body: "Draft", id: id, parentChecksum: nil).checksum())
     }
 
-    @Test func checksumIsVersionFiveUUIDMatchingPython() {
+    @Test func checksumIsVersionFiveUUID() {
         #expect("abc".checksum().version == 5)
-        #expect("abc".checksum().uuidString.lowercased() == "b0a3bad5-67e3-5474-ba39-f091c769cd7c")
-        #expect(Point(x: 1, y: 2).checksum().uuidString.lowercased() == "31c4ce15-c77a-53b4-b9ba-07b3160f4e2d")
     }
 
-    @Test func checksumSeparatesTypesWithEqualDigests() {
-        #expect(Point(x: 1, y: 2).digest == ["x": 1, "y": 2].digest)
+    @Test func checksumSeparatesTypesWithEqualContent() {
         #expect(Point(x: 1, y: 2).checksum() != ["x": 1, "y": 2].checksum())
     }
 
     @Test func dateMatchesPythonMicroseconds() {
-        #expect(Date(timeIntervalSince1970: 1_700_000_000.123456).digest.hex == "7319daf208645ce78f8795a741d5da8bb48f2cd01a7a55eedbd7d6539c6592c7")
-        #expect(Date(timeIntervalSince1970: 1_700_000_000.123456).digest == 1_700_000_000_123_456.digest)
+        #expect(Date(timeIntervalSince1970: 1_700_000_000.123456).checksum().uuidString.lowercased() == "133057f3-94d7-5a17-8370-732243f5dcd2")
     }
 
     @Test func decimalMatchesPythonNormalizedString() throws {
-        #expect(try #require(Decimal(string: "1.50")).digest.hex == "9f29a130438b81170b92a42650f9a94291ecad60bd47af2a3886e75f7f728725")
-        #expect(Decimal(100).digest == "100".digest)
+        #expect(try #require(Decimal(string: "1.50")).checksum().uuidString.lowercased() == "f8ff5fef-f6d2-5b11-813c-03f54a003b39")
     }
 
     @Test func decomposedStringMatchesPythonBytes() {
-        #expect("caf\u{E9}".digest.hex == "850f7dc43910ff890f8879c0ed26fe697c93a067ad93a7d50f466a7028a9bf4e")
-        #expect("cafe\u{301}".digest.hex == "81ef060bcd98adc7824eb5c1ada83c32491b16018e11e79f00ab9d09e04b015a")
+        #expect("caf\u{E9}".checksum().uuidString.lowercased() == "f804c7d8-131b-5ea3-8015-aa18ab34eda6")
+        #expect("cafe\u{301}".checksum().uuidString.lowercased() == "219f3f66-54ed-5d36-9611-23014584b46b")
     }
 
     @Test func dictionaryMatchesPythonSortedPairs() {
         var dictionary: [String: Int] = ["b": 2]
         dictionary["a"] = 1
-        #expect(dictionary.digest.hex == "50d73636681fe21c1f907ba74a5d2157ad808c91057c78fc0ab57a9e0c6527f2")
+        #expect(dictionary.checksum().uuidString.lowercased() == "93bb3ed0-b6a8-5145-8fc5-4cc5210e6002")
     }
 
-    @Test func digestIsThirtyTwoBytes() {
-        #expect("".digest.count == 32)
+    @Test func encodableEnumMatchesPythonRawValue() {
+        #expect(Kind.draft.checksum().uuidString.lowercased() == "fc3d2af7-f659-548b-800f-8c3dbeacebd3")
     }
 
-    @Test func encodableEnumMatchesRawValue() {
-        #expect(Kind.draft.digest == "draft".digest)
-    }
-
-    @Test func encodableNestedStructMatchesDictionaryOfStructs() {
-        let start: Point = Point(x: 0, y: 0)
-        let end: Point = Point(x: 1, y: 2)
-        #expect(Line(end: end, start: start).digest == ["end": end, "start": start].digest)
+    @Test func encodableNestedStructMatchesPython() {
+        #expect(Line(end: Point(x: 1, y: 2), start: Point(x: 0, y: 0)).checksum().uuidString.lowercased() == "6f5c2a97-4bb9-5c61-8f29-299efbeb3ee5")
     }
 
     @Test func encodableNilPropertyIsLeftOut() {
-        #expect(Book(title: "Dune", year: nil).digest == ["title": "Dune"].digest)
-        #expect(Book(title: "Dune", year: nil).digest != Book(title: "Dune", year: 1965).digest)
+        #expect(Book(title: "Dune", year: nil).checksum().uuidString.lowercased() == "a7313219-fe9b-5b8d-816c-8860925f185d")
+        #expect(Book(title: "Dune", year: nil).checksum() != Book(title: "Dune", year: 1965).checksum())
     }
 
     @Test func encodableSetUsesSortedDigests() {
-        #expect(Shelf(tags: ["b", "a"]).digest == ["tags": Set(["a", "b"])].digest)
+        #expect(Shelf(tags: ["b", "a"]).checksum().uuidString.lowercased() == "f58804b7-a55a-52fd-997e-acdbbe38fff1")
     }
 
     @Test func encodableStructMatchesPythonDictionary() {
-        #expect(Point(x: 1, y: 2).digest.hex == "f99c010e4c7f305fd562b60874896352e7fd49c214917c302b2d8e47e4dfac6b")
-        #expect(Point(x: 1, y: 2).digest == ["x": 1, "y": 2].digest)
+        #expect(Point(x: 1, y: 2).checksum().uuidString.lowercased() == "31c4ce15-c77a-53b4-b9ba-07b3160f4e2d")
     }
 
-    @Test func intMatchesKnownVector() {
-        #expect(1.digest.hex == "cd2662154e6d76b2b2b92e70c0cac3ccf534f9b74eb5b89819ec509083d00a50")
+    @Test func intMatchesPython() {
+        #expect(1.checksum().uuidString.lowercased() == "4930d598-5c4b-5d4f-942d-c01ac82b3998")
     }
 
     @Test func namespaceIsVersionFiveUUIDOfTypeName() {
@@ -151,34 +131,34 @@ private extension Data {
     }
 
     @Test func nilDiffersFromEmptyValue() {
-        #expect(String?.none.digest != String?.some("").digest)
+        #expect(String?.none.checksum() != String?.some("").checksum())
     }
 
-    @Test func nilDigestsAsZeroBlock() {
-        #expect(String?.none.digest == Data(count: 32).digest)
+    @Test func nilMatchesPython() {
+        #expect(String?.none.checksum().uuidString.lowercased() == "bd512a38-04a5-5880-8995-6c943b2888c8")
     }
 
     @Test func optionalArrayMatchesPython() {
         let values: [String?] = [nil, "a"]
-        #expect(values.digest.hex == "cbf2ea8b426ddedff454fdc58daf123e2a64600927dbdf7b884155931ca92acc")
+        #expect(values.checksum().uuidString.lowercased() == "7534268b-d46f-58ae-ad70-c1142b3b0ab9")
     }
 
-    @Test func optionalPositionChangesDigest() {
+    @Test func optionalPositionChangesChecksum() {
         let first: [String?] = [nil, "x"]
         let second: [String?] = ["x", nil]
-        #expect(first.digest != second.digest)
+        #expect(first.checksum() != second.checksum())
     }
 
     @Test func setMatchesPythonSortedDigests() {
-        #expect(Set(["b", "a"]).digest.hex == "18d79cb747ea174c59f3a3b41768672526d56fecc58360a99d283d0f9b0a3cc0")
+        #expect(Set(["b", "a"]).checksum().uuidString.lowercased() == "15a12e4e-43f4-5f65-a6d6-b3bca87fa078")
     }
 
-    @Test func someMatchesWrappedValue() {
-        #expect(String?.some("abc").digest == "abc".digest)
+    @Test func someMatchesPython() {
+        #expect(String?.some("abc").checksum().uuidString.lowercased() == "9aa7c342-a84d-5d85-88f9-6e7b3c750f99")
     }
 
-    @Test func stringMatchesPythonSHA256() {
-        #expect("abc".digest.hex == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+    @Test func stringMatchesPython() {
+        #expect("abc".checksum().uuidString.lowercased() == "b0a3bad5-67e3-5474-ba39-f091c769cd7c")
     }
 }
 #endif

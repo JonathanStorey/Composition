@@ -98,8 +98,8 @@ private struct Vector: Digestible {
 
     @Test func decimalMatchesPythonNormalizedString() throws {
         let decimal: Decimal = try #require(Decimal(string: "1.50"))
-        #expect(String(describing: Decimal.self) == "Decimal")
-        #expect(decimal.checksum().uuidString.lowercased() == "f8ff5fef-f6d2-5b11-813c-03f54a003b39")
+        #expect(String(describing: Decimal.self) == "NSDecimal")
+        #expect(decimal.checksum().uuidString.lowercased() == "da25e2ee-8448-538d-8faa-d700d94986d1")
     }
 
     @Test func decomposedStringMatchesPythonBytes() {

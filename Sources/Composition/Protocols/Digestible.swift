@@ -20,7 +20,7 @@ public extension Digestible {
     /// Returns the version 5 UUID of the content's digest in the namespace of the type's name, identical on every device and every launch.
     func checksum() -> UUID {
         var digester: Digester = Digester()
-        digester.use(namespace: String(describing: Self.self))
+        digester.namespace = String(describing: Self.self)
         digest(into: &digester)
         return digester.finalize()
     }
@@ -42,10 +42,12 @@ public extension Digestible where Self: Encodable {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct Digester {
 
-    private var hasher: SHA256 = SHA256()
-    private var namespace: UUID = .zero
+    /// The name whose version 5 UUID is the checksum's namespace, which a renamed type sets to its old name to keep its checksums.
+    public var namespace: String = ""
 
-    /// Creates a digester whose checksum falls in the nil namespace until `use(namespace:)` names one.
+    private var hasher: SHA256 = SHA256()
+
+    /// Creates an empty digester with an empty namespace name.
     public init() {}
 
     /// Returns the 32-byte SHA-256 digest of the value's content, which a parent feeds in place of the content itself.
@@ -65,14 +67,9 @@ public struct Digester {
         hasher.update(data: bytes)
     }
 
-    /// Returns the version 5 UUID of the SHA-256 digest of everything fed in so far, within the digester's namespace.
+    /// Returns the version 5 UUID of the SHA-256 digest of everything fed in so far, within the namespace named by `namespace`.
     public func finalize() -> UUID {
-        UUID(name: Data(hasher.finalize()), namespace: namespace)
-    }
-
-    /// Places the checksum in the version 5 namespace of the name, so a type can keep its checksums through a rename.
-    public mutating func use(namespace name: String) {
-        namespace = UUID(name: Data(name.utf8), namespace: .zero)
+        UUID(name: Data(hasher.finalize()), namespace: UUID(name: Data(namespace.utf8), namespace: .zero))
     }
 }
 

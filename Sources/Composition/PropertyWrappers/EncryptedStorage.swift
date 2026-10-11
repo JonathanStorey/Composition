@@ -65,6 +65,10 @@ public struct EncryptedStorage<Value: Codable & Sendable>: Sendable {
     }
 }
 
+/// The former name of `EncryptedStorage`, kept so existing callers still compile.
+@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
+public typealias KeychainStorage<Value: Codable & Sendable> = EncryptedStorage<Value>
+
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 public extension EncryptedStorage {
 

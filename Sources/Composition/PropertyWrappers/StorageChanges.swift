@@ -5,6 +5,9 @@
 #if canImport(Foundation) && canImport(Observation)
 import Foundation
 import Observation
+#if canImport(notify)
+import notify
+#endif
 
 /// Tells observers, such as a view's body, when a stored item changes, whether a wrapper wrote it or the system changed it.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
@@ -25,7 +28,7 @@ final class StorageChanges: NSObject, Observable, Sendable {
     }
 
     deinit {
-        #if canImport(Darwin)
+        #if canImport(notify)
         if let token { notify_cancel(token) }
         #endif
     }
@@ -40,7 +43,7 @@ final class StorageChanges: NSObject, Observable, Sendable {
 
     /// Relays the item's system-wide notification into this process, returning the registration to cancel.
     private static func register(_ item: [String]) -> Int32? {
-        #if canImport(Darwin)
+        #if canImport(notify)
         var token: Int32 = 0
         let status: UInt32 = notify_register_dispatch(processName(for: item), &token, .main) { _ in NotificationCenter.default.post(name: name, object: nil, userInfo: ["item": item]) }
         return status == UInt32(NOTIFY_STATUS_OK) ? token : nil
@@ -55,7 +58,7 @@ final class StorageChanges: NSObject, Observable, Sendable {
     /// Tells every wrapper for this item that its value changed, including those in other processes when watching them.
     func post() {
         NotificationCenter.default.post(name: Self.name, object: nil, userInfo: ["item": item])
-        #if canImport(Darwin)
+        #if canImport(notify)
         if token != nil { notify_post(Self.processName(for: item)) }
         #endif
     }

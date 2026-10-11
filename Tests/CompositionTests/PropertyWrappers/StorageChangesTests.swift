@@ -33,10 +33,10 @@ import Testing
 }
 #endif
 
-// MARK: - Darwin + Foundation + Observation
+// MARK: - Foundation + notify + Observation
 
-#if canImport(Darwin) && canImport(Foundation) && canImport(Observation)
-import Darwin
+#if canImport(Foundation) && canImport(notify) && canImport(Observation)
+import notify
 
 extension StorageChangesTests {
 

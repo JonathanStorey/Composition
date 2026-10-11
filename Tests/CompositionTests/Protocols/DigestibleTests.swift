@@ -54,7 +54,6 @@ private struct Vector: Digestible {
     let y: Int
 
     func digest(into digester: inout Digester) {
-        digester.namespace = "Point"
         ["x": x, "y": y].digest(into: &digester)
     }
 }
@@ -113,7 +112,7 @@ private struct Vector: Digestible {
     }
 
     @Test func digesterFinalizesInEmptyNamespace() {
-        var digester: Digester = Digester()
+        var digester: Digester = Digester(namespace: "")
         digester.combine("abc")
         #expect(digester.finalize().uuidString.lowercased() == "7aaad436-a797-53b0-974c-a71690ef7706")
     }
@@ -144,7 +143,7 @@ private struct Vector: Digestible {
     }
 
     @Test func namespaceSurvivesRename() {
-        #expect(Vector(x: 1, y: 2).checksum() == Point(x: 1, y: 2).checksum())
+        #expect(UUID(digest: Vector(x: 1, y: 2), namespace: "Point") == Point(x: 1, y: 2).checksum())
     }
 
     @Test func nilDiffersFromEmptyValue() {

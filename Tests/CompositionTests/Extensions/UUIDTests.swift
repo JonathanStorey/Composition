@@ -84,7 +84,7 @@ import Foundation
 // MARK: - CryptoKit + Foundation
 
 #if canImport(CryptoKit) && canImport(Foundation)
-private struct Title: Encodable {
+private struct Title: Digestible, Encodable {
 
     let name: String
 }

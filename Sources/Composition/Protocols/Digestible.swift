@@ -19,10 +19,7 @@ public extension Digestible {
 
     /// Returns the version 5 UUID of the content's digest in the namespace of the type's name, identical on every device and every launch.
     func checksum() -> UUID {
-        var digester: Digester = Digester()
-        digester.namespace = String(describing: Self.self)
-        digest(into: &digester)
-        return digester.finalize()
+        UUID(digest: self)
     }
 }
 
@@ -42,17 +39,19 @@ public extension Digestible where Self: Encodable {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct Digester {
 
-    /// The name whose version 5 UUID is the checksum's namespace, which a renamed type sets to its old name to keep its checksums.
-    public var namespace: String = ""
+    /// The name whose version 5 UUID is the checksum's namespace.
+    public let namespace: String
 
     private var hasher: SHA256 = SHA256()
 
-    /// Creates an empty digester with an empty namespace name.
-    public init() {}
+    /// Creates an empty digester whose checksum falls in the namespace of the name.
+    public init(namespace: String) {
+        self.namespace = namespace
+    }
 
     /// Returns the 32-byte SHA-256 digest of the value's content, which a parent feeds in place of the content itself.
     fileprivate static func digest(of value: some Digestible) -> Data {
-        var digester: Digester = Digester()
+        var digester: Digester = Digester(namespace: "")
         value.digest(into: &digester)
         return Data(digester.hasher.finalize())
     }

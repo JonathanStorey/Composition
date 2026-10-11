@@ -68,16 +68,10 @@ import Foundation
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension UUID {
 
-    /// Creates the value's checksum, the same UUID as `checksum()`, in the namespace of the given name or else of the value's type name.
-    init<E: Encodable>(digest value: E, namespace name: String? = nil) {
-        var digester: Digester = Digester()
-        digester.namespace = String(describing: E.self)
-        if let digestible = value as? any Digestible {
-            digestible.digest(into: &digester)
-        } else {
-            Encoded(value: value).digest(into: &digester)
-        }
-        if let name { digester.namespace = name }
+    /// Creates the value's checksum in the namespace of the given name, or of the value's type name when there is none.
+    init<D: Digestible>(digest value: D, namespace name: String? = nil) {
+        var digester: Digester = Digester(namespace: name ?? String(describing: D.self))
+        value.digest(into: &digester)
         self = digester.finalize()
     }
 }
@@ -92,17 +86,6 @@ extension UUID {
         bytes[6] = (bytes[6] & 0x0F) | 0x50
         bytes[8] = (bytes[8] & 0x3F) | 0x80
         self.init(uuid: bytes.withUnsafeBytes { $0.load(as: uuid_t.self) })
-    }
-}
-
-/// Wraps an Encodable value so it digests through the Encodable default of Digestible.
-@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-private struct Encoded<E: Encodable>: Digestible, Encodable {
-
-    let value: E
-
-    func encode(to encoder: any Encoder) throws {
-        try value.encode(to: encoder)
     }
 }
 #endif

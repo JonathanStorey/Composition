@@ -108,7 +108,7 @@ public extension SyncedStorage {
     /// Which value wins when two devices write before either has synced.
     enum Conflict: Hashable, Sendable {
 
-        /// The newest write wins, replacing the value on the server.
+        /// The newest write wins, by the time each device wrote it, so an older write never replaces a newer one.
         case latest
 
         /// The value already on the server wins, and the device adopts it.
@@ -124,12 +124,12 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
     private let entries: OSAllocatedUnfairLock<[String: SyncEntry]>
     private let registrar: ObservationRegistrar = ObservationRegistrar()
 
-    /// Restores the values kept on the device, each starting at its last success, or unknown when it never synced.
+    /// Restores the values kept on the device, each syncing when a write still waits to reach iCloud, else at its last success, or unknown when it never synced.
     private init() {
         let stored: [String: SyncEntry] = UserDefaults.standard.data(forKey: Self.entriesKey).flatMap { try? JSONDecoder().decode([String: SyncEntry].self, from: $0) } ?? [:]
         self.entries = OSAllocatedUnfairLock(initialState: stored.mapValues { entry in
             var restored: SyncEntry = entry
-            restored.status = entry.synced.map(SyncStatus.success) ?? .unknown
+            restored.status = entry.isPending ? .syncing : entry.synced.map(SyncStatus.success) ?? .unknown
             return restored
         })
     }
@@ -142,6 +142,12 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
 
     /// The user defaults key the engine's state is kept under.
     private static let serializationKey: String = "Composition.SyncedStorage.engine"
+
+    /// Whether a write waiting on the device should replace the server's value, which only a strictly newer write does, and never when the key keeps the first value.
+    static func prefersLocal(written local: Date?, over server: Date?, keepsFirst: Bool) -> Bool {
+        guard !keepsFirst, let local: Date else { return false }
+        return local > server ?? .distantPast
+    }
 
     /// The reason a CloudKit error gives for a failed sync.
     private static func reason(for error: any Error) -> SyncError {
@@ -185,11 +191,13 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
             if case .signIn = change.changeType { return }
             updateAll { entry in entry = SyncEntry(keepsFirst: entry.keepsFirst) }
         case .fetchedRecordZoneChanges(let changes):
-            changes.modifications.forEach { receive($0.record, adopting: false) }
+            changes.modifications.forEach { receive($0.record) }
             changes.deletions.forEach { deletion in update(deletion.recordID.recordName) { $0.value = nil; $0.record = nil } }
         case .sentRecordZoneChanges(let sent):
             sent.savedRecords.forEach(confirm)
+            sent.deletedRecordIDs.forEach(confirmDeletion)
             sent.failedRecordSaves.forEach { resolve($0.record, $0.error, syncEngine) }
+            sent.failedRecordDeletes.forEach { id, error in error.code == .unknownItem ? confirmDeletion(id) : fail(id.recordName, error) }
         default:
             break
         }
@@ -222,8 +230,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
                     entry.synced = date
                 }
             } catch {
-                let reason: SyncError = Self.reason(for: error)
-                update(key) { $0.status = .failure(reason) }
+                fail(key, error)
             }
         }
     }
@@ -248,11 +255,13 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
 
     /// Keeps the value on the device and queues it for iCloud, or records why it can't sync.
     func write(_ data: Data?, _ key: String) {
-        guard let engine: CKSyncEngine = start() else { return update(key) { $0.value = data; $0.status = .failure(.unavailable) } }
+        guard let engine: CKSyncEngine = start() else { return update(key) { $0.modified = .now; $0.status = .failure(.unavailable); $0.value = data } }
+        let date: Date = .now
         update(key) { entry in
-            entry.value = data
             entry.isPending = true
+            entry.modified = date
             entry.status = .syncing
+            entry.value = data
         }
         let id: CKRecord.ID = CKRecord.ID(recordName: key, zoneID: zoneID)
         engine.state.add(pendingRecordZoneChanges: [data == nil ? .deleteRecord(id) : .saveRecord(id)])
@@ -270,38 +279,57 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         }
     }
 
-    /// Takes in a record from iCloud, adopting its value unless a newer write on the device is waiting to replace it.
-    private func receive(_ record: CKRecord, adopting: Bool) {
-        let fields: Data = Self.systemFields(of: record)
-        let value: Data? = record["value"] as? Data
-        let date: Date = record.modificationDate ?? .now
-        update(record.recordID.recordName) { entry in
-            entry.record = fields
-            guard adopting || entry.keepsFirst || !entry.isPending else { return }
+    /// Marks a removed record's key as synced now.
+    private func confirmDeletion(_ id: CKRecord.ID) {
+        let date: Date = .now
+        update(id.recordName) { entry in
             entry.isPending = false
-            entry.value = value
+            entry.record = nil
             entry.status = .success(date)
             entry.synced = date
         }
     }
 
-    /// Builds the record to send for the key, or `nil` when its value was removed.
+    /// Records the reason a CloudKit error gives as the key's status.
+    private func fail(_ key: String, _ error: any Error) {
+        let reason: SyncError = Self.reason(for: error)
+        update(key) { $0.status = .failure(reason) }
+    }
+
+    /// Takes in a record from iCloud, adopting its value unless a newer write on the device is waiting to replace it.
+    private func receive(_ record: CKRecord) {
+        let fields: Data = Self.systemFields(of: record)
+        let modified: Date? = record["modified"] as? Date
+        let value: Data? = record["value"] as? Data
+        let date: Date = record.modificationDate ?? .now
+        update(record.recordID.recordName) { entry in
+            entry.record = fields
+            guard !entry.isPending || !Self.prefersLocal(written: entry.modified, over: modified, keepsFirst: entry.keepsFirst) else { return }
+            entry.isPending = false
+            entry.modified = modified
+            entry.status = .success(date)
+            entry.synced = date
+            entry.value = value
+        }
+    }
+
+    /// Builds the record to send for the key with the time it was written, or `nil`, which drops the change, when nothing waits to be sent.
     private func record(for id: CKRecord.ID) -> CKRecord? {
-        guard let entry: SyncEntry = entries.withLock({ $0[id.recordName] }), let value: Data = entry.value else { return nil }
+        guard let entry: SyncEntry = entries.withLock({ $0[id.recordName] }), entry.isPending, let value: Data = entry.value else { return nil }
         let record: CKRecord = entry.record.flatMap(Self.record(fromSystemFields:)) ?? CKRecord(recordType: "SyncedStorage", recordID: id)
+        record["modified"] = entry.modified
         record["value"] = value
         return record
     }
 
-    /// Settles a failed save: a conflict by the key's rule, a missing zone by creating it, and anything else as a failure.
+    /// Settles a failed save: a conflict by keeping the newer write, a missing zone by creating it, and anything else as a failure.
     private func resolve(_ record: CKRecord, _ error: CKError, _ engine: CKSyncEngine) {
         let key: String = record.recordID.recordName
         switch error.code {
         case .serverRecordChanged:
             guard let server: CKRecord = error.serverRecord else { break }
-            let keepsFirst: Bool = entries.withLock { $0[key]?.keepsFirst ?? false }
-            receive(server, adopting: keepsFirst)
-            if !keepsFirst { engine.state.add(pendingRecordZoneChanges: [.saveRecord(record.recordID)]) }
+            receive(server)
+            if entries.withLock({ $0[key]?.isPending ?? false }) { engine.state.add(pendingRecordZoneChanges: [.saveRecord(record.recordID)]) }
             return
         case .zoneNotFound:
             engine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))])
@@ -310,8 +338,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         default:
             break
         }
-        let reason: SyncError = Self.reason(for: error)
-        update(key) { $0.status = .failure(reason) }
+        fail(key, error)
     }
 
     /// Changes the entries, keeps them on the device, and tells observers.
@@ -325,14 +352,16 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         UserDefaults.standard.set(data, forKey: Self.entriesKey)
     }
 
-    /// Creates the engine on first use, or returns `nil` when the app can't use CloudKit.
+    /// Creates the engine on first use, queuing every write an earlier launch left unsent, or returns `nil` when the app can't use CloudKit.
     @discardableResult private func start() -> CKSyncEngine? {
         guard hasCloudKitEntitlement else { return nil }
         return engine.withLockUnchecked { stored in
             if let stored { return stored }
             let serialization: CKSyncEngine.State.Serialization? = UserDefaults.standard.data(forKey: Self.serializationKey).flatMap { try? JSONDecoder().decode(CKSyncEngine.State.Serialization.self, from: $0) }
             let created: CKSyncEngine = CKSyncEngine(CKSyncEngine.Configuration(database: CKContainer.default().privateCloudDatabase, stateSerialization: serialization, delegate: self))
+            let unsent: [CKSyncEngine.PendingRecordZoneChange] = entries.withLock { $0.filter(\.value.isPending) }.map { key, entry in entry.value == nil ? .deleteRecord(CKRecord.ID(recordName: key, zoneID: zoneID)) : .saveRecord(CKRecord.ID(recordName: key, zoneID: zoneID)) }
             if serialization == nil { created.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))]) }
+            created.state.add(pendingRecordZoneChanges: unsent)
             stored = created
             return created
         }
@@ -360,6 +389,7 @@ fileprivate struct SyncEntry: Codable, Sendable {
 
     var isPending: Bool = false
     var keepsFirst: Bool = false
+    var modified: Date?
     var record: Data?
     var status: SyncStatus = .unknown
     var synced: Date?

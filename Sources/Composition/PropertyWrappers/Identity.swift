@@ -1,7 +1,7 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/Identity.swift
 // dependencies: [Extensions/Date.swift, Extensions/String.swift, Extensions/UUID.swift, PropertyWrappers/CloudStorage.swift, PropertyWrappers/EncryptedStorage.swift, PropertyWrappers/UserStorage.swift]
-// permissions: [com.apple.developer.ubiquity-kvstore-identifier, com.apple.security.application-groups]
+// permissions: [com.apple.developer.ubiquity-kvstore-identifier]
 
 // MARK: - Foundation + Observation + os + Security
 
@@ -44,9 +44,6 @@ public enum SyncError: Error, Hashable, Sendable {
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 enum Identities {
 
-    /// Kept in the Keychain and carried to new devices by encrypted backups, or the device's when the Keychain refuses it.
-    static let backedUp: UUID = identity(in: .backedUp, or: device)
-
     /// Kept in this device's Keychain, or the install's when the Keychain refuses it.
     static let device: UUID = identity(in: .localOnly, or: install)
 
@@ -55,14 +52,6 @@ enum Identities {
 
     /// Created when the app launches and gone when it quits.
     static let launch: UUID = .timestamp
-
-    /// Reads the identity shared by every app and extension in the app group, or stores a new one there, returning the install's when the group refuses it.
-    static func appGroup(_ identifier: String) -> UUID {
-        let storage: UserStorage<UUID?> = UserStorage("Composition.Identity", .appGroup(identifier))
-        if let identity: UUID = storage.wrappedValue, identity.version == 7 { return identity }
-        storage.wrappedValue = .timestamp
-        return storage.wrappedValue ?? install
-    }
 
     /// Reads the identity stored at the URL, or stores a new one there, excluded from backup, when none can be read.
     static func identity(at url: URL) -> UUID {
@@ -90,11 +79,11 @@ enum Identities {
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 final class CloudIdentity: NSObject, Observable, Sendable {
 
-    private let cache: UserStorage<UUID?> = UserStorage("Composition.Identity.iCloud")
+    private let cache: UserStorage<UUID?> = UserStorage("Composition.Identity.account")
     private let cloud: CloudStorage<UUID?> = CloudStorage("Composition.Identity")
     private let registrar: ObservationRegistrar = ObservationRegistrar()
     private let state: OSAllocatedUnfairLock<SyncStatus>
-    private let synced: UserStorage<Date?> = UserStorage("Composition.Identity.iCloud.lastSynced")
+    private let synced: UserStorage<Date?> = UserStorage("Composition.Identity.account.lastSynced")
 
     /// Restores the last successful sync, and starts watching iCloud for changes.
     private override init() {
@@ -105,7 +94,7 @@ final class CloudIdentity: NSObject, Observable, Sendable {
         NotificationCenter.default.addObserver(self, selector: #selector(receive(_:)), name: .NSUbiquityIdentityDidChange, object: nil)
     }
 
-    /// The identity every wrapper of the iCloud scope shares.
+    /// The identity every wrapper of the account scope shares.
     static let shared: CloudIdentity = CloudIdentity()
 
     /// The identity for the signed-in iCloud account, created when the account has none, or zero when no account is signed in.
@@ -170,7 +159,7 @@ final class CloudIdentity: NSObject, Observable, Sendable {
 #if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(SwiftUI)
 import SwiftUI
 
-/// A version 7 UUID created on first read and shared by every wrapper of its scope, from a single view to every device on an iCloud account.
+/// A version 7 UUID created on first read and shared by every wrapper of its scope, from a single view to every device on the user's account.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
 public struct Identity: DynamicProperty {
@@ -190,17 +179,11 @@ public struct Identity: DynamicProperty {
         /// Stays the same until the app is deleted, and is never backed up or restored onto another device.
         case install
 
-        /// Stays the same for every app and extension in the app group with this identifier.
-        case appGroup(String)
-
         /// Stays the same across reinstalls, and is never restored onto another device.
         case device
 
-        /// Stays the same across reinstalls, and moves to a new device with an encrypted backup.
-        case backedUp
-
-        /// Stays the same on every device signed in to the iCloud account, changes with the account, and is zero when none is signed in.
-        case iCloud
+        /// Stays the same on every device signed in to the user's Apple account through iCloud, changes with the account, and is zero when none is signed in.
+        case account
     }
 
     /// How widely the identity is shared and how long it lasts.
@@ -215,7 +198,7 @@ public struct Identity: DynamicProperty {
 
     /// The last time the identity synced, or when it was created for scopes that never sync.
     public var lastSynced: Date? {
-        scope == .iCloud ? CloudIdentity.shared.lastSynced : Date(timestamp: wrappedValue)
+        scope == .account ? CloudIdentity.shared.lastSynced : Date(timestamp: wrappedValue)
     }
 
     /// The wrapper itself, for its sync status and refresh.
@@ -225,16 +208,14 @@ public struct Identity: DynamicProperty {
 
     /// The status of the identity's last sync, which is always a success at its creation for scopes that never sync.
     public var status: SyncStatus {
-        scope == .iCloud ? CloudIdentity.shared.status : .success(Date(timestamp: wrappedValue) ?? .distantPast)
+        scope == .account ? CloudIdentity.shared.status : .success(Date(timestamp: wrappedValue) ?? .distantPast)
     }
 
     /// The identity, created on first read and reused for as long as the scope lives.
     public var wrappedValue: UUID {
         switch scope {
-        case .appGroup(let identifier): Identities.appGroup(identifier)
-        case .backedUp: Identities.backedUp
+        case .account: CloudIdentity.shared.identity
         case .device: Identities.device
-        case .iCloud: CloudIdentity.shared.identity
         case .install: Identities.install
         case .launch: Identities.launch
         case .scene: storedSceneIdentity()
@@ -242,9 +223,9 @@ public struct Identity: DynamicProperty {
         }
     }
 
-    /// Syncs the identity with its source in the background, which only the iCloud scope has.
+    /// Syncs the identity with its source in the background, which only the account scope has.
     public func refresh() {
-        if scope == .iCloud { CloudIdentity.shared.refresh() }
+        if scope == .account { CloudIdentity.shared.refresh() }
     }
 
     /// Reads the scene's identity, storing this view's identity as the scene's when the scene has none yet.

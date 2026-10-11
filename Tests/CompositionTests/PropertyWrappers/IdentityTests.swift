@@ -11,14 +11,6 @@ import Testing
 
 @Suite struct IdentitiesTests {
 
-    @Test func appGroupStoresAndReusesIdentity() {
-        let group: String = "group.CompositionTests.\(UUID().uuidString)"
-        let identity: UUID = Identities.appGroup(group)
-        #expect(identity.version == 7)
-        #expect(Identities.appGroup(group) == identity)
-        UserDefaults(suiteName: group)?.removeObject(forKey: "Composition.Identity")
-    }
-
     @Test func identityAtURLReplacesUnreadableContents() throws {
         let url: URL = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).appending(path: "Identity")
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -53,15 +45,15 @@ import SwiftUI
     /// Whether this process has no iCloud account, as on test runners.
     nonisolated private static let hasNoAccount: Bool = FileManager.default.ubiquityIdentityToken == nil
 
-    @Test func dateIsTheTimeInsideTheIdentity() {
-        #expect(Date(timestamp: Identity(of: .install).wrappedValue) != nil)
-    }
-
-    @Test(.enabled(if: IdentityTests.hasNoAccount, "Needs a process without an iCloud account")) func iCloudIsZeroAndFailsToRefreshWithoutAccount() {
-        let identity: Identity = Identity(of: .iCloud)
+    @Test(.enabled(if: IdentityTests.hasNoAccount, "Needs a process without an iCloud account")) func accountIsZeroAndFailsToRefreshWithoutAccount() {
+        let identity: Identity = Identity(of: .account)
         #expect(identity.wrappedValue == .zero)
         identity.projectedValue.refresh()
         #expect(identity.projectedValue.status == .failure(.noAccount))
+    }
+
+    @Test func dateIsTheTimeInsideTheIdentity() {
+        #expect(Date(timestamp: Identity(of: .install).wrappedValue) != nil)
     }
 
     @Test func localScopesSucceedAtTheirCreation() {
@@ -73,7 +65,7 @@ import SwiftUI
     }
 
     @Test func scopeIsKept() {
-        #expect(Identity(of: .appGroup("group.CompositionTests")).scope == .appGroup("group.CompositionTests"))
+        #expect(Identity(of: .account).scope == .account)
     }
 
     @Test func storedScopesAreSharedAcrossWrappers() {

@@ -1,45 +1,55 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/KeychainStorage.swift
-// dependencies: []
+// dependencies: [PropertyWrappers/StorageChanges.swift]
+
+// MARK: - Foundation + Observation + Security
 
 #if canImport(Foundation) && canImport(Observation) && canImport(Security)
 import Foundation
 import Observation
 import Security
 
-/// Reads and writes a value in the Keychain, kept on this device or synced through iCloud Keychain, and refreshes every view that reads it when it changes.
+/// Reads and writes a value in the Keychain like `AppStorage`, kept on this device or synced through iCloud Keychain.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
-public struct KeychainStorage<Value: Codable> {
+public struct KeychainStorage<Value: Codable & Sendable>: Sendable {
 
+    /// The value returned when nothing is stored.
+    public let defaultValue: Value
     /// The account name the value is stored under.
     public let key: String
     /// Where the Keychain keeps the value.
     public let location: Location
     /// The service name that groups this wrapper's values.
     public let service: String
-    private let changes: KeychainChanges
+    private let changes: StorageChanges
 
-    /// Creates storage for the key in the service, kept in the location.
-    public init(_ key: String, service: String = Bundle.main.bundleIdentifier ?? "Composition", location: Location = .local) {
+    /// Creates storage for the key that returns the default value until something is stored.
+    public init(wrappedValue: Value, _ key: String, service: String = Bundle.main.bundleIdentifier ?? "Composition", location: Location = .local) {
+        self.defaultValue = wrappedValue
         self.key = key
         self.location = location
         self.service = service
-        self.changes = KeychainChanges(item: [service, key, "\(location)"])
+        self.changes = StorageChanges(item: ["Keychain", service, key, "\(location)"])
     }
 
-    /// The stored value, or `nil` when nothing is stored; setting `nil` removes it.
-    public var wrappedValue: Value? {
+    /// Creates storage for the key that returns `nil` until something is stored.
+    public init(_ key: String, service: String = Bundle.main.bundleIdentifier ?? "Composition", location: Location = .local) where Value: ExpressibleByNilLiteral {
+        self.init(wrappedValue: nil, key, service: service, location: location)
+    }
+
+    /// The stored value, or the default value when nothing is stored; setting `nil` removes it.
+    public var wrappedValue: Value {
         get {
-            _ = changes.count
+            changes.track()
             let query: [CFString: Any] = item.merging([kSecMatchLimit: kSecMatchLimitOne, kSecReturnData: true]) { $1 }
             var result: CFTypeRef?
-            guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data: Data = result as? Data else { return nil }
-            return try? JSONDecoder().decode(Value.self, from: data)
+            guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data: Data = result as? Data, let value: Value = try? JSONDecoder().decode(Value.self, from: data) else { return defaultValue }
+            return value
         }
         nonmutating set {
             defer { changes.post() }
-            guard let value: Value = newValue, let data: Data = try? JSONEncoder().encode(value) else {
+            guard let data: Data = try? JSONEncoder().encode(newValue), data != Data("null".utf8) else {
                 SecItemDelete(item as CFDictionary)
                 return
             }
@@ -51,7 +61,7 @@ public struct KeychainStorage<Value: Codable> {
 
     /// The attributes that identify this wrapper's Keychain item.
     private var item: [CFString: Any] {
-        [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: key, kSecAttrSynchronizable: location == .iCloud, kSecUseDataProtectionKeychain: KeychainChanges.usesDataProtectionKeychain]
+        [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: key, kSecAttrSynchronizable: location == .iCloud, kSecUseDataProtectionKeychain: usesDataProtectionKeychain]
     }
 }
 
@@ -77,45 +87,28 @@ public extension KeychainStorage {
     }
 }
 
-/// Counts writes to one Keychain item, so every wrapper for that item refreshes the views that read it.
+/// Whether to use the data protection keychain, which macOS needs for local and iCloud items but only grants to apps signed with an entitlement for it.
+fileprivate let usesDataProtectionKeychain: Bool = {
+    #if os(macOS)
+    guard let task: SecTask = SecTaskCreateFromSelf(nil) else { return false }
+    return ["com.apple.application-identifier", "keychain-access-groups"].contains { SecTaskCopyValueForEntitlement(task, $0 as CFString, nil) != nil }
+    #else
+    return true
+    #endif
+}()
+#endif
+
+// MARK: - Foundation + Observation + Security + SwiftUI
+
+#if canImport(Foundation) && canImport(Observation) && canImport(Security) && canImport(SwiftUI)
+import SwiftUI
+
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
-@Observable
-fileprivate final class KeychainChanges: NSObject {
+public extension KeychainStorage {
 
-    private let item: [String]
-    private(set) var count: Int = 0
-
-    init(item: [String]) {
-        self.item = item
-        super.init()
-        NotificationCenter.default.addObserver(self, selector: #selector(receive(_:)), name: Self.name, object: nil)
-    }
-
-    /// Whether to use the data protection keychain, which macOS needs for local and iCloud items but only grants to entitled apps.
-    static let usesDataProtectionKeychain: Bool = hasKeychainEntitlement()
-
-    /// The notification every wrapper posts after writing, carrying the item it wrote.
-    private static let name: Notification.Name = Notification.Name("Composition.KeychainStorage.didChange")
-
-    /// Whether the process is signed with an entitlement that grants the data protection keychain, which only macOS can lack.
-    private static func hasKeychainEntitlement() -> Bool {
-        #if os(macOS)
-        guard let task: SecTask = SecTaskCreateFromSelf(nil) else { return false }
-        return ["com.apple.application-identifier", "keychain-access-groups"].contains { SecTaskCopyValueForEntitlement(task, $0 as CFString, nil) != nil }
-        #else
-        return true
-        #endif
-    }
-
-    /// Tells every wrapper for this item that its value changed.
-    func post() {
-        NotificationCenter.default.post(name: Self.name, object: nil, userInfo: ["item": item])
-    }
-
-    /// Counts a change when the notification is for this item.
-    @objc private func receive(_ notification: Notification) {
-        guard notification.userInfo?["item"] as? [String] == item else { return }
-        count += 1
+    /// A binding to the stored value, for controls such as `TextField` and `Toggle`.
+    var projectedValue: Binding<Value> {
+        Binding(get: { wrappedValue }, set: { wrappedValue = $0 })
     }
 }
 #endif

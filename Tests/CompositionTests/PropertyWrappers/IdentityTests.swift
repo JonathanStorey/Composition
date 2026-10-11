@@ -64,6 +64,12 @@ import SwiftUI
         #expect(identity.projectedValue.lastSynced == created)
     }
 
+    @Test func refreshKeepsScopesFixedForTheirLifetime() {
+        let identities: [UUID] = [Identity(of: .device), Identity(of: .install), Identity(of: .launch)].map(\.wrappedValue)
+        [Identity(of: .device), Identity(of: .install), Identity(of: .launch)].forEach { $0.refresh() }
+        #expect([Identity(of: .device), Identity(of: .install), Identity(of: .launch)].map(\.wrappedValue) == identities)
+    }
+
     @Test func scopeIsKept() {
         #expect(Identity(of: .account).scope == .account)
     }

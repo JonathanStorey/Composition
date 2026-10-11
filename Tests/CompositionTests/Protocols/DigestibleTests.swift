@@ -154,13 +154,13 @@ private extension Data {
         #expect(String?.none.digest != String?.some("").digest)
     }
 
-    @Test func nilIsZeroBlock() {
-        #expect(String?.none.digest == Data(count: 32))
+    @Test func nilDigestsAsZeroBlock() {
+        #expect(String?.none.digest == Data(count: 32).digest)
     }
 
     @Test func optionalArrayMatchesPython() {
         let values: [String?] = [nil, "a"]
-        #expect(values.digest.hex == "8c374a53782642f7514d087d26a3e733f1b806009a03e04a43b288ef2fa9f9c0")
+        #expect(values.digest.hex == "cbf2ea8b426ddedff454fdc58daf123e2a64600927dbdf7b884155931ca92acc")
     }
 
     @Test func optionalPositionChangesDigest() {

@@ -65,7 +65,7 @@ private struct Vector: Digestible {
     }
 
     @Test func arrayMatchesPython() {
-        #expect(["a", "b"].checksum().uuidString.lowercased() == "237a0c21-426f-5a65-b17d-715c239bc1d9")
+        #expect(["a", "b"].checksum().uuidString.lowercased() == "7b2e031d-5505-515a-acf1-22e60aa6140d")
     }
 
     @Test func arrayOrderChangesChecksum() {
@@ -93,24 +93,23 @@ private struct Vector: Digestible {
     }
 
     @Test func dateMatchesPythonMicroseconds() {
-        #expect(Date(timeIntervalSince1970: 1_700_000_000.123456).checksum().uuidString.lowercased() == "133057f3-94d7-5a17-8370-732243f5dcd2")
+        #expect(Date(timeIntervalSince1970: 1_700_000_000.123456).checksum().uuidString.lowercased() == "f1e96d31-845d-5da6-a963-1cc43cd7388a")
     }
 
     @Test func decimalMatchesPythonNormalizedString() throws {
         let decimal: Decimal = try #require(Decimal(string: "1.50"))
-        #expect(String(describing: Decimal.self) == "NSDecimal")
-        #expect(decimal.checksum().uuidString.lowercased() == "da25e2ee-8448-538d-8faa-d700d94986d1")
+        #expect(decimal.checksum().uuidString.lowercased() == "f8ff5fef-f6d2-5b11-813c-03f54a003b39")
     }
 
     @Test func decomposedStringMatchesPythonBytes() {
-        #expect("caf\u{E9}".checksum().uuidString.lowercased() == "f804c7d8-131b-5ea3-8015-aa18ab34eda6")
-        #expect("cafe\u{301}".checksum().uuidString.lowercased() == "219f3f66-54ed-5d36-9611-23014584b46b")
+        #expect("caf\u{E9}".checksum().uuidString.lowercased() == "6ffb5c84-cebb-5cc1-8672-bd35f1d7bc5f")
+        #expect("cafe\u{301}".checksum().uuidString.lowercased() == "9436dc42-b661-515d-8aca-c0937c55ad59")
     }
 
     @Test func dictionaryMatchesPythonSortedPairs() {
         var dictionary: [String: Int] = ["b": 2]
         dictionary["a"] = 1
-        #expect(dictionary.checksum().uuidString.lowercased() == "93bb3ed0-b6a8-5145-8fc5-4cc5210e6002")
+        #expect(dictionary.checksum().uuidString.lowercased() == "3175c854-b778-5487-aec9-2a298e68e460")
     }
 
     @Test func digesterFinalizesInEmptyNamespace() {
@@ -141,7 +140,7 @@ private struct Vector: Digestible {
     }
 
     @Test func intMatchesPython() {
-        #expect(1.checksum().uuidString.lowercased() == "4930d598-5c4b-5d4f-942d-c01ac82b3998")
+        #expect(1.checksum().uuidString.lowercased() == "fa6c604e-934e-500f-8f25-c5912a22c47d")
     }
 
     @Test func namespaceSurvivesRename() {
@@ -153,12 +152,12 @@ private struct Vector: Digestible {
     }
 
     @Test func nilMatchesPython() {
-        #expect(String?.none.checksum().uuidString.lowercased() == "bd512a38-04a5-5880-8995-6c943b2888c8")
+        #expect(String?.none.checksum().uuidString.lowercased() == "f5976f16-7fd1-5d59-8a6d-8e238a320320")
     }
 
     @Test func optionalArrayMatchesPython() {
         let values: [String?] = [nil, "a"]
-        #expect(values.checksum().uuidString.lowercased() == "7534268b-d46f-58ae-ad70-c1142b3b0ab9")
+        #expect(values.checksum().uuidString.lowercased() == "28e9195e-7cbc-543b-984e-c02055eb18ee")
     }
 
     @Test func optionalPositionChangesChecksum() {
@@ -168,15 +167,15 @@ private struct Vector: Digestible {
     }
 
     @Test func setMatchesPythonSortedDigests() {
-        #expect(Set(["b", "a"]).checksum().uuidString.lowercased() == "15a12e4e-43f4-5f65-a6d6-b3bca87fa078")
+        #expect(Set(["b", "a"]).checksum().uuidString.lowercased() == "888a75fa-b664-57c9-8fa9-60c4aec3c4c9")
     }
 
     @Test func someMatchesPython() {
-        #expect(String?.some("abc").checksum().uuidString.lowercased() == "9aa7c342-a84d-5d85-88f9-6e7b3c750f99")
+        #expect(String?.some("abc").checksum().uuidString.lowercased() == "346d2d34-1577-533f-afd2-be148522bcdc")
     }
 
     @Test func stringMatchesPython() {
-        #expect("abc".checksum().uuidString.lowercased() == "b0a3bad5-67e3-5474-ba39-f091c769cd7c")
+        #expect("abc".checksum().uuidString.lowercased() == "346d2d34-1577-533f-afd2-be148522bcdc")
     }
 }
 #endif

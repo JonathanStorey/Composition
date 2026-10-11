@@ -96,7 +96,7 @@ extension UUIDTests {
     }
 
     @Test func initDigestEncodesDatesAsMicroseconds() {
-        #expect(UUID(digest: Date(timeIntervalSince1970: 1_700_000_000.123456)).uuidString == "133057F3-94D7-5A17-8370-732243F5DCD2")
+        #expect(UUID(digest: Date(timeIntervalSince1970: 1_700_000_000.123456)).uuidString == "F1E96D31-845D-5DA6-A963-1CC43CD7388A")
     }
 
     @Test func initDigestIgnoresKeyOrder() {
@@ -113,11 +113,11 @@ extension UUIDTests {
     }
 
     @Test func initDigestMatchesPythonForData() {
-        #expect(UUID(digest: Data("www.example.com".utf8)).uuidString == "DC0C86E6-7800-5BA4-BBA4-F39D15EF6B0D")
+        #expect(UUID(digest: Data("www.example.com".utf8)).uuidString == "8D83D065-36E4-5D65-B346-87DDBF3EF18F")
     }
 
     @Test func initDigestMatchesPythonForDoubles() {
-        #expect(UUID(digest: 1.0).uuidString == "BE800188-C508-58AB-A79B-3D45F963281D")
+        #expect(UUID(digest: 1.0).uuidString == "DEC944BA-ECE6-585C-8A80-496028ACE62A")
     }
 
     @Test func initDigestMatchesPythonForEncodableStructs() {
@@ -125,12 +125,12 @@ extension UUIDTests {
     }
 
     @Test func initDigestMatchesPythonForStrings() {
-        #expect(UUID(digest: "Dune").uuidString == "17DE6B0C-FF9D-590C-B083-9783149F319D")
+        #expect(UUID(digest: "Dune").uuidString == "7A7AE168-3F14-5728-B79F-8565561432C4")
     }
 
     @Test func initDigestNamespaceOverridesTypeName() {
         #expect(UUID(digest: "Dune", namespace: "Book").uuidString == "7D8CB9F5-A6D7-5995-AF75-D2DF624BF643")
-        #expect(UUID(digest: "Dune", namespace: "String") == UUID(digest: "Dune"))
+        #expect(UUID(digest: "Dune", namespace: "str") == UUID(digest: "Dune"))
     }
 
     @Test func initDigestSetsVersionAndVariant() {

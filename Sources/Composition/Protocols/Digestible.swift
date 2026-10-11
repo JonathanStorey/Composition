@@ -17,11 +17,20 @@ public protocol Digestible {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Digestible {
 
-    /// Returns the UUID of the content's digest in the namespace of the given name, or of the type's name when there is none, identical on every device and every launch.
+    /// Returns the UUID of the content's digest in the namespace of the given name, or of the type's Python name when there is none, identical on every device and every launch.
     func checksum(namespace: String? = nil) -> UUID {
-        var digester: Digester = Digester(namespace: namespace ?? String(describing: Self.self))
+        var digester: Digester = Digester(namespace: namespace ?? pythonName)
         digest(into: &digester)
         return digester.finalize()
+    }
+}
+
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+fileprivate extension Digestible {
+
+    /// The name Python's `type(x).__name__` gives the value: the built-in name for a standard type, and the type's own name for everything else.
+    var pythonName: String {
+        (self as? any PythonNamed)?.pythonName ?? String(describing: Self.self)
     }
 }
 
@@ -338,6 +347,13 @@ fileprivate extension Digester.Encoder {
     }
 }
 
+/// A standard type whose default checksum namespace is the name of its Python counterpart.
+private protocol PythonNamed {
+
+    /// The name Python's `type(x).__name__` gives the equivalent value.
+    var pythonName: String { get }
+}
+
 /// A type that can say whether it holds a nil optional, so the encoder can leave nil properties out.
 private protocol OptionalValue {
 
@@ -352,7 +368,9 @@ extension Optional: OptionalValue {
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension Array: Digestible where Element: Digestible {
+extension Array: Digestible, PythonNamed where Element: Digestible {
+
+    fileprivate var pythonName: String { "list" }
 
     /// Feeds the digest of each element in order.
     public func digest(into digester: inout Digester) {
@@ -361,7 +379,9 @@ extension Array: Digestible where Element: Digestible {
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension Bool: Digestible {
+extension Bool: Digestible, PythonNamed {
+
+    fileprivate var pythonName: String { "bool" }
 
     /// Feeds the value as a single byte.
     public func digest(into digester: inout Digester) {
@@ -370,7 +390,9 @@ extension Bool: Digestible {
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension Data: Digestible {
+extension Data: Digestible, PythonNamed {
+
+    fileprivate var pythonName: String { "bytes" }
 
     /// Feeds the bytes unchanged.
     public func digest(into digester: inout Digester) {
@@ -379,7 +401,9 @@ extension Data: Digestible {
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension Date: Digestible {
+extension Date: Digestible, PythonNamed {
+
+    fileprivate var pythonName: String { "datetime" }
 
     /// Feeds the whole microseconds since 1970 as eight big-endian bytes, matching Python's `datetime` precision.
     public func digest(into digester: inout Digester) {
@@ -387,9 +411,10 @@ extension Date: Digestible {
     }
 }
 
-// Decimal is a typealias of NSDecimal on Apple platforms, so its default checksum namespace is "NSDecimal", not "Decimal".
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension Decimal: Digestible {
+extension Decimal: Digestible, PythonNamed {
+
+    fileprivate var pythonName: String { "Decimal" }
 
     /// Feeds the UTF-8 bytes of the plain normalized string, such as "1.5" for 1.50.
     public func digest(into digester: inout Digester) {
@@ -398,7 +423,9 @@ extension Decimal: Digestible {
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension Dictionary: Digestible where Key: Digestible, Value: Digestible {
+extension Dictionary: Digestible, PythonNamed where Key: Digestible, Value: Digestible {
+
+    fileprivate var pythonName: String { "dict" }
 
     /// Feeds each key's digest followed by its value's digest, with the pairs sorted so insertion order does not matter.
     public func digest(into digester: inout Digester) {
@@ -407,7 +434,9 @@ extension Dictionary: Digestible where Key: Digestible, Value: Digestible {
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension Double: Digestible {
+extension Double: Digestible, PythonNamed {
+
+    fileprivate var pythonName: String { "float" }
 
     /// Feeds the exact bit pattern in big-endian order.
     public func digest(into digester: inout Digester) {
@@ -416,7 +445,9 @@ extension Double: Digestible {
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension Int: Digestible {
+extension Int: Digestible, PythonNamed {
+
+    fileprivate var pythonName: String { "int" }
 
     /// Feeds the value as eight big-endian bytes on every platform.
     public func digest(into digester: inout Digester) {
@@ -425,7 +456,9 @@ extension Int: Digestible {
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension Optional: Digestible where Wrapped: Digestible {
+extension Optional: Digestible, PythonNamed where Wrapped: Digestible {
+
+    fileprivate var pythonName: String { self?.pythonName ?? "NoneType" }
 
     /// Feeds the wrapped value unchanged, or 32 zero bytes when there is none.
     public func digest(into digester: inout Digester) {
@@ -435,7 +468,9 @@ extension Optional: Digestible where Wrapped: Digestible {
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension Set: Digestible where Element: Digestible {
+extension Set: Digestible, PythonNamed where Element: Digestible {
+
+    fileprivate var pythonName: String { "set" }
 
     /// Feeds each element's digest, sorted so iteration order does not matter.
     public func digest(into digester: inout Digester) {
@@ -444,7 +479,9 @@ extension Set: Digestible where Element: Digestible {
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension String: Digestible {
+extension String: Digestible, PythonNamed {
+
+    fileprivate var pythonName: String { "str" }
 
     /// Feeds the UTF-8 bytes unchanged, matching how Python encodes the string.
     public func digest(into digester: inout Digester) {
@@ -453,7 +490,9 @@ extension String: Digestible {
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension UUID: Digestible {
+extension UUID: Digestible, PythonNamed {
+
+    fileprivate var pythonName: String { "UUID" }
 
     /// Feeds the sixteen raw bytes.
     public func digest(into digester: inout Digester) {

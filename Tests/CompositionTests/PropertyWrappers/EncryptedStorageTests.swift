@@ -12,12 +12,26 @@ import Testing
 
 @Suite struct EncryptedStorageTests {
 
+    @Test func backedUpLocationSharesTheItemWithLocalOnly() {
+        let key: String = UUID().uuidString
+        let backedUp: EncryptedStorage<String?> = EncryptedStorage(key, .backedUp, service: "CompositionTests")
+        backedUp.wrappedValue = "Dune"
+        #expect(backedUp.wrappedValue == "Dune")
+        #expect(EncryptedStorage<String?>(key, service: "CompositionTests").wrappedValue == "Dune")
+        backedUp.wrappedValue = nil
+    }
+
     @Test func initDefaultsToLocalOnly() {
         #expect(EncryptedStorage<String?>("token").location == .localOnly)
     }
 
     @Test func initTakesLocationAsSecondArgument() {
         #expect(EncryptedStorage<String?>("token", .iCloud).location == .iCloud)
+    }
+
+    @Test func keychainStorageIsEncryptedStorage() {
+        let storage: EncryptedStorage<Int> = KeychainStorage(wrappedValue: 3, UUID().uuidString, service: "CompositionTests")
+        #expect(storage.wrappedValue == 3)
     }
 
     @Test func wrappedValueChangeIgnoresOtherKeys() async {

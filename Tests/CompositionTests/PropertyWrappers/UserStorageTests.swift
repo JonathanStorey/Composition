@@ -18,6 +18,18 @@ private final class Settings {
 
 @Suite struct UserStorageTests {
 
+    @Test func appGroupStoreWritesToItsSuite() {
+        let storage: UserStorage<String?> = UserStorage(UUID().uuidString, .appGroup("group.CompositionTests"))
+        storage.wrappedValue = "Dune"
+        #expect(UserDefaults(suiteName: "group.CompositionTests")?.string(forKey: storage.key) == "Dune")
+        #expect(UserDefaults.standard.string(forKey: storage.key) == nil)
+        storage.wrappedValue = nil
+    }
+
+    @Test func initDefaultsToStandardStore() {
+        #expect(UserStorage<String?>("volume").store == .standard)
+    }
+
     @Test func initWithoutDefaultStartsNil() {
         #expect(UserStorage<String?>(UUID().uuidString).wrappedValue == nil)
     }
@@ -30,6 +42,11 @@ private final class Settings {
         }
         #expect(settings.volume == 9)
         UserDefaults.standard.removeObject(forKey: "CompositionTests.Settings.volume")
+    }
+
+    @Test func userDefaultsStorageIsUserStorage() {
+        let storage: UserStorage<Int> = UserDefaultsStorage(wrappedValue: 3, UUID().uuidString)
+        #expect(storage.wrappedValue == 3)
     }
 
     @Test func wrappedValueChangeNotifiesOtherWrappersForTheSameKey() async {

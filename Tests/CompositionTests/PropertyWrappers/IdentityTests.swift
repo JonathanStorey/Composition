@@ -51,7 +51,7 @@ import SwiftUI
 @Suite struct IdentityTests {
 
     /// Whether this process has no iCloud account, as on test runners.
-    private static let hasNoAccount: Bool = FileManager.default.ubiquityIdentityToken == nil
+    nonisolated private static let hasNoAccount: Bool = FileManager.default.ubiquityIdentityToken == nil
 
     @Test func dateIsTheTimeInsideTheIdentity() {
         #expect(Date(timestamp: Identity(of: .install).wrappedValue) != nil)

@@ -14,11 +14,7 @@ import Security
 enum Identities {
 
     /// Kept in the private iCloud database, where the first identity to arrive wins on every device, seeded on first read.
-    static let account: SyncedStorage<UUID?> = {
-        let storage: SyncedStorage<UUID?> = SyncedStorage("Composition.Identity.account", .first)
-        if storage.wrappedValue == nil { storage.wrappedValue = .timestamp }
-        return storage
-    }()
+    static let account: SyncedStorage<UUID?> = seeded(SyncedStorage("Composition.Identity.account", .first))
 
     /// Kept in this device's Keychain, or the install's when the Keychain refuses it.
     static let device: UUID = identity(in: .localOnly, or: install)
@@ -43,6 +39,12 @@ enum Identities {
         try? identity.uuidString.write(to: url, atomically: true, encoding: .utf8)
         try? location.setResourceValues(values)
         return identity
+    }
+
+    /// Gives the storage a new identity to offer iCloud when it has none, such as on first launch or after the iCloud account changes.
+    @discardableResult static func seeded(_ storage: SyncedStorage<UUID?>) -> SyncedStorage<UUID?> {
+        if storage.wrappedValue == nil { storage.wrappedValue = .timestamp }
+        return storage
     }
 
     /// Reads the identity stored in the Keychain at the location, or stores a new one there, returning the fallback when the Keychain refuses it.
@@ -139,7 +141,7 @@ public struct Identity: DynamicProperty {
     /// Brings the identity up to date: a new identity for a view or scene, a round trip for iCloud, a fetch for the account until it arrives, and nothing for scopes fixed for their lifetime.
     public func refresh() {
         switch scope {
-        case .account: Identities.account.refresh()
+        case .account: Identities.seeded(Identities.account).refresh()
         case .device, .install, .launch: break
         case .iCloud:
             Identities.iCloud.wrappedValue = .timestamp

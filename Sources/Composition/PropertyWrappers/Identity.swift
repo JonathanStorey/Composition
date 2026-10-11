@@ -182,7 +182,7 @@ public struct Identity: DynamicProperty {
         /// Stays the same across reinstalls, and is never restored onto another device.
         case device
 
-        /// Stays the same on every device signed in to the user's Apple account through iCloud, changes with the account, and is zero when none is signed in.
+        /// Identifies the user on every device signed in to their Apple account through iCloud, never changes once synced, and is zero when no account is signed in.
         case account
     }
 
@@ -223,9 +223,14 @@ public struct Identity: DynamicProperty {
         }
     }
 
-    /// Syncs the identity with its source in the background, which only the account scope has.
+    /// Brings the identity up to date: a new identity for a view or scene, a background sync for the account, and nothing for scopes fixed for their lifetime.
     public func refresh() {
-        if scope == .account { CloudIdentity.shared.refresh() }
+        switch scope {
+        case .account: CloudIdentity.shared.refresh()
+        case .device, .install, .launch: break
+        case .scene: sceneIdentity = UUID.timestamp.uuidString
+        case .view: viewIdentity = .timestamp
+        }
     }
 
     /// Reads the scene's identity, storing this view's identity as the scene's when the scene has none yet.

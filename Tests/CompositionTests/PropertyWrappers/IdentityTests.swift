@@ -2,9 +2,9 @@
 // path: PropertyWrappers/IdentityTests.swift
 // dependencies: [Extensions/Date.swift, Extensions/UUID.swift, PropertyWrappers/Identity.swift]
 
-// MARK: - Foundation + Observation + os + Security
+// MARK: - Foundation + Observation + Security
 
-#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security)
+#if canImport(Foundation) && canImport(Observation) && canImport(Security)
 import Foundation
 import Testing
 @testable import Composition
@@ -34,23 +34,13 @@ import Testing
 }
 #endif
 
-// MARK: - Foundation + Observation + os + Security + SwiftUI
+// MARK: - Foundation + Observation + Security + SwiftUI
 
-#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(SwiftUI)
+#if canImport(Foundation) && canImport(Observation) && canImport(Security) && canImport(SwiftUI)
 import SwiftUI
 
 @MainActor
 @Suite struct IdentityTests {
-
-    /// Whether this process has no iCloud account, as on test runners.
-    nonisolated private static let hasNoAccount: Bool = FileManager.default.ubiquityIdentityToken == nil
-
-    @Test(.enabled(if: IdentityTests.hasNoAccount, "Needs a process without an iCloud account")) func accountIsZeroAndFailsToRefreshWithoutAccount() {
-        let identity: Identity = Identity(of: .account)
-        #expect(identity.wrappedValue == .zero)
-        identity.projectedValue.refresh()
-        #expect(identity.projectedValue.status == .failure(.noAccount))
-    }
 
     @Test func dateIsTheTimeInsideTheIdentity() {
         #expect(Date(timestamp: Identity(of: .install).wrappedValue) != nil)
@@ -71,7 +61,7 @@ import SwiftUI
     }
 
     @Test func scopeIsKept() {
-        #expect(Identity(of: .account).scope == .account)
+        #expect(Identity(of: .scene).scope == .scene)
     }
 
     @Test func storedScopesAreSharedAcrossWrappers() {

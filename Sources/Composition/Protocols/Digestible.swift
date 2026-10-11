@@ -17,9 +17,9 @@ public protocol Digestible {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Digestible {
 
-    /// Returns the version 5 UUID of the content's digest in the namespace of the type's name, identical on every device and every launch.
-    func checksum() -> UUID {
-        var digester: Digester = Digester(namespace: String(describing: Self.self))
+    /// Returns the UUID of the content's digest in the namespace of the given name, or of the type's name when there is none, identical on every device and every launch.
+    func checksum(namespace: String? = nil) -> UUID {
+        var digester: Digester = Digester(namespace: namespace ?? String(describing: Self.self))
         digest(into: &digester)
         return digester.finalize()
     }
@@ -41,7 +41,7 @@ public extension Digestible where Self: Encodable {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct Digester {
 
-    /// The name whose version 5 UUID is the checksum's namespace.
+    /// The name whose UUID is the checksum's namespace.
     public let namespace: String
 
     private var hasher: SHA256 = SHA256()
@@ -51,19 +51,19 @@ public struct Digester {
         self.namespace = namespace
     }
 
-    /// Returns the 16 bytes of an RFC 9562 version 5 UUID: the SHA-1 digest of the namespace's bytes followed by the name, with the version and variant bits set.
-    static func versionFive(name: Data, namespace: Data) -> Data {
-        var bytes: [UInt8] = Array(Insecure.SHA1.hash(data: namespace + name).prefix(16))
-        bytes[6] = (bytes[6] & 0x0F) | 0x50
-        bytes[8] = (bytes[8] & 0x3F) | 0x80
-        return Data(bytes)
-    }
-
     /// Returns the 32-byte SHA-256 digest of the value's content, which a parent feeds in place of the content itself.
     fileprivate static func digest(of value: some Digestible) -> Data {
         var digester: Digester = Digester(namespace: "")
         value.digest(into: &digester)
         return Data(digester.hasher.finalize())
+    }
+
+    /// Returns the 16 bytes of the name-based UUID of the name within the namespace's bytes.
+    private static func uuid(name: Data, namespace: Data) -> Data {
+        var bytes: [UInt8] = Array(Insecure.SHA1.hash(data: namespace + name).prefix(16))
+        bytes[6] = (bytes[6] & 0x0F) | 0x50
+        bytes[8] = (bytes[8] & 0x3F) | 0x80
+        return Data(bytes)
     }
 
     /// Feeds the value's 32-byte digest, so adjacent values cannot run together.
@@ -76,10 +76,10 @@ public struct Digester {
         hasher.update(data: bytes)
     }
 
-    /// Returns the version 5 UUID of the SHA-256 digest of everything fed in so far, within the namespace named by `namespace`.
+    /// Returns the UUID of the SHA-256 digest of everything fed in so far, within the namespace named by `namespace`.
     public func finalize() -> UUID {
-        let space: Data = Self.versionFive(name: Data(namespace.utf8), namespace: Data(count: 16))
-        let bytes: Data = Self.versionFive(name: Data(hasher.finalize()), namespace: space)
+        let space: Data = Self.uuid(name: Data(namespace.utf8), namespace: Data(count: 16))
+        let bytes: Data = Self.uuid(name: Data(hasher.finalize()), namespace: space)
         return UUID(uuid: bytes.withUnsafeBytes { $0.load(as: uuid_t.self) })
     }
 }

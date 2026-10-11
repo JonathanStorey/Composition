@@ -54,7 +54,7 @@ private struct Vector: Digestible {
     let y: Int
 
     func digest(into digester: inout Digester) {
-        digester.use(namespace: "Point")
+        digester.namespace = "Point"
         ["x": x, "y": y].digest(into: &digester)
     }
 }
@@ -112,10 +112,10 @@ private struct Vector: Digestible {
         #expect(dictionary.checksum().uuidString.lowercased() == "93bb3ed0-b6a8-5145-8fc5-4cc5210e6002")
     }
 
-    @Test func digesterFinalizesInNilNamespace() {
+    @Test func digesterFinalizesInEmptyNamespace() {
         var digester: Digester = Digester()
         digester.combine("abc")
-        #expect(digester.finalize().uuidString.lowercased() == "a8cf195d-0d19-5d6f-a042-d4653dbc5d98")
+        #expect(digester.finalize().uuidString.lowercased() == "7aaad436-a797-53b0-974c-a71690ef7706")
     }
 
     @Test func encodableEnumMatchesPythonRawValue() {

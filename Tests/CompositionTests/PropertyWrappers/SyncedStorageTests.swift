@@ -36,15 +36,15 @@ import Observation
     #if os(macOS)
     @Test func refreshFailsWithoutTheCloudKitEntitlement() {
         let storage: SyncedStorage<Int?> = SyncedStorage(UUID().uuidString)
-        storage.projectedValue.refresh()
-        #expect(storage.projectedValue.status == .failure(.unavailable))
+        storage.refresh()
+        #expect(storage.status == .failure(.unavailable))
     }
     #endif
 
     @Test func statusStartsUnknownForANewKey() {
         let storage: SyncedStorage<Int?> = SyncedStorage(UUID().uuidString)
-        #expect(storage.projectedValue.status == .unknown)
-        #expect(storage.projectedValue.lastSynced == nil)
+        #expect(storage.status == .unknown)
+        #expect(storage.lastSynced == nil)
     }
 
     @Test func wrappedValueChangeNotifiesObservers() async {
@@ -77,9 +77,9 @@ import SwiftUI
 
 extension SyncedStorageTests {
 
-    @Test func bindingWritesThrough() {
+    @Test func projectedValueWritesThrough() {
         let storage: SyncedStorage<Bool> = SyncedStorage(wrappedValue: false, UUID().uuidString)
-        storage.projectedValue.binding.wrappedValue = true
+        storage.projectedValue.wrappedValue = true
         #expect(storage.wrappedValue)
     }
 }

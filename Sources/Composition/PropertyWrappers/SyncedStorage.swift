@@ -79,11 +79,6 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
         SyncEngine.shared.lastSynced(key)
     }
 
-    /// The wrapper itself, for its sync status and refresh.
-    public var projectedValue: Self {
-        self
-    }
-
     /// The status of the value's last sync.
     public var status: SyncStatus {
         SyncEngine.shared.status(key)
@@ -391,7 +386,7 @@ import SwiftUI
 public extension SyncedStorage {
 
     /// A binding to the value, for controls such as `TextField` and `Toggle`.
-    var binding: Binding<Value> {
+    var projectedValue: Binding<Value> {
         Binding(get: { wrappedValue }, set: { wrappedValue = $0 })
     }
 }

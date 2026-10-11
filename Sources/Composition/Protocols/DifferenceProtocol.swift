@@ -2,12 +2,12 @@
 // path: Protocols/DifferenceProtocol.swift
 // dependencies: []
 
-/// A description of how one value differs from another, listed as a sequence of changes.
-public protocol DifferenceProtocol {
+/// A description of how one value differs from another, as a collection of changes in the order they apply.
+public protocol DifferenceProtocol<ChangeElement>: Collection where Element == Change {
+
+    /// The type of value each change inserts or removes.
+    associatedtype ChangeElement
 
     /// A single change that turns one value toward another.
     associatedtype Change
-
-    /// The changes that make up the difference, in the order they apply.
-    var changes: [Change] { get }
 }

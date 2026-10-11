@@ -1,5 +1,5 @@
 // repository: https://github.com/JonathanStorey/Composition
-// path: PropertyWrappers/KeychainStorage.swift
+// path: PropertyWrappers/EncryptedStorage.swift
 // dependencies: [PropertyWrappers/StorageChanges.swift]
 
 // MARK: - Foundation + Observation + Security
@@ -9,10 +9,10 @@ import Foundation
 import Observation
 import Security
 
-/// Reads and writes a value in the Keychain like `AppStorage`, kept on this device or synced through iCloud Keychain.
+/// Reads and writes a value encrypted in the Keychain like `AppStorage`, kept on this device only or synced through iCloud Keychain.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
-public struct KeychainStorage<Value: Codable & Sendable>: Sendable {
+public struct EncryptedStorage<Value: Codable & Sendable>: Sendable {
 
     /// The value returned when nothing is stored.
     public let defaultValue: Value
@@ -25,7 +25,7 @@ public struct KeychainStorage<Value: Codable & Sendable>: Sendable {
     private let changes: StorageChanges
 
     /// Creates storage for the key that returns the default value until something is stored.
-    public init(wrappedValue: Value, _ key: String, service: String = Bundle.main.bundleIdentifier ?? "Composition", location: Location = .local) {
+    public init(wrappedValue: Value, _ key: String, _ location: Location = .localOnly, service: String = Bundle.main.bundleIdentifier ?? "Composition") {
         self.defaultValue = wrappedValue
         self.key = key
         self.location = location
@@ -34,8 +34,8 @@ public struct KeychainStorage<Value: Codable & Sendable>: Sendable {
     }
 
     /// Creates storage for the key that returns `nil` until something is stored.
-    public init(_ key: String, service: String = Bundle.main.bundleIdentifier ?? "Composition", location: Location = .local) where Value: ExpressibleByNilLiteral {
-        self.init(wrappedValue: nil, key, service: service, location: location)
+    public init(_ key: String, _ location: Location = .localOnly, service: String = Bundle.main.bundleIdentifier ?? "Composition") where Value: ExpressibleByNilLiteral {
+        self.init(wrappedValue: nil, key, location, service: service)
     }
 
     /// The stored value, or the default value when nothing is stored; setting `nil` removes it.
@@ -66,13 +66,13 @@ public struct KeychainStorage<Value: Codable & Sendable>: Sendable {
 }
 
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
-public extension KeychainStorage {
+public extension EncryptedStorage {
 
     /// Where the Keychain keeps a value.
     enum Location: Hashable, Sendable {
 
-        /// Kept on this device only, never synced or restored onto another device.
-        case local
+        /// Kept on this device only, never synced, backed up, or restored onto another device.
+        case localOnly
 
         /// Synced to the user's other devices through iCloud Keychain.
         case iCloud
@@ -80,7 +80,7 @@ public extension KeychainStorage {
         /// The Keychain accessibility that matches the location.
         fileprivate var accessibility: CFString {
             switch self {
-            case .local: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            case .localOnly: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
             case .iCloud: kSecAttrAccessibleAfterFirstUnlock
             }
         }
@@ -104,7 +104,7 @@ fileprivate let usesDataProtectionKeychain: Bool = {
 import SwiftUI
 
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
-public extension KeychainStorage {
+public extension EncryptedStorage {
 
     /// A binding to the stored value, for controls such as `TextField` and `Toggle`.
     var projectedValue: Binding<Value> {

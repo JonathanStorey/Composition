@@ -13,9 +13,6 @@ public protocol Digestible {
     /// The namespace that keeps equal content in different types from sharing a checksum.
     static var namespace: UUID { get }
 
-    /// The 32-byte SHA-256 digest of the value's content, which a parent feeds in place of the content itself.
-    var digest: Data { get }
-
     /// Feeds the value's content into the digester.
     func digest(into digester: inout Digester)
 }
@@ -28,16 +25,20 @@ public extension Digestible {
         UUID(name: Data(String(describing: Self.self).utf8), namespace: .zero)
     }
 
+    /// Returns the version 5 UUID of the content's digest within the type's namespace, identical on every device and every launch.
+    func checksum() -> UUID {
+        UUID(name: digest, namespace: Self.namespace)
+    }
+}
+
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+extension Digestible {
+
     /// The 32-byte SHA-256 digest of the value's content, which a parent feeds in place of the content itself.
     var digest: Data {
         var digester: Digester = Digester()
         digest(into: &digester)
         return digester.finalize()
-    }
-
-    /// Returns the version 5 UUID of the content's digest within the type's namespace, identical on every device and every launch.
-    func checksum() -> UUID {
-        UUID(name: digest, namespace: Self.namespace)
     }
 }
 
@@ -73,7 +74,7 @@ public struct Digester {
     }
 
     /// Returns the 32-byte digest of everything fed in so far.
-    public func finalize() -> Data {
+    func finalize() -> Data {
         Data(hasher.finalize())
     }
 }
@@ -202,17 +203,9 @@ fileprivate extension Digester.Encoder {
             self.leaf = leaf
         }
 
-        /// A nil value, which digests as 32 zero bytes like `Optional.none`.
+        /// A nil value, which digests like `Optional.none`.
         static var null: Node {
             Node(leaf: Bool?.none)
-        }
-
-        /// The leaf's own digest, so a leaf node digests exactly like the value it holds.
-        var digest: Data {
-            if let leaf { return leaf.digest }
-            var digester: Digester = Digester()
-            digest(into: &digester)
-            return digester.finalize()
         }
 
         /// Copies another node's contents into this one.
@@ -275,7 +268,7 @@ fileprivate extension Digester.Encoder {
         }
     }
 
-    /// Appends values to a node's elements, with a nil value as 32 zero bytes like `Optional.none`.
+    /// Appends values to a node's elements, with a nil value digested like `Optional.none`.
     struct UnkeyedContainer: UnkeyedEncodingContainer {
 
         let codingPath: [any CodingKey]
@@ -427,11 +420,6 @@ extension Int: Digestible {
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Optional: Digestible where Wrapped: Digestible {
-
-    /// The wrapped value's digest, or 32 zero bytes when there is none.
-    public var digest: Data {
-        self?.digest ?? Data(count: 32)
-    }
 
     /// Feeds the wrapped value unchanged, or 32 zero bytes when there is none.
     public func digest(into digester: inout Digester) {

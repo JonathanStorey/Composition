@@ -9,7 +9,7 @@ import IOKit
 #endif
 
 /// A UUID that stays the same for as long as its scope lives: a view, a scene, an install, or a device.
-@available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, *)
+@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
 public struct StableIdentifier: DynamicProperty {
 

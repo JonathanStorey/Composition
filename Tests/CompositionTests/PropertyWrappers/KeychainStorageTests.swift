@@ -2,8 +2,9 @@
 // path: PropertyWrappers/KeychainStorageTests.swift
 // dependencies: [PropertyWrappers/KeychainStorage.swift]
 
-#if canImport(Foundation) && canImport(Security)
+#if canImport(Foundation) && canImport(Observation) && canImport(Security)
 import Foundation
+import Observation
 import Testing
 @testable import Composition
 
@@ -11,6 +12,28 @@ import Testing
 
     @Test func initDefaultsToLocal() {
         #expect(KeychainStorage<String>("token").location == .local)
+    }
+
+    @Test func wrappedValueChangeIgnoresOtherKeys() async {
+        let reader: KeychainStorage<Int> = KeychainStorage(UUID().uuidString, service: "CompositionTests")
+        let writer: KeychainStorage<Int> = KeychainStorage(UUID().uuidString, service: "CompositionTests")
+        await confirmation(expectedCount: 0) { changed in
+            withObservationTracking({ _ = reader.wrappedValue }, onChange: { changed() })
+            writer.wrappedValue = 1
+        }
+        writer.wrappedValue = nil
+    }
+
+    @Test func wrappedValueChangeNotifiesOtherWrappersForTheSameKey() async {
+        let key: String = UUID().uuidString
+        let reader: KeychainStorage<Int> = KeychainStorage(key, service: "CompositionTests")
+        let writer: KeychainStorage<Int> = KeychainStorage(key, service: "CompositionTests")
+        await confirmation { changed in
+            withObservationTracking({ _ = reader.wrappedValue }, onChange: { changed() })
+            writer.wrappedValue = 1
+        }
+        #expect(reader.wrappedValue == 1)
+        writer.wrappedValue = nil
     }
 
     @Test func wrappedValueIsNilWhenNothingIsStored() {

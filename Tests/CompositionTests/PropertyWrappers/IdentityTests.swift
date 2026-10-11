@@ -2,9 +2,9 @@
 // path: PropertyWrappers/IdentityTests.swift
 // dependencies: [Extensions/Date.swift, Extensions/UUID.swift, PropertyWrappers/Identity.swift, PropertyWrappers/SyncedStorage.swift]
 
-// MARK: - CloudKit + Foundation + Observation + os + Security
+// MARK: - CloudKit + Foundation + Network + Observation + os + Security
 
-#if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security)
+#if canImport(CloudKit) && canImport(Foundation) && canImport(Network) && canImport(Observation) && canImport(os) && canImport(Security)
 import Foundation
 import Testing
 @testable import Composition
@@ -32,11 +32,38 @@ import Testing
         #expect(Identities.launch != Identities.install)
     }
 }
+
+@Suite struct InternetConnectionTests {
+
+    @Test func confirmFailsAsOfflineWhenThePageWontLoad() async {
+        let key: String = UUID().uuidString
+        let connection: InternetConnection = InternetConnection(checking: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString), storedUnder: key)
+        await connection.confirm()?.value
+        #expect(connection.status == .failure(.offline))
+        #expect(UserDefaults.standard.string(forKey: key) == nil)
+    }
+
+    @Test func confirmRenewsTheIdentityWhenThePageSaysSuccess() async throws {
+        let key: String = UUID().uuidString
+        let url: URL = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try "<HTML><BODY>Success</BODY></HTML>".write(to: url, atomically: true, encoding: .utf8)
+        let connection: InternetConnection = InternetConnection(checking: url, storedUnder: key)
+        await connection.confirm()?.value
+        let identity: UUID? = UserDefaults.standard.string(forKey: key).flatMap(UUID.init(uuidString:))
+        #expect(identity?.version == 7)
+        #expect(connection.status == identity.flatMap(Date.init(timestamp:)).map(SyncStatus.success))
+        UserDefaults.standard.removeObject(forKey: key)
+    }
+
+    @Test func statusStartsUnknownBeforeTheFirstCheck() {
+        #expect(InternetConnection(storedUnder: UUID().uuidString).status == .unknown)
+    }
+}
 #endif
 
-// MARK: - CloudKit + Foundation + Observation + os + Security + SwiftUI
+// MARK: - CloudKit + Foundation + Network + Observation + os + Security + SwiftUI
 
-#if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(SwiftUI)
+#if canImport(CloudKit) && canImport(Foundation) && canImport(Network) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(SwiftUI)
 import SwiftUI
 
 @MainActor

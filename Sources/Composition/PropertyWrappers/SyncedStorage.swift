@@ -24,13 +24,13 @@ public enum SyncStatus: Codable, Hashable, Sendable {
     case failure(SyncError)
 }
 
-/// Why a sync with iCloud failed.
+/// Why a sync with iCloud, or a check of the internet connection, failed.
 public enum SyncError: Error, Codable, Hashable, Sendable {
 
     /// No iCloud account is signed in, or iCloud is turned off for the app.
     case noAccount
 
-    /// The device can't reach iCloud right now, and the sync will retry.
+    /// The device can't reach the server right now, and a sync will retry.
     case offline
 
     /// The user's iCloud storage is full.

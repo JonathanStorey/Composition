@@ -9,7 +9,7 @@ import Foundation
 import Observation
 import Security
 
-/// Reads and writes a value encrypted in the Keychain like `AppStorage`, kept on this device only or synced through iCloud Keychain.
+/// Reads and writes a value encrypted in the Keychain like `AppStorage`, kept on this device, carried by backups, or synced through iCloud Keychain.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
 public struct EncryptedStorage<Value: Codable & Sendable>: Sendable {
@@ -30,7 +30,7 @@ public struct EncryptedStorage<Value: Codable & Sendable>: Sendable {
         self.key = key
         self.location = location
         self.service = service
-        self.changes = StorageChanges(item: ["Keychain", service, key, "\(location)"])
+        self.changes = StorageChanges(item: ["Keychain", service, key, "\(location == .iCloud)"])
     }
 
     /// Creates storage for the key that returns `nil` until something is stored.
@@ -65,7 +65,7 @@ public struct EncryptedStorage<Value: Codable & Sendable>: Sendable {
     }
 }
 
-/// The former name of `EncryptedStorage`, kept so existing callers still compile.
+/// Another name for `EncryptedStorage` that says which store it uses.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 public typealias KeychainStorage<Value: Codable & Sendable> = EncryptedStorage<Value>
 
@@ -78,6 +78,9 @@ public extension EncryptedStorage {
         /// Kept on this device only, never synced, backed up, or restored onto another device.
         case localOnly
 
+        /// Kept off iCloud Keychain but carried to a new device by an encrypted backup.
+        case backedUp
+
         /// Synced to the user's other devices through iCloud Keychain.
         case iCloud
 
@@ -85,7 +88,7 @@ public extension EncryptedStorage {
         fileprivate var accessibility: CFString {
             switch self {
             case .localOnly: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-            case .iCloud: kSecAttrAccessibleAfterFirstUnlock
+            case .backedUp, .iCloud: kSecAttrAccessibleAfterFirstUnlock
             }
         }
     }

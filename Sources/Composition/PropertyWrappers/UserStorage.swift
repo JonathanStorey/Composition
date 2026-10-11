@@ -1,6 +1,7 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/UserStorage.swift
 // dependencies: [PropertyWrappers/StorageChanges.swift]
+// permissions: [com.apple.security.application-groups]
 
 // MARK: - Foundation + Observation
 
@@ -17,21 +18,21 @@ public struct UserStorage<Value: Codable & Sendable>: Sendable {
     public let defaultValue: Value
     /// The key the value is stored under.
     public let key: String
-    /// The name of the user defaults suite the value is stored in, or `nil` for the standard user defaults.
-    public let suite: String?
+    /// The user defaults the value is stored in.
+    public let store: Store
     private let changes: StorageChanges
 
     /// Creates storage for the key that returns the default value until something is stored.
-    public init(wrappedValue: Value, _ key: String, suite: String? = nil) {
+    public init(wrappedValue: Value, _ key: String, _ store: Store = .standard) {
         self.defaultValue = wrappedValue
         self.key = key
-        self.suite = suite
-        self.changes = StorageChanges(item: ["UserDefaults", suite ?? "", key], observing: [UserDefaults.didChangeNotification])
+        self.store = store
+        self.changes = StorageChanges(item: ["UserDefaults", store.suiteName ?? "", key], observing: [UserDefaults.didChangeNotification], acrossProcesses: store.suiteName != nil)
     }
 
     /// Creates storage for the key that returns `nil` until something is stored.
-    public init(_ key: String, suite: String? = nil) where Value: ExpressibleByNilLiteral {
-        self.init(wrappedValue: nil, key, suite: suite)
+    public init(_ key: String, _ store: Store = .standard) where Value: ExpressibleByNilLiteral {
+        self.init(wrappedValue: nil, key, store)
     }
 
     /// Whether the value is a property-list type that user defaults stores as is, so `AppStorage` can share its key.
@@ -46,7 +47,7 @@ public struct UserStorage<Value: Codable & Sendable>: Sendable {
     public var wrappedValue: Value {
         get {
             changes.track()
-            switch store.object(forKey: key) {
+            switch defaults.object(forKey: key) {
             case let value as Value: return value
             case let data as Data: return (try? JSONDecoder().decode(Value.self, from: data)) ?? defaultValue
             default: return defaultValue
@@ -54,14 +55,40 @@ public struct UserStorage<Value: Codable & Sendable>: Sendable {
         }
         nonmutating set {
             defer { changes.post() }
-            guard let data: Data = try? JSONEncoder().encode(newValue), data != Data("null".utf8) else { return store.removeObject(forKey: key) }
-            store.set(Self.isPropertyList(newValue) ? newValue : data, forKey: key)
+            guard let data: Data = try? JSONEncoder().encode(newValue), data != Data("null".utf8) else { return defaults.removeObject(forKey: key) }
+            defaults.set(Self.isPropertyList(newValue) ? newValue : data, forKey: key)
         }
     }
 
-    /// The user defaults for the suite.
-    private var store: UserDefaults {
-        suite.flatMap(UserDefaults.init(suiteName:)) ?? .standard
+    /// The user defaults for the store.
+    private var defaults: UserDefaults {
+        store.suiteName.flatMap(UserDefaults.init(suiteName:)) ?? .standard
+    }
+}
+
+/// Another name for `UserStorage` that says which store it uses.
+@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
+public typealias UserDefaultsStorage<Value: Codable & Sendable> = UserStorage<Value>
+
+@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
+public extension UserStorage {
+
+    /// The user defaults a value is stored in.
+    enum Store: Hashable, Sendable {
+
+        /// The app's standard user defaults.
+        case standard
+
+        /// The user defaults shared by every app and extension in the app group, refreshing when any of them writes.
+        case appGroup(String)
+
+        /// The name of the user defaults suite, or `nil` for the standard user defaults.
+        fileprivate var suiteName: String? {
+            switch self {
+            case .standard: nil
+            case .appGroup(let identifier): identifier
+            }
+        }
     }
 }
 #endif

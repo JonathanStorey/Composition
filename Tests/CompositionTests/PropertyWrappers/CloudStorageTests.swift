@@ -12,6 +12,14 @@ import Testing
 
 @Suite struct CloudStorageTests {
 
+    /// Whether this process can write to iCloud key-value storage.
+    private static let canStore: Bool = {
+        let key: String = UUID().uuidString
+        NSUbiquitousKeyValueStore.default.set(true, forKey: key)
+        defer { NSUbiquitousKeyValueStore.default.removeObject(forKey: key) }
+        return NSUbiquitousKeyValueStore.default.bool(forKey: key)
+    }()
+
     @Test func initWithoutDefaultStartsNil() {
         #expect(CloudStorage<String?>(UUID().uuidString).wrappedValue == nil)
     }
@@ -31,7 +39,7 @@ import Testing
         #expect(CloudStorage(wrappedValue: 7, UUID().uuidString).wrappedValue == 7)
     }
 
-    @Test func wrappedValueStoresReadsAndRemovesValue() {
+    @Test(.enabled(if: CloudStorageTests.canStore, "Needs the iCloud key-value storage entitlement, which test runners lack")) func wrappedValueStoresReadsAndRemovesValue() {
         let storage: CloudStorage<String?> = CloudStorage(UUID().uuidString)
         storage.wrappedValue = "Dune"
         #expect(storage.wrappedValue == "Dune")

@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Extensions/CollectionDifferenceTests.swift
-// dependencies: [Extensions/CollectionDifference.swift]
+// dependencies: [Extensions/CollectionDifference.swift, Protocols/DifferenceProtocol.swift]
 
 import Testing
 @testable import Composition
@@ -32,5 +32,15 @@ import Testing
         #expect(removal.offset == 1 && removal.element == 2)
         #expect(insertion.isInsertion && !insertion.isRemoval)
         #expect(insertion.offset == 1 && insertion.element == 3)
+    }
+
+    @Test func differenceProtocolCountsEveryChange() {
+        let difference: some DifferenceProtocol<Int> = [1, 3].difference(from: [1, 2])
+        #expect(difference.count == 2)
+    }
+
+    @Test func differenceProtocolIsEmptyWithoutChanges() {
+        let difference: some DifferenceProtocol<Int> = [1, 2].difference(from: [1, 2])
+        #expect(difference.isEmpty)
     }
 }

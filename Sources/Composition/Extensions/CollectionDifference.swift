@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Extensions/CollectionDifference.swift
-// dependencies: []
+// dependencies: [Protocols/DifferenceProtocol.swift]
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension CollectionDifference.Change {
@@ -36,6 +36,9 @@ public extension CollectionDifference.Change {
         }
     }
 }
+
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+extension CollectionDifference: DifferenceProtocol {}
 
 /// An error thrown when a difference does not apply to a collection, carrying the offset of the change that failed.
 public enum CollectionDifferenceError: Error, Equatable, Sendable {

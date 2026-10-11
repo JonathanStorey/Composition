@@ -33,6 +33,21 @@ import Observation
         #expect(SyncedStorage<String?>("theme", .first).conflict == .first)
     }
 
+    @Test func prefersLocalOnlyWhenTheWriteIsNewer() {
+        let earlier: Date = Date(timeIntervalSince1970: 1_000)
+        let later: Date = Date(timeIntervalSince1970: 2_000)
+        #expect(SyncEngine.prefersLocal(written: later, over: earlier, keepsFirst: false))
+        #expect(!SyncEngine.prefersLocal(written: earlier, over: later, keepsFirst: false))
+        #expect(SyncEngine.prefersLocal(written: earlier, over: nil, keepsFirst: false))
+    }
+
+    @Test func prefersServerOnATieOrWhenKeepingTheFirst() {
+        let date: Date = Date(timeIntervalSince1970: 1_000)
+        #expect(!SyncEngine.prefersLocal(written: date, over: date, keepsFirst: false))
+        #expect(!SyncEngine.prefersLocal(written: date.addingTimeInterval(1), over: date, keepsFirst: true))
+        #expect(!SyncEngine.prefersLocal(written: nil, over: nil, keepsFirst: false))
+    }
+
     #if os(macOS)
     @Test func refreshFailsWithoutTheCloudKitEntitlement() {
         let storage: SyncedStorage<Int?> = SyncedStorage(UUID().uuidString)

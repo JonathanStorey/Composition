@@ -92,10 +92,20 @@ fileprivate final class KeychainChanges: NSObject {
     }
 
     /// Whether to use the data protection keychain, which macOS needs for local and iCloud items but only grants to entitled apps.
-    static let usesDataProtectionKeychain: Bool = SecItemCopyMatching([kSecClass: kSecClassGenericPassword, kSecUseDataProtectionKeychain: true] as CFDictionary, nil) != errSecMissingEntitlement
+    static let usesDataProtectionKeychain: Bool = hasKeychainEntitlement()
 
     /// The notification every wrapper posts after writing, carrying the item it wrote.
     private static let name: Notification.Name = Notification.Name("Composition.KeychainStorage.didChange")
+
+    /// Whether the process is signed with an entitlement that grants the data protection keychain, which only macOS can lack.
+    private static func hasKeychainEntitlement() -> Bool {
+        #if os(macOS)
+        guard let task: SecTask = SecTaskCreateFromSelf(nil) else { return false }
+        return ["com.apple.application-identifier", "keychain-access-groups"].contains { SecTaskCopyValueForEntitlement(task, $0 as CFString, nil) != nil }
+        #else
+        return true
+        #endif
+    }
 
     /// Tells every wrapper for this item that its value changed.
     func post() {

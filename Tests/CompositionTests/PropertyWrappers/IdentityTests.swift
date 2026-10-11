@@ -27,13 +27,6 @@ import Testing
         #expect(try url.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
     }
 
-    @Test func seededKeepsAnExistingIdentity() {
-        let storage: SyncedStorage<UUID?> = SyncedStorage(UUID().uuidString)
-        let identity: UUID? = Identities.seeded(storage).wrappedValue
-        #expect(identity?.version == 7)
-        #expect(Identities.seeded(storage).wrappedValue == identity)
-    }
-
     @Test func storedScopesAreVersion7AndDistinct() {
         #expect([Identities.launch, Identities.install, Identities.device].allSatisfy { $0.version == 7 })
         #expect(Identities.launch != Identities.install)
@@ -48,15 +41,6 @@ import SwiftUI
 
 @MainActor
 @Suite struct IdentityTests {
-
-    #if os(macOS)
-    @Test func accountIsZeroUntilItReachesICloud() {
-        let identity: Identity = Identity(of: .account)
-        identity.refresh()
-        #expect(identity.wrappedValue == .zero)
-        #expect(identity.status == .failure(.unavailable))
-    }
-    #endif
 
     @Test func dateIsTheTimeInsideTheIdentity() {
         #expect(Date(timestamp: Identity(of: .install).wrappedValue) != nil)

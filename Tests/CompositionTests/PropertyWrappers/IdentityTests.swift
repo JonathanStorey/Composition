@@ -1,10 +1,10 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/IdentityTests.swift
-// dependencies: [Extensions/Date.swift, Extensions/UUID.swift, PropertyWrappers/Identity.swift]
+// dependencies: [Extensions/Date.swift, Extensions/UUID.swift, PropertyWrappers/Identity.swift, PropertyWrappers/SyncedStorage.swift]
 
-// MARK: - Foundation + Observation + Security
+// MARK: - CloudKit + Foundation + Observation + os + Security
 
-#if canImport(Foundation) && canImport(Observation) && canImport(Security)
+#if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security)
 import Foundation
 import Testing
 @testable import Composition
@@ -34,17 +34,36 @@ import Testing
 }
 #endif
 
-// MARK: - Foundation + Observation + Security + SwiftUI
+// MARK: - CloudKit + Foundation + Observation + os + Security + SwiftUI
 
-#if canImport(Foundation) && canImport(Observation) && canImport(Security) && canImport(SwiftUI)
+#if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(SwiftUI)
 import SwiftUI
 
 @MainActor
 @Suite struct IdentityTests {
 
+    #if os(macOS)
+    @Test func accountIsZeroUntilItReachesICloud() {
+        let identity: Identity = Identity(of: .account)
+        identity.refresh()
+        #expect(identity.wrappedValue == .zero)
+        #expect(identity.status == .failure(.unavailable))
+    }
+    #endif
+
     @Test func dateIsTheTimeInsideTheIdentity() {
         #expect(Date(timestamp: Identity(of: .install).wrappedValue) != nil)
     }
+
+    #if os(macOS)
+    @Test func iCloudStaysZeroWhenARefreshFails() {
+        let identity: Identity = Identity(of: .iCloud)
+        identity.refresh()
+        #expect(identity.wrappedValue == .zero)
+        #expect(identity.status == .failure(.unavailable))
+        #expect(identity.lastSynced == nil)
+    }
+    #endif
 
     @Test func localScopesSucceedAtTheirCreation() {
         let identity: Identity = Identity(of: .install)

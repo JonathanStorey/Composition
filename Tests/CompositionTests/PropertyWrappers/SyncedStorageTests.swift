@@ -62,6 +62,13 @@ import Observation
         #expect(storage.lastSynced == nil)
     }
 
+    @Test func syncedValueIgnoresWritesUntilTheyReachICloud() {
+        let storage: SyncedStorage<Int> = SyncedStorage(wrappedValue: 0, UUID().uuidString)
+        storage.wrappedValue = 5
+        #expect(storage.wrappedValue == 5)
+        #expect(storage.syncedValue == 0)
+    }
+
     @Test func wrappedValueChangeNotifiesObservers() async {
         let storage: SyncedStorage<Int?> = SyncedStorage(UUID().uuidString)
         await confirmation { changed in

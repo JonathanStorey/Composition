@@ -96,6 +96,12 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
         SyncEngine.shared.status(key)
     }
 
+    /// The value as of its last round trip to iCloud, or the default value before the first.
+    var syncedValue: Value {
+        guard let data: Data = SyncEngine.shared.syncedValue(key), let value: Value = try? JSONDecoder().decode(Value.self, from: data) else { return defaultValue }
+        return value
+    }
+
     /// Fetches the latest values from iCloud in the background, moving the status to syncing and then to success or failure.
     func refresh() {
         SyncEngine.shared.refresh(key)
@@ -192,7 +198,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
             updateAll { entry in entry = SyncEntry(keepsFirst: entry.keepsFirst) }
         case .fetchedRecordZoneChanges(let changes):
             changes.modifications.forEach { receive($0.record) }
-            changes.deletions.forEach { deletion in update(deletion.recordID.recordName) { $0.value = nil; $0.record = nil } }
+            changes.deletions.forEach { deletion in update(deletion.recordID.recordName) { $0.confirmed = nil; $0.record = nil; $0.value = nil } }
         case .sentRecordZoneChanges(let sent):
             sent.savedRecords.forEach(confirm)
             sent.deletedRecordIDs.forEach(confirmDeletion)
@@ -246,6 +252,13 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         return entries.withLock { $0[key]?.status ?? .unknown }
     }
 
+    /// The key's value as of its last round trip to iCloud.
+    func syncedValue(_ key: String) -> Data? {
+        registrar.access(self, keyPath: \.revision)
+        start()
+        return entries.withLock { $0[key]?.confirmed }
+    }
+
     /// The key's value as kept on the device, starting the engine so iCloud's values arrive.
     func value(_ key: String) -> Data? {
         registrar.access(self, keyPath: \.revision)
@@ -270,8 +283,10 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
     /// Marks a saved record's key as synced at the server's time.
     private func confirm(_ record: CKRecord) {
         let fields: Data = Self.systemFields(of: record)
+        let value: Data? = record["value"] as? Data
         let date: Date = record.modificationDate ?? .now
         update(record.recordID.recordName) { entry in
+            entry.confirmed = value
             entry.isPending = false
             entry.record = fields
             entry.status = .success(date)
@@ -283,6 +298,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
     private func confirmDeletion(_ id: CKRecord.ID) {
         let date: Date = .now
         update(id.recordName) { entry in
+            entry.confirmed = nil
             entry.isPending = false
             entry.record = nil
             entry.status = .success(date)
@@ -303,6 +319,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         let value: Data? = record["value"] as? Data
         let date: Date = record.modificationDate ?? .now
         update(record.recordID.recordName) { entry in
+            entry.confirmed = value
             entry.record = fields
             guard !entry.isPending || !Self.prefersLocal(written: entry.modified, over: modified, keepsFirst: entry.keepsFirst) else { return }
             entry.isPending = false
@@ -387,6 +404,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
 /// A key's value as kept on the device, with its sync status and the archived server fields of its record.
 fileprivate struct SyncEntry: Codable, Sendable {
 
+    var confirmed: Data?
     var isPending: Bool = false
     var keepsFirst: Bool = false
     var modified: Date?

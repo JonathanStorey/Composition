@@ -49,6 +49,7 @@ Start every file with this header and a blank line:
 - `path` is relative to the file's target folder (`Sources/Composition/` or `Tests/CompositionTests/`).
 - `dependencies` lists, alphabetically and relative to `Sources/Composition/`, every source file whose code this file uses directly, or `[]`. Frameworks and test files are never listed.
 - Reuse existing helpers instead of duplicating them, and list their files here.
+- When the code needs an entitlement or Info.plist key in the app that uses it, add a `permissions` line after `dependencies` listing those keys alphabetically, as in `// permissions: [com.apple.developer.ubiquity-kvstore-identifier]`. Leave the line out when nothing is needed.
 
 ### Access and availability
 

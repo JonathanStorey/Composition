@@ -66,7 +66,7 @@ public struct StableIdentifier: DynamicProperty {
         let property: CFTypeRef? = IORegistryEntryCreateCFProperty(service, kIOPlatformUUIDKey as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue()
         return (property as? String).flatMap(UUID.init(uuidString:))
         #else
-        let storage: KeychainStorage<UUID> = KeychainStorage("device", service: "Composition.StableIdentifier")
+        let storage: KeychainStorage<UUID?> = KeychainStorage("device", service: "Composition.StableIdentifier")
         if let identifier: UUID = storage.wrappedValue { return identifier }
         storage.wrappedValue = .timestamp
         return storage.wrappedValue

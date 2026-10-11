@@ -49,7 +49,7 @@ import Observation
 import os
 import Security
 
-/// Reads and writes a value like `AppStorage`, kept on the device and synced through the user's private iCloud database, with the status of each round trip.
+/// Reads and writes a value like `AppStorage`, kept on the device and synced through the user's private iCloud database.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
 public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
@@ -74,16 +74,6 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
         self.init(wrappedValue: nil, key, conflict)
     }
 
-    /// The last time the value made a round trip to iCloud, kept on the device.
-    public var lastSynced: Date? {
-        SyncEngine.shared.lastSynced(key)
-    }
-
-    /// The status of the value's last sync.
-    public var status: SyncStatus {
-        SyncEngine.shared.status(key)
-    }
-
     /// The value kept on the device, or the default value when nothing is stored; setting `nil` removes it.
     public var wrappedValue: Value {
         get {
@@ -96,8 +86,18 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
         }
     }
 
+    /// The last time the value made a round trip to iCloud, kept on the device.
+    var lastSynced: Date? {
+        SyncEngine.shared.lastSynced(key)
+    }
+
+    /// The status of the value's last sync.
+    var status: SyncStatus {
+        SyncEngine.shared.status(key)
+    }
+
     /// Fetches the latest values from iCloud in the background, moving the status to syncing and then to success or failure.
-    public func refresh() {
+    func refresh() {
         SyncEngine.shared.refresh(key)
     }
 }

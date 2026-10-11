@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Protocols/Digestible.swift
-// dependencies: [Extensions/Date.swift, Extensions/Decimal.swift]
+// dependencies: [Extensions/Date.swift, Extensions/Decimal.swift, Extensions/UUID.swift]
 
 #if canImport(CryptoKit) && canImport(Foundation)
 import CryptoKit
@@ -10,8 +10,11 @@ import Foundation
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public protocol Digestible {
 
-    /// The SHA-256 checksum of the value's content, identical on every device and every launch.
-    var checksum: Checksum { get }
+    /// The namespace that keeps equal content in different types from sharing a checksum.
+    static var namespace: UUID { get }
+
+    /// The 32-byte SHA-256 digest of the value's content, which a parent feeds in place of the content itself.
+    var digest: Data { get }
 
     /// Feeds the value's content into the digester.
     func digest(into digester: inout Digester)
@@ -20,11 +23,21 @@ public protocol Digestible {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Digestible {
 
-    /// The SHA-256 checksum of the value's content, identical on every device and every launch.
-    var checksum: Checksum {
+    /// The version 5 UUID of the type's unqualified name, so each type has its own namespace.
+    static var namespace: UUID {
+        UUID(name: Data(String(describing: Self.self).utf8), namespace: .zero)
+    }
+
+    /// The 32-byte SHA-256 digest of the value's content, which a parent feeds in place of the content itself.
+    var digest: Data {
         var digester: Digester = Digester()
         digest(into: &digester)
         return digester.finalize()
+    }
+
+    /// Returns the version 5 UUID of the content's digest within the type's namespace, identical on every device and every launch.
+    func checksum() -> UUID {
+        UUID(name: digest, namespace: Self.namespace)
     }
 }
 
@@ -40,24 +53,7 @@ public extension Digestible where Self: Encodable {
     }
 }
 
-/// A SHA-256 checksum, compared, hashed and stored by value.
-@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-public struct Checksum: Codable, Hashable, Sendable {
-
-    /// The 32 raw bytes of the checksum.
-    public let bytes: Data
-}
-
-@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension Checksum: CustomStringConvertible {
-
-    /// The checksum as lowercase hexadecimal.
-    public var description: String {
-        bytes.map { String(format: "%02x", $0) }.joined()
-    }
-}
-
-/// Accumulates digestible values into a SHA-256 checksum.
+/// Accumulates digestible values into a SHA-256 digest.
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public struct Digester {
 
@@ -66,9 +62,9 @@ public struct Digester {
     /// Creates an empty digester.
     public init() {}
 
-    /// Feeds the value's 32-byte checksum, so adjacent values cannot run together.
+    /// Feeds the value's 32-byte digest, so adjacent values cannot run together.
     public mutating func combine<D: Digestible>(_ value: D) {
-        hasher.update(data: value.checksum.bytes)
+        hasher.update(data: value.digest)
     }
 
     /// Feeds raw bytes unchanged, for a leaf value's own encoding.
@@ -76,16 +72,16 @@ public struct Digester {
         hasher.update(data: bytes)
     }
 
-    /// Returns the checksum of everything fed in so far.
-    public func finalize() -> Checksum {
-        Checksum(bytes: Data(hasher.finalize()))
+    /// Returns the 32-byte digest of everything fed in so far.
+    public func finalize() -> Data {
+        Data(hasher.finalize())
     }
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 fileprivate extension Digester {
 
-    /// Encodes a value into a tree of nodes whose checksums follow the standard conformances: keyed containers as dictionaries and unkeyed containers as arrays.
+    /// Encodes a value into a tree of nodes whose digests follow the standard conformances: keyed containers as dictionaries and unkeyed containers as arrays.
     struct Encoder: Swift.Encoder {
 
         let codingPath: [any CodingKey]
@@ -98,7 +94,7 @@ fileprivate extension Digester {
             case let digestible as any Digestible: return Node(leaf: digestible)
             case let float as Float: return Node(leaf: Double(float))
             case let integer as any BinaryInteger:
-                guard let int: Int = Int(exactly: integer) else { throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: codingPath, debugDescription: "\(integer) does not fit in the 64-bit integer a checksum feeds.")) }
+                guard let int: Int = Int(exactly: integer) else { throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: codingPath, debugDescription: "\(integer) does not fit in the 64-bit integer a digest feeds.")) }
                 return Node(leaf: int)
             default:
                 let node: Node = Node()
@@ -208,12 +204,12 @@ fileprivate extension Digester.Encoder {
 
         /// A nil value, which digests as 32 zero bytes like `Optional.none`.
         static var null: Node {
-            Node(leaf: Checksum(bytes: Data(count: 32)))
+            Node(leaf: Bool?.none)
         }
 
-        /// The leaf's own checksum, so a leaf node checksums exactly like the value it holds.
-        var checksum: Checksum {
-            if let leaf { return leaf.checksum }
+        /// The leaf's own digest, so a leaf node digests exactly like the value it holds.
+        var digest: Data {
+            if let leaf { return leaf.digest }
             var digester: Digester = Digester()
             digest(into: &digester)
             return digester.finalize()
@@ -360,7 +356,7 @@ extension Optional: OptionalValue {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Array: Digestible where Element: Digestible {
 
-    /// Feeds the checksum of each element in order.
+    /// Feeds the digest of each element in order.
     public func digest(into digester: inout Digester) {
         forEach { digester.combine($0) }
     }
@@ -372,18 +368,6 @@ extension Bool: Digestible {
     /// Feeds the value as a single byte.
     public func digest(into digester: inout Digester) {
         digester.combine(bytes: Data([self ? 1 : 0]))
-    }
-}
-
-@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-extension Checksum: Digestible {
-
-    /// The checksum itself, so a checksum is never hashed again.
-    public var checksum: Checksum { self }
-
-    /// Feeds the raw bytes.
-    public func digest(into digester: inout Digester) {
-        digester.combine(bytes: bytes)
     }
 }
 
@@ -417,9 +401,9 @@ extension Decimal: Digestible {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Dictionary: Digestible where Key: Digestible, Value: Digestible {
 
-    /// Feeds each key's checksum followed by its value's checksum, with the pairs sorted so insertion order does not matter.
+    /// Feeds each key's digest followed by its value's digest, with the pairs sorted so insertion order does not matter.
     public func digest(into digester: inout Digester) {
-        map { $0.key.checksum.bytes + $0.value.checksum.bytes }.sorted { $0.lexicographicallyPrecedes($1) }.forEach { digester.combine(bytes: $0) }
+        map { $0.key.digest + $0.value.digest }.sorted { $0.lexicographicallyPrecedes($1) }.forEach { digester.combine(bytes: $0) }
     }
 }
 
@@ -444,9 +428,9 @@ extension Int: Digestible {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Optional: Digestible where Wrapped: Digestible {
 
-    /// The wrapped value's checksum, or 32 zero bytes when there is none.
-    public var checksum: Checksum {
-        self?.checksum ?? Checksum(bytes: Data(count: 32))
+    /// The wrapped value's digest, or 32 zero bytes when there is none.
+    public var digest: Data {
+        self?.digest ?? Data(count: 32)
     }
 
     /// Feeds the wrapped value unchanged, or 32 zero bytes when there is none.
@@ -459,9 +443,9 @@ extension Optional: Digestible where Wrapped: Digestible {
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Set: Digestible where Element: Digestible {
 
-    /// Feeds each element's checksum, sorted so iteration order does not matter.
+    /// Feeds each element's digest, sorted so iteration order does not matter.
     public func digest(into digester: inout Digester) {
-        map(\.checksum.bytes).sorted { $0.lexicographicallyPrecedes($1) }.forEach { digester.combine(bytes: $0) }
+        map(\.digest).sorted { $0.lexicographicallyPrecedes($1) }.forEach { digester.combine(bytes: $0) }
     }
 }
 

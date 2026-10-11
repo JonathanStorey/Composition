@@ -25,7 +25,7 @@ private struct Page: Versioned {
 @Suite struct VersionedTests {
 
     @Test func commitDecodesWhatItEncodes() throws {
-        let commit: Commit = Commit(checksum: Page(body: "A").checksum, isCommitted: true, parent: UUID())
+        let commit: Commit = Commit(checksum: Page(body: "A").checksum(), isCommitted: true, parent: UUID())
         let data: Data = try JSONEncoder().encode(commit)
         #expect(try JSONDecoder().decode(Commit.self, from: data) == commit)
     }
@@ -33,7 +33,7 @@ private struct Page: Versioned {
     @Test func commitIsEmptyOnlyWhenNew() {
         #expect(Commit().isEmpty)
         #expect(!Commit(checksum: nil, isCommitted: false, parent: UUID()).isEmpty)
-        #expect(!Commit(checksum: Page(body: "A").checksum, isCommitted: false, parent: nil).isEmpty)
+        #expect(!Commit(checksum: Page(body: "A").checksum(), isCommitted: false, parent: nil).isEmpty)
     }
 
     @Test func commitIsRootWithoutParent() {
@@ -43,15 +43,15 @@ private struct Page: Versioned {
 
     @Test func commitMatchesOnlyItsChecksum() {
         let page: Page = Page(body: "A")
-        let commit: Commit = Commit(checksum: page.checksum, isCommitted: true, parent: nil)
-        #expect(commit.matches(page.checksum))
-        #expect(!commit.matches(Page(body: "B").checksum))
-        #expect(!Commit().matches(page.checksum))
+        let commit: Commit = Commit(checksum: page.checksum(), isCommitted: true, parent: nil)
+        #expect(commit.matches(page.checksum()))
+        #expect(!commit.matches(Page(body: "B").checksum()))
+        #expect(!Commit().matches(page.checksum()))
     }
 
     @Test func forkedCopiesOnlyContent() {
         var parent: Page = Page(body: "A")
-        parent.revision = Commit(checksum: parent.checksum, isCommitted: true, parent: nil)
+        parent.revision = Commit(checksum: parent.checksum(), isCommitted: true, parent: nil)
         let child: Page = Page.forked(copying: parent)
         #expect(child.body == parent.body)
         #expect(child.id != parent.id)
@@ -60,7 +60,7 @@ private struct Page: Versioned {
 
     @Test func hasUncommittedChangesAfterEdit() {
         var page: Page = Page(body: "A")
-        page.revision = Commit(checksum: page.checksum, isCommitted: true, parent: nil)
+        page.revision = Commit(checksum: page.checksum(), isCommitted: true, parent: nil)
         page.body = "B"
         #expect(page.hasUncommittedChanges)
     }
@@ -68,17 +68,17 @@ private struct Page: Versioned {
     @Test func hasUncommittedChangesUntilCommitted() {
         var page: Page = Page(body: "A")
         #expect(page.hasUncommittedChanges)
-        page.revision = Commit(checksum: page.checksum, isCommitted: false, parent: UUID())
+        page.revision = Commit(checksum: page.checksum(), isCommitted: false, parent: UUID())
         #expect(page.hasUncommittedChanges)
-        page.revision = Commit(checksum: page.checksum, isCommitted: true, parent: page.revision.parent)
+        page.revision = Commit(checksum: page.checksum(), isCommitted: true, parent: page.revision.parent)
         #expect(!page.hasUncommittedChanges)
     }
 
     @Test func revisionIsLeftOutOfChecksum() {
         var page: Page = Page(body: "A")
-        let checksum: Checksum = page.checksum
+        let checksum: UUID = page.checksum()
         page.revision = Commit(checksum: checksum, isCommitted: true, parent: UUID())
-        #expect(page.checksum == checksum)
+        #expect(page.checksum() == checksum)
     }
 }
 #endif

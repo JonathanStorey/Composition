@@ -24,7 +24,7 @@ public extension Versioned {
 
     /// A Boolean value indicating whether the value has not been committed or its content changed since it was.
     var hasUncommittedChanges: Bool {
-        !revision.isCommitted || !revision.matches(checksum)
+        !revision.isCommitted || !revision.matches(checksum())
     }
 }
 
@@ -33,7 +33,7 @@ public extension Versioned {
 public struct Commit: Codable, Hashable, Sendable {
 
     /// The checksum of the content when it was committed or forked, or `nil` for a value that has been neither.
-    public let checksum: Checksum?
+    public let checksum: UUID?
 
     /// A Boolean value indicating whether the version was committed rather than only created or forked.
     public let isCommitted: Bool
@@ -46,7 +46,7 @@ public struct Commit: Codable, Hashable, Sendable {
         self.init(checksum: nil, isCommitted: false, parent: nil)
     }
 
-    init(checksum: Checksum?, isCommitted: Bool, parent: UUID?) {
+    init(checksum: UUID?, isCommitted: Bool, parent: UUID?) {
         self.checksum = checksum
         self.isCommitted = isCommitted
         self.parent = parent
@@ -63,7 +63,7 @@ public struct Commit: Codable, Hashable, Sendable {
     }
 
     /// Returns a Boolean value indicating whether the recorded checksum equals the given one.
-    public func matches(_ checksum: Checksum) -> Bool {
+    public func matches(_ checksum: UUID) -> Bool {
         self.checksum == checksum
     }
 }

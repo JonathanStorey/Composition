@@ -457,7 +457,7 @@ protocol SyncedItems {
     func sync(under key: String, positioned: Bool)
 }
 
-extension Array: SyncedItems where Element: Codable & Identifiable & Sendable {
+extension Array: SyncedItems where Element: Codable & Identifiable {
 
     /// Reads the items kept under the key in order, or `nil` when none were ever stored.
     init?(syncedUnder key: String) {
@@ -507,7 +507,7 @@ fileprivate struct SyncedQuery<Value>: Sendable {
 }
 
 /// One element of an array synced item by item, with its position in the array.
-fileprivate struct SyncedItem<Element: Codable & Sendable>: Codable, Sendable {
+fileprivate struct SyncedItem<Element: Codable>: Codable {
 
     let position: Double
     let value: Element

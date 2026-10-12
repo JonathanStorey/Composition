@@ -5,12 +5,12 @@
 
 // Setup in Xcode:
 // - .app, .caches and .temp need nothing.
-// - .documents, for Data only, needs nothing to work. To let people see the files in the Files app on iOS, open the target's Info tab and set both UIFileSharingEnabled (Application supports iTunes file sharing) and LSSupportsOpeningDocumentsInPlace (Supports opening documents in place) to YES.
+// - .documents needs nothing to work. To let people see the files in the Files app on iOS, open the target's Info tab and set both UIFileSharingEnabled (Application supports iTunes file sharing) and LSSupportsOpeningDocumentsInPlace (Supports opening documents in place) to YES.
 // - .group("group.com.example"): select the app target and each extension that shares the file, open Signing & Capabilities, click + Capability, add App Groups, and check the same group identifier in every target.
 // - .iCloud and .iCloudDrive:
 //   1. Select the app target, open Signing & Capabilities, click + Capability, and add iCloud.
 //   2. Under iCloud, check iCloud Documents and select or create the container named iCloud. followed by the bundle identifier. FileStorage uses the first container listed.
-//   3. .iCloud keeps files hidden in the container. For .iCloudDrive, which is for Data only, show the files in iCloud Drive by adding NSUbiquitousContainers to the Info tab: a dictionary keyed by the container identifier, holding NSUbiquitousContainerIsDocumentScopePublic set to YES, NSUbiquitousContainerName set to the folder's name, and NSUbiquitousContainerSupportedFolderLevels set to Any. Raise the build number so iCloud Drive notices the change.
+//   3. .iCloud keeps files hidden in the container. For .iCloudDrive, show the files in iCloud Drive by adding NSUbiquitousContainers to the Info tab: a dictionary keyed by the container identifier, holding NSUbiquitousContainerIsDocumentScopePublic set to YES, NSUbiquitousContainerName set to the folder's name, and NSUbiquitousContainerSupportedFolderLevels set to Any. Raise the build number so iCloud Drive notices the change.
 //   4. Run on a device or simulator signed in to iCloud. While iCloud is unavailable the file stays on the device and moves to iCloud at the first launch that can reach it.
 
 // MARK: - Foundation + Observation + os
@@ -29,13 +29,13 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
     private let file: StoredFile
     private let isRaw: Bool
 
-    /// Creates storage for the path that returns the default value until something is stored, where `Data` keeps its extension, as in "Images/avatar.png", or gets ".dat" without one, and any other value is kept as JSON with ".json" added to a name without an extension, as in "Settings/theme", stopping on a path that could leave the location or gives JSON an extension.
+    /// Creates storage for the path that returns the default value until something is stored, where a path without an extension, such as "Settings/theme", gets ".data" for `Data` and ".json" for anything else, stopping on a path that could leave the location.
     public init(wrappedValue: Value, _ path: String, _ location: Location = .app) {
         let isRaw: Bool = Value.self == Data.self || Value.self == Data?.self
-        let violation: String? = StoredFile.pathViolation(path, isFile: isRaw)
+        let violation: String? = StoredFile.pathViolation(path)
         precondition(violation == nil, violation ?? "")
         self.defaultValue = wrappedValue
-        self.file = location.folder.file(isRaw ? StoredFile.withExtension(path) : "\(path).json")
+        self.file = location.file(StoredFile.withExtension(path, isRaw ? "data" : "json"))
         self.isRaw = isRaw
     }
 
@@ -61,93 +61,56 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 public extension FileStorage {
 
-    /// The folder a file is kept in, where every value can use the hidden ones and only `Data` can use `.documents` and `.iCloudDrive`, which people can see.
-    struct Location: Hashable, Sendable {
-
-        fileprivate let folder: Folder
+    /// The folder a file is kept in.
+    enum Location: Hashable, Sendable {
 
         /// The app's own folder in Application Support, backed up and hidden from the user.
-        public static var app: Self {
-            Self(folder: .app)
-        }
+        case app
 
         /// The app's caches folder, which isn't backed up and which the system may empty when space runs low.
-        public static var caches: Self {
-            Self(folder: .caches)
-        }
+        case caches
 
-        /// The app's iCloud container, synced across the user's devices and hidden from iCloud Drive, or a folder on the device until iCloud is available.
-        public static var iCloud: Self {
-            Self(folder: .iCloud(visible: false))
-        }
-
-        /// The temporary folder, which isn't backed up and which the system may empty when the app isn't running.
-        public static var temp: Self {
-            Self(folder: .temp)
-        }
+        /// The app's Documents folder, backed up and visible in the Files app when the app shares its files.
+        case documents
 
         /// The shared container of the app group with the identifier, which the app and its extensions can all read and write.
-        public static func group(_ identifier: String) -> Self {
-            Self(folder: .group(identifier))
-        }
-    }
-}
+        case group(String)
 
-@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
-public extension FileStorage.Location where Value == Data {
+        /// The app's iCloud container, synced across the user's devices and hidden from iCloud Drive, or a folder on the device until iCloud is available.
+        case iCloud
 
-    /// The app's Documents folder, backed up and visible in the Files app when the app shares its files.
-    static var documents: Self {
-        Self(folder: .documents)
-    }
+        /// The Documents folder of the app's iCloud container, synced across the user's devices and visible in iCloud Drive when the app makes it public, or a folder on the device until iCloud is available.
+        case iCloudDrive
 
-    /// The Documents folder of the app's iCloud container, synced across the user's devices and visible in iCloud Drive when the app makes it public, or a folder on the device until iCloud is available.
-    static var iCloudDrive: Self {
-        Self(folder: .iCloud(visible: true))
-    }
-}
+        /// The temporary folder, which isn't backed up and which the system may empty when the app isn't running.
+        case temp
 
-@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
-public extension FileStorage.Location where Value == Data? {
-
-    /// The app's Documents folder, backed up and visible in the Files app when the app shares its files.
-    static var documents: Self {
-        Self(folder: .documents)
-    }
-
-    /// The Documents folder of the app's iCloud container, synced across the user's devices and visible in iCloud Drive when the app makes it public, or a folder on the device until iCloud is available.
-    static var iCloudDrive: Self {
-        Self(folder: .iCloud(visible: true))
-    }
-}
-
-/// A folder a file can be kept in, whatever it holds.
-@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
-fileprivate enum Folder: Hashable {
-
-    case app, caches, documents, group(String), iCloud(visible: Bool), temp
-
-    /// The shared file at the path inside the folder, where an app group the app can't reach stops debug builds and falls back to the app's own folder, and iCloud falls back to the device until it's available.
-    func file(_ path: String) -> StoredFile {
-        switch self {
-        case .app:
-            return StoredFile.at(StoredFile.appFolder.appending(path: path))
-        case .caches:
-            return StoredFile.at(URL.cachesDirectory.appending(component: StoredFile.bundleID, directoryHint: .isDirectory).appending(path: path))
-        case .documents:
-            return StoredFile.at(URL.documentsDirectory.appending(path: path))
-        case .group(let identifier):
-            guard let container: URL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: identifier) else {
-                assertionFailure("The app can't reach the app group \"\(identifier)\". Add it under Signing & Capabilities > App Groups.")
-                return StoredFile.at(StoredFile.appFolder.appending(component: identifier, directoryHint: .isDirectory).appending(path: path))
+        /// The shared file at the path inside the location, where an app group the app can't reach stops debug builds and falls back to the app's own folder, and iCloud falls back to the device until it's available.
+        fileprivate func file(_ path: String) -> StoredFile {
+            switch self {
+            case .app:
+                return StoredFile.at(StoredFile.appFolder.appending(path: path))
+            case .caches:
+                return StoredFile.at(URL.cachesDirectory.appending(component: StoredFile.bundleID, directoryHint: .isDirectory).appending(path: path))
+            case .documents:
+                return StoredFile.at(URL.documentsDirectory.appending(path: path))
+            case .group(let identifier):
+                guard let container: URL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: identifier) else {
+                    assertionFailure("The app can't reach the app group \"\(identifier)\". Add it under Signing & Capabilities > App Groups.")
+                    return StoredFile.at(StoredFile.appFolder.appending(component: identifier, directoryHint: .isDirectory).appending(path: path))
+                }
+                return StoredFile.at(container.appending(path: path))
+            case .iCloud:
+                let local: URL = StoredFile.localICloudFolder.appending(path: path)
+                guard let container: URL = StoredFile.iCloudContainer else { return StoredFile.at(local) }
+                return StoredFile.at(container.appending(path: path), ubiquitous: true, moving: local)
+            case .iCloudDrive:
+                let local: URL = StoredFile.localICloudFolder.appending(component: "Documents", directoryHint: .isDirectory).appending(path: path)
+                guard let container: URL = StoredFile.iCloudContainer else { return StoredFile.at(local) }
+                return StoredFile.at(container.appending(component: "Documents", directoryHint: .isDirectory).appending(path: path), ubiquitous: true, moving: local)
+            case .temp:
+                return StoredFile.at(URL.temporaryDirectory.appending(path: path))
             }
-            return StoredFile.at(container.appending(path: path))
-        case .iCloud(let visible):
-            let local: URL = (visible ? StoredFile.localICloudFolder.appending(component: "Documents", directoryHint: .isDirectory) : StoredFile.localICloudFolder).appending(path: path)
-            guard let container: URL = StoredFile.iCloudContainer else { return StoredFile.at(local) }
-            return StoredFile.at((visible ? container.appending(component: "Documents", directoryHint: .isDirectory) : container).appending(path: path), ubiquitous: true, moving: local)
-        case .temp:
-            return StoredFile.at(URL.temporaryDirectory.appending(path: path))
         }
     }
 }
@@ -194,17 +157,15 @@ final class StoredFile: NSObject, NSFilePresenter, Observable, Sendable {
         files.withLock { Array($0.values) }.forEach { $0.queue.sync {} }
     }
 
-    /// Why the path can't name a file inside its location, or `nil` when it can: a relative path of names, none starting with ".", whose last name has no extension unless it's a file kept as given.
-    static func pathViolation(_ path: String, isFile: Bool) -> String? {
-        let components: [Substring] = path.split(separator: "/", omittingEmptySubsequences: false)
-        guard !path.hasPrefix("/"), components.allSatisfy({ !$0.isEmpty && !$0.hasPrefix(".") }) else { return "The FileStorage path \"\(path)\" must be relative, without empty components or ones starting with \".\"." }
-        if !isFile, components.last?.contains(".") == true { return "The FileStorage name \"\(path)\" can't have an extension, since FileStorage adds \".json\", as in \"Settings/theme\"." }
+    /// Why the path can't name a file inside its location, or `nil` when it can: a relative path of names, none empty or starting with ".".
+    static func pathViolation(_ path: String) -> String? {
+        guard !path.hasPrefix("/"), path.split(separator: "/", omittingEmptySubsequences: false).allSatisfy({ !$0.isEmpty && !$0.hasPrefix(".") }) else { return "The FileStorage path \"\(path)\" must be relative, without empty components or ones starting with \".\"." }
         return nil
     }
 
-    /// The path as given when its last name has an extension, or with ".dat" added when it has none.
-    static func withExtension(_ path: String) -> String {
-        path.split(separator: "/").last?.contains(".") == true ? path : "\(path).dat"
+    /// The path as given when its last name has an extension, or with the default extension added when it has none.
+    static func withExtension(_ path: String, _ defaultExtension: String) -> String {
+        path.split(separator: "/").last?.contains(".") == true ? path : "\(path).\(defaultExtension)"
     }
 
     /// The shared file at the URL, created on first use.

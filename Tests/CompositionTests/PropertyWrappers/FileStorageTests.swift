@@ -18,9 +18,11 @@ import Testing
         #expect(storage.wrappedValue == "Dune")
     }
 
-    @Test func documentsHoldDataUntouched() {
-        let storage: FileStorage<Data?> = FileStorage("\(UUID().uuidString).png", .documents)
-        #expect(storage.wrappedValue == nil)
+    @Test func documentsHoldAnyValue() {
+        let data: FileStorage<Data?> = FileStorage("\(UUID().uuidString).png", .documents)
+        let number: FileStorage<Int?> = FileStorage(UUID().uuidString, .documents)
+        #expect(data.wrappedValue == nil)
+        #expect(number.wrappedValue == nil)
     }
 
     #if os(macOS)
@@ -37,18 +39,15 @@ import Testing
     }
     #endif
 
-    @Test func pathViolationAllowsNamesForJSONAndFilePathsForData() {
-        #expect(StoredFile.pathViolation("Settings/Colors/theme", isFile: false) == nil)
-        #expect(StoredFile.pathViolation("Images/avatar.png", isFile: true) == nil)
-        #expect(StoredFile.pathViolation("Images/avatar", isFile: true) == nil)
+    @Test func pathViolationAllowsRelativePathsWithOrWithoutExtensions() {
+        #expect(StoredFile.pathViolation("Settings/Colors/theme") == nil)
+        #expect(StoredFile.pathViolation("Images/avatar.png") == nil)
     }
 
-    @Test func pathViolationCatchesPathsThatLeaveTheLocationOrGiveJSONAnExtension() {
+    @Test func pathViolationCatchesPathsThatLeaveTheLocation() {
         for path: String in ["", "/theme", "Settings/", "Settings//theme", "../theme", "Settings/./theme", ".hidden"] {
-            #expect(StoredFile.pathViolation(path, isFile: false) != nil)
-            #expect(StoredFile.pathViolation(path, isFile: true) != nil)
+            #expect(StoredFile.pathViolation(path) != nil)
         }
-        #expect(StoredFile.pathViolation("theme.json", isFile: false) != nil)
     }
 
     #if compiler(>=6.2) && os(macOS)
@@ -57,9 +56,10 @@ import Testing
     }
     #endif
 
-    @Test func withExtensionAddsDatOnlyWhenThereIsNone() {
-        #expect(StoredFile.withExtension("Images/avatar.png") == "Images/avatar.png")
-        #expect(StoredFile.withExtension("Exports.2026/report") == "Exports.2026/report.dat")
+    @Test func withExtensionAddsTheDefaultOnlyWhenThereIsNone() {
+        #expect(StoredFile.withExtension("Settings/theme", "json") == "Settings/theme.json")
+        #expect(StoredFile.withExtension("Exports.2026/report", "data") == "Exports.2026/report.data")
+        #expect(StoredFile.withExtension("Images/avatar.png", "data") == "Images/avatar.png")
     }
 
     @Test func wrappedValueChangeNotifiesObservers() async {
@@ -88,6 +88,14 @@ import Testing
         storage.wrappedValue = Data([1, 2, 3])
         StoredFile.flushAll()
         #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data([1, 2, 3]))
+    }
+
+    @Test func wrappedValueKeepsJSONUnderTheGivenExtension() {
+        let path: String = "\(UUID().uuidString).txt"
+        let storage: FileStorage<[Int]> = FileStorage(wrappedValue: [], path, .temp)
+        storage.wrappedValue = [3]
+        StoredFile.flushAll()
+        #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data("[3]".utf8))
     }
 
     @Test func wrappedValueReloadsWhenTheFileChangesOnDisk() async throws {

@@ -56,6 +56,21 @@ private struct Todo: Codable, Equatable, Identifiable, Sendable {
         #expect(SyncEngine.shared.value("\(key)/1") == untouched)
     }
 
+    @Test func arrayWithAFilterKeepsHiddenElementsInPlace() {
+        let key: String = UUID().uuidString
+        let all: SyncedStorage<[Todo]> = SyncedStorage(wrappedValue: [], key)
+        let open: SyncedStorage<[Todo]> = SyncedStorage(wrappedValue: [], key, filter: #Predicate<Todo> { $0.due == nil })
+        all.wrappedValue = [Todo(id: 1, title: "Read"), Todo(id: 2, title: "Write", due: .distantFuture), Todo(id: 3, title: "Edit")]
+        open.wrappedValue = [Todo(id: 3, title: "Edit"), Todo(id: 4, title: "Print")]
+        #expect(all.wrappedValue.map(\.id) == [2, 3, 4])
+    }
+
+    @Test func arrayWithAFilterReadsOnlyMatchingElements() {
+        let storage: SyncedStorage<[Todo]> = SyncedStorage(wrappedValue: [], UUID().uuidString, filter: #Predicate<Todo> { $0.due == nil }, sort: \.title)
+        storage.wrappedValue = [Todo(id: 1, title: "Write"), Todo(id: 2, title: "Edit", due: .distantFuture), Todo(id: 3, title: "Read")]
+        #expect(storage.wrappedValue.map(\.id) == [3, 1])
+    }
+
     @Test func arrayWithASortKeepsPositionsWhenReordered() {
         let key: String = UUID().uuidString
         let storage: SyncedStorage<[Todo]> = SyncedStorage(wrappedValue: [], key, sort: \.title)

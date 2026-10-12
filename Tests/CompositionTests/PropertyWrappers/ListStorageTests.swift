@@ -35,6 +35,12 @@ private struct Todo: Codable, Equatable, Identifiable, Sendable {
         #expect(storage.wrappedValue.map(\.id) == [3, 1])
     }
 
+    @Test func identifiedStorageIsListStorage() {
+        let storage: ListStorage<Todo> = IdentifiedStorage(UUID().uuidString)
+        storage.wrappedValue = [Todo(id: 1, title: "Read")]
+        #expect(storage.wrappedValue == [Todo(id: 1, title: "Read")])
+    }
+
     #if compiler(>=6.2) && os(macOS)
     @Test func keyWithASlashOrLeadingUnderscoreStopsTheApp() async {
         await #expect(processExitsWith: .failure) { _ = ListStorage<Todo>("todos/1") }

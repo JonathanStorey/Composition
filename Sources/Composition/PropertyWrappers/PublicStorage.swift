@@ -21,7 +21,7 @@ import Foundation
 import Observation
 import os
 
-/// Reads every user's entry for a key in the app's public iCloud database, newest first.
+/// Reads every user's entry for a key in the app's public iCloud database, oldest first.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
 public struct PublicStorage<Value: Codable & Sendable>: Sendable {
@@ -33,7 +33,7 @@ public struct PublicStorage<Value: Codable & Sendable>: Sendable {
         self.key = key
     }
 
-    /// Every user's entry, newest first, refreshed from iCloud when read at most once a minute.
+    /// Every user's entry, oldest first, refreshed from iCloud when read at most once a minute.
     public var wrappedValue: [Value] {
         PublicStore.shared.entries(key).compactMap { try? JSONDecoder().decode(Value.self, from: $0) }
     }
@@ -76,13 +76,13 @@ final class PublicStore: Observable, Sendable {
     /// A placeholder property that observers track in place of the entries.
     private var revision: Void { () }
 
-    /// Every user's entry for the key, newest first, syncing when the last sync is over a minute old.
+    /// Every user's entry for the key, oldest first, syncing when the last sync is over a minute old.
     func entries(_ key: String) -> [Data] {
         registrar.access(self, keyPath: \.revision)
         sync(key, ifOlderThan: 60)
         guard let entry: PublicEntry = entries.withLock({ $0[key] }) else { return [] }
         let mine: [PublicValue] = entry.mine.map { [PublicValue(modified: entry.modified ?? .now, value: $0)] } ?? []
-        return (mine + entry.others).sorted { $0.modified > $1.modified }.map(\.value)
+        return (mine + entry.others).sorted { $0.modified < $1.modified }.map(\.value)
     }
 
     /// The current user's entry for the key, syncing when the last sync is over a minute old.

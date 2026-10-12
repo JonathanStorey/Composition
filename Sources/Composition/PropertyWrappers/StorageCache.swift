@@ -12,7 +12,7 @@ enum StorageCache {
     nonisolated(unsafe) private static let values: NSCache<NSData, Decoded> = NSCache()
 
     /// The value the data decodes to, taken from the cache when the same data was decoded as the same type before.
-    static func decode<V: Decodable & Sendable>(_ type: V.Type, from data: Data) -> V? {
+    static func decode<V: Decodable>(_ type: V.Type, from data: Data) -> V? {
         if let value: V = values.object(forKey: data as NSData)?.value as? V { return value }
         guard let value: V = try? JSONDecoder().decode(V.self, from: data) else { return nil }
         values.setObject(Decoded(value), forKey: data as NSData)
@@ -21,12 +21,12 @@ enum StorageCache {
 }
 
 /// A decoded value, boxed so `NSCache` can hold it.
-fileprivate final class Decoded: Sendable {
+fileprivate final class Decoded {
 
-    let value: any Sendable
+    let value: Any
 
     /// Boxes the value.
-    init(_ value: any Sendable) {
+    init(_ value: Any) {
         self.value = value
     }
 }

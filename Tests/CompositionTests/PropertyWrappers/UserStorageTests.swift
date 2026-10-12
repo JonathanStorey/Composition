@@ -22,6 +22,14 @@ private final class Settings {
         #expect(UserStorage<String?>(UUID().uuidString).wrappedValue == nil)
     }
 
+    @Test func limitViolationAllowsValuesUnder4MB() {
+        #expect(UserStorage<Int>.limitViolation(writing: Data(count: 4_194_303)) == nil)
+    }
+
+    @Test func limitViolationCatches4MB() {
+        #expect(UserStorage<Int>.limitViolation(writing: Data(count: 4_194_304)) != nil)
+    }
+
     @Test func observableClassReadsAndRefreshesThroughWrapper() async {
         let settings: Settings = Settings()
         await confirmation { changed in

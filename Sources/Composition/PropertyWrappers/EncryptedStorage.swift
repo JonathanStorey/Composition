@@ -34,7 +34,12 @@ public struct EncryptedStorage<Value: Codable & Sendable>: Sendable {
         self.init(wrappedValue: nil, key, location, service: service)
     }
 
-    /// The stored value, or the default value when nothing is stored; setting `nil` removes it.
+    /// The Keychain limit that writing the data would break, or `nil` when it fits in 16,777,110 bytes.
+    static func limitViolation(writing data: Data) -> String? {
+        data.count <= 16_777_110 ? nil : "EncryptedStorage value is \(data.count) bytes, over the 16,777,110 the Keychain holds."
+    }
+
+    /// The stored value, or the default value when nothing is stored; setting `nil` removes it, and debug builds stop on a value past the Keychain's limit.
     public var wrappedValue: Value {
         get {
             changes.track()
@@ -49,6 +54,7 @@ public struct EncryptedStorage<Value: Codable & Sendable>: Sendable {
                 SecItemDelete(item as CFDictionary)
                 return
             }
+            assert(Self.limitViolation(writing: data) == nil, Self.limitViolation(writing: data) ?? "")
             let attributes: [CFString: Any] = [kSecValueData: data, kSecAttrAccessible: location.accessibility]
             guard SecItemUpdate(item as CFDictionary, attributes as CFDictionary) == errSecItemNotFound else { return }
             SecItemAdd(item.merging(attributes) { $1 } as CFDictionary, nil)

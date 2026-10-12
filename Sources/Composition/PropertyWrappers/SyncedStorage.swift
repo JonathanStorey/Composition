@@ -121,6 +121,14 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         return local > server ?? .distantPast
     }
 
+    /// The CloudKit limit a record named after the key, with the suffix's length after it, and holding the data would break, or `nil` when it fits: an ASCII name of at most 255 characters that doesn't start with an underscore, and data under 1 MB.
+    static func recordViolation(named key: String, holding data: Data?, reserving suffix: Int = 0) -> String? {
+        if key.hasPrefix("_") || !key.allSatisfy(\.isASCII) { return "The key \"\(key)\" must be ASCII and not start with an underscore to name a CloudKit record." }
+        if key.utf8.count + suffix > 255 { return "The key \"\(key)\" is over the \(255 - suffix) characters a CloudKit record name has room for." }
+        if let data: Data, data.count >= 1_000_000 { return "The value for \"\(key)\" is \(data.count) bytes, over the 1 MB a CloudKit record holds." }
+        return nil
+    }
+
     /// Positions for items in their new order that keep the old positions of the most items still in order, so a move or insert rewrites as few records as possible.
     static func positions(keeping old: [Double?]) -> [Double] {
         var links: [Int?] = Array(repeating: nil, count: old.count)
@@ -260,8 +268,9 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         return entries.withLock { entries in entries.filter { $0.key.hasPrefix(key + "/") }.compactMapValues(\.value) }
     }
 
-    /// Keeps each key's value on the device, where `nil` removes it, and queues them for iCloud together, leaving the status to the sync's result or the next refresh.
+    /// Keeps each key's value on the device, where `nil` removes it, and queues them for iCloud together, stopping debug builds on a value CloudKit can't hold.
     func write(_ changes: [String: Data?]) {
+        assert(changes.allSatisfy { Self.recordViolation(named: $0.key, holding: $0.value) == nil }, changes.lazy.compactMap { Self.recordViolation(named: $0.key, holding: $0.value) }.first ?? "")
         let date: Date = .now
         let engine: CKSyncEngine? = start()
         let queues: Bool = engine != nil

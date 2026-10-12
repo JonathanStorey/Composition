@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/EncryptedStorage.swift
-// dependencies: [PropertyWrappers/StorageCache.swift, PropertyWrappers/StorageChanges.swift]
+// dependencies: [PropertyWrappers/StorageChanges.swift]
 
 // MARK: - Foundation + Observation + os + Security
 
@@ -44,7 +44,7 @@ public struct EncryptedStorage<Value: Codable & Sendable>: Sendable {
     public var wrappedValue: Value {
         get {
             changes.track()
-            guard let data: Data = keychainReads.withLock({ $0[identity] }) ?? read(), let value: Value = StorageCache.decode(Value.self, from: data) else { return defaultValue }
+            guard let data: Data = keychainReads.withLock({ $0[identity] }) ?? read(), let value: Value = DecodedValues.decode(Value.self, from: data) else { return defaultValue }
             return value
         }
         nonmutating set {
@@ -106,6 +106,32 @@ public extension EncryptedStorage {
             case .device: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
             }
         }
+    }
+}
+
+/// Values decoded from stored JSON, remembered by the data they came from so reading unchanged data again skips the decoder, and dropped when memory runs low.
+fileprivate enum DecodedValues {
+
+    /// The decoded values, keyed by the data they came from.
+    nonisolated(unsafe) private static let cache: NSCache<NSData, DecodedValue> = NSCache()
+
+    /// The value the data decodes to, taken from the cache when the same data was decoded as the same type before.
+    static func decode<V: Decodable>(_ type: V.Type, from data: Data) -> V? {
+        if let decoded: DecodedValue = cache.object(forKey: data as NSData), let value: V = decoded.value as? V { return value }
+        guard let value: V = try? JSONDecoder().decode(V.self, from: data) else { return nil }
+        cache.setObject(DecodedValue(value), forKey: data as NSData)
+        return value
+    }
+}
+
+/// A decoded value, boxed so `NSCache` can hold it.
+fileprivate final class DecodedValue {
+
+    let value: Any
+
+    /// Boxes the value.
+    init(_ value: Any) {
+        self.value = value
     }
 }
 

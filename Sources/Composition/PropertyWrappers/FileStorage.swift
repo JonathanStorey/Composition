@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/FileStorage.swift
-// dependencies: []
+// dependencies: [Protocols/FileRepresentable.swift]
 // permissions: [com.apple.developer.icloud-container-identifiers, com.apple.developer.icloud-services, com.apple.developer.ubiquity-container-identifiers, com.apple.security.application-groups, LSSupportsOpeningDocumentsInPlace, NSUbiquitousContainers, UIFileSharingEnabled]
 
 // Setup in Xcode:
@@ -13,14 +13,15 @@
 //   3. .iCloud keeps files hidden in the container. For .iCloudDrive, show the files in iCloud Drive by adding NSUbiquitousContainers to the Info tab: a dictionary keyed by the container identifier, holding NSUbiquitousContainerIsDocumentScopePublic set to YES, NSUbiquitousContainerName set to the folder's name, and NSUbiquitousContainerSupportedFolderLevels set to Any. Raise the build number so iCloud Drive notices the change.
 //   4. Run on a device or simulator signed in to iCloud. While iCloud is unavailable the file stays on the device and moves to iCloud at the first launch that can reach it.
 
-// MARK: - Foundation + Observation + os
+// MARK: - Foundation + Observation + os + UniformTypeIdentifiers
 
-#if canImport(Foundation) && canImport(Observation) && canImport(os)
+#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(UniformTypeIdentifiers)
 import Foundation
 import Observation
 import os
+import UniformTypeIdentifiers
 
-/// Reads and writes a value like `AppStorage`, kept in its own file inside the location as raw bytes for `Data`, UTF-8 text for `String`, a property list under ".plist", and JSON otherwise, cached in memory, written in the background, and reloaded when another process or iCloud changes the file.
+/// Reads and writes a value like `AppStorage`, kept in its own file inside the location in its own content type when it is `FileRepresentable` and the path's extension fits, as a property list under ".plist", and as JSON otherwise, cached in memory, written in the background, and reloaded when another process or iCloud changes the file.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
 public struct FileStorage<Value: Codable & Sendable>: Sendable {
@@ -29,15 +30,17 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
     private let file: StoredFile
     private let format: Format
 
-    /// Creates storage for the path that returns the default value until something is stored, where a path without an extension, such as "Settings/theme", gets ".data" for `Data`, ".txt" for `String` and ".json" for anything else, stopping on a path that could leave the location.
+    /// Creates storage for the path that returns the default value until something is stored, where a path without an extension, such as "Settings/theme", gets the `FileRepresentable` type's preferred extension or ".json", and a `FileRepresentable` value is kept in its own content type when the path's type and its own are related either way, stopping on a path that could leave the location.
     public init(wrappedValue: Value, _ path: String, _ location: Location = .app) {
         let violation: String? = StoredFile.pathViolation(path)
         precondition(violation == nil, violation ?? "")
-        let format: Format = Value.self == Data.self || Value.self == Data?.self ? .data : Value.self == String.self || Value.self == String?.self ? .text : .json
-        let filePath: String = StoredFile.withExtension(path, format.rawValue)
+        let representable: (any FileRepresentable.Type)? = Value.self as? any FileRepresentable.Type
+        let filePath: String = StoredFile.withExtension(path, representable?.preferredFilenameExtension ?? "json")
+        let pathExtension: String = URL(filePath: filePath).pathExtension
+        let pathType: UTType? = UTType(filenameExtension: pathExtension)
         self.defaultValue = wrappedValue
         self.file = location.file(filePath)
-        self.format = format == .json && URL(filePath: filePath).pathExtension.lowercased() == Format.propertyList.rawValue ? .propertyList : format
+        self.format = if let representable, let pathType, pathType.conforms(to: representable.contentType) || representable.contentType.conforms(to: pathType) { .file } else if pathExtension.lowercased() == "plist" { .propertyList } else { .json }
     }
 
     /// Creates storage for the path that returns `nil` until something is stored.
@@ -50,10 +53,9 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
         get {
             guard let data: Data = file.data else { return defaultValue }
             let value: Value? = switch format {
-            case .data: data as? Value
+            case .file: DecodedValues.decode(data) { try (Value.self as? any FileRepresentable.Type)?.init(fileContents: $0) as? Value }
             case .json: DecodedValues.decode(data) { try JSONDecoder().decode(Value.self, from: $0) }
             case .propertyList: DecodedValues.decode(data) { try PropertyListDecoder().decode(Value.self, from: $0) }
-            case .text: String(decoding: data, as: UTF8.self) as? Value
             }
             return value ?? defaultValue
         }
@@ -61,10 +63,9 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
             let mirror: Mirror = Mirror(reflecting: newValue)
             guard mirror.displayStyle != .optional || !mirror.children.isEmpty else { return file.write(nil) }
             switch format {
-            case .data: file.write(newValue as? Data)
+            case .file: file.write(try? (newValue as? any FileRepresentable)?.fileContents)
             case .json: file.write(try? JSONEncoder().encode(newValue))
             case .propertyList: file.write(try? PropertyListEncoder().encode(newValue))
-            case .text: file.write((newValue as? String).map { Data($0.utf8) })
             }
         }
     }
@@ -305,10 +306,10 @@ fileprivate struct Contents: Sendable {
     var writes: Int = 0
 }
 
-/// How a file's contents are written, named by the extension a file in that format gets: raw bytes, JSON, a property list, or UTF-8 text.
-fileprivate enum Format: String, Sendable {
+/// How a file's contents are written: in the value's own content type, as JSON, or as a property list.
+fileprivate enum Format: Sendable {
 
-    case data, json, propertyList = "plist", text = "txt"
+    case file, json, propertyList
 }
 
 /// Values decoded from stored files, remembered by the data they came from so reading unchanged data again skips the decoder, and dropped when memory runs low.
@@ -338,9 +339,9 @@ fileprivate final class DecodedValue {
 }
 #endif
 
-// MARK: - Foundation + Observation + os + SwiftUI
+// MARK: - Foundation + Observation + os + SwiftUI + UniformTypeIdentifiers
 
-#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(SwiftUI)
+#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(SwiftUI) && canImport(UniformTypeIdentifiers)
 import SwiftUI
 
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)

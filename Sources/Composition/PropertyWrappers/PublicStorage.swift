@@ -36,12 +36,12 @@ public struct PublicStorage<Value: Codable & Sendable>: Sendable {
     }
 
     /// Creates storage for the key, shared by every user of the app, whose entries read sorted by the key path.
-    public init<C: Comparable>(_ key: String, sort keyPath: KeyPath<Value, C>, order: SortOrder = .forward) {
+    public init<C: Comparable>(_ key: String, sort keyPath: KeyPath<Value, C> & Sendable, order: SortOrder = .forward) {
         self.init(key, sort: [SortDescriptor(keyPath, order: order)])
     }
 
     /// Creates storage for the key, shared by every user of the app, whose entries read sorted by the optional key path.
-    public init<C: Comparable>(_ key: String, sort keyPath: KeyPath<Value, C?>, order: SortOrder = .forward) {
+    public init<C: Comparable>(_ key: String, sort keyPath: KeyPath<Value, C?> & Sendable, order: SortOrder = .forward) {
         self.init(key, sort: [SortDescriptor(keyPath, order: order)])
     }
 

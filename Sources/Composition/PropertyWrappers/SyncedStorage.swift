@@ -58,12 +58,12 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
     }
 
     /// Creates storage for the key whose identifiable elements, each synced on its own, read sorted by the key path.
-    public init<I: Codable & Identifiable & Sendable, C: Comparable>(wrappedValue: Value, _ key: String, sort keyPath: KeyPath<I, C>, order: SortOrder = .forward) where Value == [I] {
+    public init<I: Codable & Identifiable & Sendable, C: Comparable>(wrappedValue: Value, _ key: String, sort keyPath: KeyPath<I, C> & Sendable, order: SortOrder = .forward) where Value == [I] {
         self.init(wrappedValue: wrappedValue, key, sort: [SortDescriptor(keyPath, order: order)])
     }
 
     /// Creates storage for the key whose identifiable elements, each synced on its own, read sorted by the optional key path.
-    public init<I: Codable & Identifiable & Sendable, C: Comparable>(wrappedValue: Value, _ key: String, sort keyPath: KeyPath<I, C?>, order: SortOrder = .forward) where Value == [I] {
+    public init<I: Codable & Identifiable & Sendable, C: Comparable>(wrappedValue: Value, _ key: String, sort keyPath: KeyPath<I, C?> & Sendable, order: SortOrder = .forward) where Value == [I] {
         self.init(wrappedValue: wrappedValue, key, sort: [SortDescriptor(keyPath, order: order)])
     }
 

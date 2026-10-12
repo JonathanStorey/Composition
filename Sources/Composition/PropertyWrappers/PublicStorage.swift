@@ -68,6 +68,9 @@ final class PublicStore: Observable, Sendable {
     /// The record type every entry is saved as.
     private static let recordType: CKRecord.RecordType = "PublicStorage"
 
+    /// The length of the period and iCloud user record name that follow the key in each record's name.
+    private static let userSuffix: Int = 34
+
     /// The name of the user's record for the key, so each user has exactly one.
     private static func recordName(_ key: String, _ user: String) -> String {
         "\(key).\(user)"
@@ -92,8 +95,9 @@ final class PublicStore: Observable, Sendable {
         return entries.withLock { $0[key]?.mine }
     }
 
-    /// Keeps the current user's entry on the device and sends it to iCloud.
+    /// Keeps the current user's entry on the device and sends it to iCloud, stopping debug builds on a value CloudKit can't hold.
     func write(_ data: Data?, _ key: String) {
+        assert(SyncEngine.recordViolation(named: key, holding: data, reserving: Self.userSuffix) == nil, SyncEngine.recordViolation(named: key, holding: data, reserving: Self.userSuffix) ?? "")
         let date: Date = .now
         update(key) { entry in
             entry.isPending = true

@@ -17,6 +17,14 @@ import Testing
         #expect(storage.wrappedValue == 3)
     }
 
+    @Test func limitViolationAllowsTheKeychainsLimit() {
+        #expect(EncryptedStorage<Int>.limitViolation(writing: Data(count: 16_777_110)) == nil)
+    }
+
+    @Test func limitViolationCatchesOneByteMore() {
+        #expect(EncryptedStorage<Int>.limitViolation(writing: Data(count: 16_777_111)) != nil)
+    }
+
     @Test func wrappedValueChangeIgnoresOtherKeys() async {
         let reader: EncryptedStorage<Int?> = EncryptedStorage(UUID().uuidString, .device, service: "CompositionTests")
         let writer: EncryptedStorage<Int?> = EncryptedStorage(UUID().uuidString, .device, service: "CompositionTests")

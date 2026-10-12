@@ -29,6 +29,11 @@ public struct UserStorage<Value: Codable & Sendable>: Sendable {
         self.init(wrappedValue: nil, key)
     }
 
+    /// The user defaults limit that writing the data would break, or `nil` when it fits under 4 MB.
+    static func limitViolation(writing data: Data) -> String? {
+        data.count < 4_194_304 ? nil : "UserStorage value is \(data.count) bytes, over the 4 MB user defaults allows."
+    }
+
     /// Whether the value is a property-list type that user defaults stores as is, so `AppStorage` can share its key.
     private static func isPropertyList(_ value: Value) -> Bool {
         switch value as Any {
@@ -37,7 +42,7 @@ public struct UserStorage<Value: Codable & Sendable>: Sendable {
         }
     }
 
-    /// The stored value, or the default value when nothing is stored; setting `nil` removes it.
+    /// The stored value, or the default value when nothing is stored; setting `nil` removes it, and debug builds stop on a value of 4 MB or more.
     public var wrappedValue: Value {
         get {
             changes.track()
@@ -50,6 +55,7 @@ public struct UserStorage<Value: Codable & Sendable>: Sendable {
         nonmutating set {
             defer { changes.post() }
             guard let data: Data = try? JSONEncoder().encode(newValue), data != Data("null".utf8) else { return UserDefaults.standard.removeObject(forKey: key) }
+            assert(Self.limitViolation(writing: data) == nil, Self.limitViolation(writing: data) ?? "")
             UserDefaults.standard.set(Self.isPropertyList(newValue) ? newValue : data, forKey: key)
         }
     }

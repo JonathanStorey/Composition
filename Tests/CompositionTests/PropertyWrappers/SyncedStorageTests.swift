@@ -80,6 +80,22 @@ private struct Todo: Codable, Equatable, Identifiable, Sendable {
         #expect(!SyncEngine.prefersLocal(written: nil, over: nil))
     }
 
+    @Test func recordViolationAllowsAnOrdinaryKeyAndValue() {
+        #expect(SyncEngine.recordViolation(named: "todos/1", holding: Data(count: 1_000)) == nil)
+        #expect(SyncEngine.recordViolation(named: "todos", holding: nil) == nil)
+    }
+
+    @Test func recordViolationCatchesAValueOver1MB() {
+        #expect(SyncEngine.recordViolation(named: "photo", holding: Data(count: 1_000_000)) != nil)
+    }
+
+    @Test func recordViolationCatchesKeysCloudKitRejects() {
+        #expect(SyncEngine.recordViolation(named: "_todos", holding: nil) != nil)
+        #expect(SyncEngine.recordViolation(named: "tâches", holding: nil) != nil)
+        #expect(SyncEngine.recordViolation(named: String(repeating: "k", count: 256), holding: nil) != nil)
+        #expect(SyncEngine.recordViolation(named: String(repeating: "k", count: 222), holding: nil, reserving: 34) != nil)
+    }
+
     #if os(macOS)
     @Test func refreshFailsWithoutTheCloudKitEntitlement() {
         let storage: SyncedStorage<Int?> = SyncedStorage(UUID().uuidString)

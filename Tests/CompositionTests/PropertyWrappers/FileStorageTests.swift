@@ -19,11 +19,17 @@ import Testing
     }
 
     @Test func documentsHoldDataUntouched() {
-        let storage: FileStorage<Data?> = FileStorage(file: "\(UUID().uuidString).png", .documents)
+        let storage: FileStorage<Data?> = FileStorage("\(UUID().uuidString).png", .documents)
         #expect(storage.wrappedValue == nil)
     }
 
     #if os(macOS)
+    @Test func iCloudDriveKeepsDataOnTheDeviceWithoutAnAccount() {
+        let storage: FileStorage<Data> = FileStorage(wrappedValue: Data(), "\(UUID().uuidString).pdf", .iCloudDrive)
+        storage.wrappedValue = Data([4])
+        #expect(storage.wrappedValue == Data([4]))
+    }
+
     @Test func iCloudKeepsTheFileOnTheDeviceWithoutAnAccount() {
         let storage: FileStorage<Int> = FileStorage(wrappedValue: 0, UUID().uuidString, .iCloud)
         storage.wrappedValue = 4
@@ -73,7 +79,7 @@ import Testing
 
     @Test func wrappedValueKeepsDataAsIs() {
         let path: String = "\(UUID().uuidString).png"
-        let storage: FileStorage<Data?> = FileStorage(file: path, .temp)
+        let storage: FileStorage<Data?> = FileStorage(path, .temp)
         storage.wrappedValue = Data([1, 2, 3])
         StoredFile.flushAll()
         #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data([1, 2, 3]))

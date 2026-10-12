@@ -5,7 +5,7 @@
 
 // Setup in Xcode:
 // 1. Select the app target, open Signing & Capabilities, click + Capability, and add iCloud.
-// 2. Under iCloud, check CloudKit and select or create a container. PublicStorage uses the first container in the list.
+// 2. Under iCloud, check CloudKit and select or create the container named iCloud. followed by the bundle identifier, which PublicStorage uses.
 // 3. Open the CloudKit Console at https://icloud.developer.apple.com, choose that container, then the Development environment.
 // 4. Under Schema, add a record type named PublicStorage with the fields key (String), modified (Date/Time) and value (Bytes).
 // 5. Under Indexes, add a Queryable index on PublicStorage's key field. Every read fails until it exists.

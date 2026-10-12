@@ -31,7 +31,17 @@ public struct CloudStorage<Value: Codable & Sendable>: Sendable {
         self.init(wrappedValue: nil, key)
     }
 
-    /// The stored value, or the default value when nothing is stored; setting `nil` removes it.
+    /// The iCloud key-value storage limit that writing the data under the key would break, or `nil` when it fits: 64 bytes per key, 1,024 keys, and 1 MB in total.
+    static func limitViolation(writing data: Data, to key: String, in stored: [String: Any]) -> String? {
+        let values: [String: Any] = stored.merging([key: data]) { $1 }
+        let size: Int = (try? PropertyListSerialization.data(fromPropertyList: values, format: .binary, options: 0).count) ?? 0
+        if key.utf8.count > 64 { return "CloudStorage key \"\(key)\" is \(key.utf8.count) bytes, over iCloud's limit of 64." }
+        if values.count > 1_024 { return "CloudStorage would hold \(values.count) keys, over iCloud's limit of 1,024." }
+        if size > 1_048_576 { return "CloudStorage would hold \(size) bytes, over iCloud's limit of 1 MB." }
+        return nil
+    }
+
+    /// The stored value, or the default value when nothing is stored; setting `nil` removes it, and debug builds stop on a write past iCloud's limits.
     public var wrappedValue: Value {
         get {
             changes.track()
@@ -41,6 +51,7 @@ public struct CloudStorage<Value: Codable & Sendable>: Sendable {
         nonmutating set {
             defer { changes.post() }
             if let data: Data = try? JSONEncoder().encode(newValue), data != Data("null".utf8) {
+                assert(Self.limitViolation(writing: data, to: key, in: NSUbiquitousKeyValueStore.default.dictionaryRepresentation) == nil, Self.limitViolation(writing: data, to: key, in: NSUbiquitousKeyValueStore.default.dictionaryRepresentation) ?? "")
                 NSUbiquitousKeyValueStore.default.set(data, forKey: key)
             } else {
                 NSUbiquitousKeyValueStore.default.removeObject(forKey: key)

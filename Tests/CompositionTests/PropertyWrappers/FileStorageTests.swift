@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/FileStorageTests.swift
-// dependencies: [PropertyWrappers/FileStorage.swift]
+// dependencies: [PropertyWrappers/FileStorage.swift, Protocols/FileRepresentable.swift]
 
 // MARK: - Foundation + Observation + os
 
@@ -80,6 +80,23 @@ import Testing
         let second: FileStorage<String> = FileStorage(wrappedValue: "", path, .temp)
         first.wrappedValue = "Dune"
         #expect(second.wrappedValue == "Dune")
+    }
+
+    @Test func wrappedValueKeepsAPropertyListUnderPlist() {
+        let path: String = "\(UUID().uuidString).plist"
+        let storage: FileStorage<[String: Int]> = FileStorage(wrappedValue: [:], path, .temp)
+        storage.wrappedValue = ["Dune": 1965]
+        StoredFile.flushAll()
+        let data: Data? = try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))
+        #expect(data.flatMap { try? PropertyListDecoder().decode([String: Int].self, from: $0) } == ["Dune": 1965])
+    }
+
+    @Test func wrappedValueKeepsAStringAsText() {
+        let path: String = UUID().uuidString
+        let storage: FileStorage<String> = FileStorage(wrappedValue: "", path, .temp)
+        storage.wrappedValue = "Dune"
+        StoredFile.flushAll()
+        #expect((try? String(contentsOf: URL.temporaryDirectory.appending(path: "\(path).txt"), encoding: .utf8)) == "Dune")
     }
 
     @Test func wrappedValueKeepsDataAsIs() {

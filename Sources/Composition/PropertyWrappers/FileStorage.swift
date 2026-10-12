@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/FileStorage.swift
-// dependencies: []
+// dependencies: [Protocols/FileRepresentable.swift]
 // permissions: [com.apple.developer.icloud-container-identifiers, com.apple.developer.icloud-services, com.apple.developer.ubiquity-container-identifiers, com.apple.security.application-groups, LSSupportsOpeningDocumentsInPlace, NSUbiquitousContainers, UIFileSharingEnabled]
 
 // Setup in Xcode:
@@ -20,23 +20,24 @@ import Foundation
 import Observation
 import os
 
-/// Reads and writes a value like `AppStorage`, kept in its own file inside the location as JSON or, for `Data`, exactly as given, cached in memory, written in the background, and reloaded when another process or iCloud changes the file.
+/// Reads and writes a value like `AppStorage`, kept in its own file inside the location in its own format when it is `FileRepresentable`, as a property list under ".plist", and as JSON otherwise, cached in memory, written in the background, and reloaded when another process or iCloud changes the file.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
 public struct FileStorage<Value: Codable & Sendable>: Sendable {
 
     private let defaultValue: Value
     private let file: StoredFile
-    private let isRaw: Bool
+    private let format: Format
 
-    /// Creates storage for the path that returns the default value until something is stored, where a path without an extension, such as "Settings/theme", gets ".data" for `Data` and ".json" for anything else, stopping on a path that could leave the location.
+    /// Creates storage for the path that returns the default value until something is stored, where a path without an extension, such as "Settings/theme", gets the `FileRepresentable` type's extension or ".json", stopping on a path that could leave the location.
     public init(wrappedValue: Value, _ path: String, _ location: Location = .app) {
-        let isRaw: Bool = Value.self == Data.self || Value.self == Data?.self
         let violation: String? = StoredFile.pathViolation(path)
         precondition(violation == nil, violation ?? "")
+        let representable: (any FileRepresentable.Type)? = Value.self as? any FileRepresentable.Type
+        let filePath: String = StoredFile.withExtension(path, representable?.fileExtension ?? "json")
         self.defaultValue = wrappedValue
-        self.file = location.file(StoredFile.withExtension(path, isRaw ? "data" : "json"))
-        self.isRaw = isRaw
+        self.file = location.file(filePath)
+        self.format = representable != nil ? .file : filePath.lowercased().hasSuffix(".plist") ? .propertyList : .json
     }
 
     /// Creates storage for the path that returns `nil` until something is stored.
@@ -44,16 +45,25 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
         self.init(wrappedValue: nil, path, location)
     }
 
-    /// The value kept in the file, or the default value when there is none or it can't be decoded, where `Data` is kept exactly as given, anything else as JSON, and setting `nil` removes the file.
+    /// The value kept in the file, or the default value when there is none or it can't be read, where setting `nil` removes the file.
     public var wrappedValue: Value {
         get {
             guard let data: Data = file.data else { return defaultValue }
-            if isRaw, let raw: Value = data as? Value { return raw }
-            return DecodedValues.decode(Value.self, from: data) ?? defaultValue
+            let value: Value? = switch format {
+            case .file: DecodedValues.decode(data) { try (Value.self as? any FileRepresentable.Type)?.init(fileContents: $0) as? Value }
+            case .json: DecodedValues.decode(data) { try JSONDecoder().decode(Value.self, from: $0) }
+            case .propertyList: DecodedValues.decode(data) { try PropertyListDecoder().decode(Value.self, from: $0) }
+            }
+            return value ?? defaultValue
         }
         nonmutating set {
-            if isRaw, let data: Data = newValue as? Data { return file.write(data) }
-            file.write((try? JSONEncoder().encode(newValue)).flatMap { $0 == Data("null".utf8) ? nil : $0 })
+            let mirror: Mirror = Mirror(reflecting: newValue)
+            guard mirror.displayStyle != .optional || !mirror.children.isEmpty else { return file.write(nil) }
+            switch format {
+            case .file: file.write(try? (newValue as? any FileRepresentable)?.fileContents)
+            case .json: file.write(try? JSONEncoder().encode(newValue))
+            case .propertyList: file.write(try? PropertyListEncoder().encode(newValue))
+            }
         }
     }
 }
@@ -293,16 +303,22 @@ fileprivate struct Contents: Sendable {
     var writes: Int = 0
 }
 
-/// Values decoded from stored JSON, remembered by the data they came from so reading unchanged data again skips the decoder, and dropped when memory runs low.
+/// How a file's contents are written: in the value's own format, as JSON, or as a property list.
+fileprivate enum Format: Sendable {
+
+    case file, json, propertyList
+}
+
+/// Values decoded from stored files, remembered by the data they came from so reading unchanged data again skips the decoder, and dropped when memory runs low.
 fileprivate enum DecodedValues {
 
     /// The decoded values, keyed by the data they came from.
     nonisolated(unsafe) private static let cache: NSCache<NSData, DecodedValue> = NSCache()
 
-    /// The value the data decodes to, taken from the cache when the same data was decoded as the same type before.
-    static func decode<V: Decodable>(_ type: V.Type, from data: Data) -> V? {
+    /// The value the decoder makes from the data, taken from the cache when the same data was decoded as the same type before.
+    static func decode<V>(_ data: Data, with decoder: (Data) throws -> V?) -> V? {
         if let decoded: DecodedValue = cache.object(forKey: data as NSData), let value: V = decoded.value as? V { return value }
-        guard let value: V = try? JSONDecoder().decode(V.self, from: data) else { return nil }
+        guard let value: V = try? decoder(data) else { return nil }
         cache.setObject(DecodedValue(value), forKey: data as NSData)
         return value
     }

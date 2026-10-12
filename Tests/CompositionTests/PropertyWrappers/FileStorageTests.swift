@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/FileStorageTests.swift
-// dependencies: [PropertyWrappers/FileStorage.swift, Protocols/FileRepresentable.swift]
+// dependencies: [PropertyWrappers/FileStorage.swift]
 
 // MARK: - Foundation + Observation + os
 
@@ -99,12 +99,12 @@ import Testing
         #expect((try? String(contentsOf: URL.temporaryDirectory.appending(path: "\(path).txt"), encoding: .utf8)) == "Dune")
     }
 
-    @Test func wrappedValueKeepsAStringUnderAnotherExtensionAsJSON() {
-        let path: String = "\(UUID().uuidString).json"
-        let storage: FileStorage<String> = FileStorage(wrappedValue: "", path, .temp)
-        storage.wrappedValue = "Dune"
+    @Test func wrappedValueKeepsAStringAsTextUnderAnyExtension() {
+        let path: String = "\(UUID().uuidString).md"
+        let storage: FileStorage<String?> = FileStorage(path, .temp)
+        storage.wrappedValue = "# Dune"
         StoredFile.flushAll()
-        #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data("\"Dune\"".utf8))
+        #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data("# Dune".utf8))
     }
 
     @Test func wrappedValueKeepsDataAsIs() {

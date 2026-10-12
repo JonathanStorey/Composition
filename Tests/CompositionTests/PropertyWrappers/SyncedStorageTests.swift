@@ -92,6 +92,51 @@ private struct Todo: Codable, Equatable, Identifiable, Sendable {
         #expect(storage.wrappedValue.map(\.id) == [2, 1])
     }
 
+    @Test func collectionModifiedIsTheWriteTimeOrNilWhenNotKept() {
+        let storage: SyncedStorage<SyncedStorage<Todo>.Collection> = SyncedStorage(wrappedValue: [], UUID().uuidString)
+        let before: Date = .now
+        storage.wrappedValue = [Todo(id: 1, title: "Read")]
+        #expect(storage.wrappedValue.modified(Todo(id: 1, title: "Read")).map { $0 >= before } == true)
+        #expect(storage.wrappedValue.modified(Todo(id: 2, title: "Write")) == nil)
+    }
+
+    #if os(macOS)
+    @Test func collectionRefreshThrowsWithoutTheCloudKitEntitlement() async {
+        let storage: SyncedStorage<SyncedStorage<Todo>.Collection> = SyncedStorage(wrappedValue: [], UUID().uuidString)
+        await #expect(throws: CKError.self) { try await storage.wrappedValue.refresh() }
+        guard case .failure = storage.wrappedValue.status else { Issue.record("Expected a failure"); return }
+    }
+    #endif
+
+    @Test func collectionStartsUnknownWithNothingPendingOrFailed() {
+        let todos: SyncedStorage<Todo>.Collection = SyncedStorage<SyncedStorage<Todo>.Collection>(wrappedValue: [], UUID().uuidString).wrappedValue
+        guard case .unknown = todos.status else { Issue.record("Expected unknown"); return }
+        #expect(todos.pending.isEmpty)
+        #expect(todos.failed.isEmpty)
+    }
+
+    @Test func collectionWithAFilterReadsOnlyMatchingItems() {
+        let storage: SyncedStorage<SyncedStorage<Todo>.Collection> = SyncedStorage(wrappedValue: [], UUID().uuidString, filter: #Predicate<Todo> { $0.due == nil }, sort: \.title)
+        storage.wrappedValue = [Todo(id: 1, title: "Write"), Todo(id: 2, title: "Edit", due: .distantFuture), Todo(id: 3, title: "Read")]
+        #expect(storage.wrappedValue.map(\.id) == [3, 1])
+    }
+
+    @Test func collectionWorksLikeAnArray() {
+        let storage: SyncedStorage<SyncedStorage<Todo>.Collection> = SyncedStorage(wrappedValue: [], UUID().uuidString)
+        storage.wrappedValue.append(Todo(id: 1, title: "Read"))
+        storage.wrappedValue.append(Todo(id: 2, title: "Write"))
+        storage.wrappedValue[0].title = "Edit"
+        storage.wrappedValue.removeAll { $0.id == 2 }
+        #expect(storage.wrappedValue == [Todo(id: 1, title: "Edit")])
+    }
+
+    #if compiler(>=6.2) && os(macOS)
+    @Test func keyWithASlashOrLeadingUnderscoreStopsTheApp() async {
+        await #expect(processExitsWith: .failure) { _ = SyncedStorage<Int>(wrappedValue: 0, "todos/1") }
+        await #expect(processExitsWith: .failure) { _ = SyncedStorage<Int>(wrappedValue: 0, "_todos") }
+    }
+    #endif
+
     @Test func positionsKeepItemsStillInOrder() {
         #expect(SyncEngine.positions(keeping: [0, 1, 2]) == [0, 1, 2])
         #expect(SyncEngine.positions(keeping: [2, 0, 1]) == [-1, 0, 1])

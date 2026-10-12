@@ -49,11 +49,12 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
 
     private let defaultValue: Value
     private let key: String
-    private let query: SyncedQuery<Value>?
 
     /// Creates storage for the key that returns the default value until something is stored.
     public init(wrappedValue: Value, _ key: String) {
-        self.init(wrappedValue: wrappedValue, key, query: nil)
+        precondition(!key.contains("/") && !key.hasPrefix("_"), "The SyncedStorage key \"\(key)\" can't contain \"/\", which separates a ListStorage list from its items, or start with \"_\", which CloudKit reserves.")
+        self.defaultValue = wrappedValue
+        self.key = key
     }
 
     /// Creates storage for the key that returns `nil` until something is stored.
@@ -61,39 +62,13 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
         self.init(wrappedValue: nil, key)
     }
 
-    /// Creates storage for the key whose identifiable elements, each synced on its own, read through the filter and sorted by the descriptors.
-    public init<I: Codable & Identifiable & Sendable>(wrappedValue: Value, _ key: String, filter: Predicate<I>? = nil, sort descriptors: [SortDescriptor<I>] = []) where Value: RangeReplaceableCollection, Value.Element == I {
-        self.init(wrappedValue: wrappedValue, key, query: SyncedQuery(key, filter: filter, sort: descriptors))
-    }
-
-    /// Creates storage for the key whose identifiable elements, each synced on its own, read through the filter and sorted by the key path.
-    public init<I: Codable & Identifiable & Sendable, C: Comparable>(wrappedValue: Value, _ key: String, filter: Predicate<I>? = nil, sort keyPath: KeyPath<I, C> & Sendable, order: SortOrder = .forward) where Value: RangeReplaceableCollection, Value.Element == I {
-        self.init(wrappedValue: wrappedValue, key, filter: filter, sort: [SortDescriptor(keyPath, order: order)])
-    }
-
-    /// Creates storage for the key whose identifiable elements, each synced on its own, read through the filter and sorted by the optional key path.
-    public init<I: Codable & Identifiable & Sendable, C: Comparable>(wrappedValue: Value, _ key: String, filter: Predicate<I>? = nil, sort keyPath: KeyPath<I, C?> & Sendable, order: SortOrder = .forward) where Value: RangeReplaceableCollection, Value.Element == I {
-        self.init(wrappedValue: wrappedValue, key, filter: filter, sort: [SortDescriptor(keyPath, order: order)])
-    }
-
-    /// Creates storage for the key that reads and writes through the query, when there is one, stopping on a key that contains "/" or starts with "_", which name a list's items and the engine's own file.
-    private init(wrappedValue: Value, _ key: String, query: SyncedQuery<Value>?) {
-        precondition(!key.contains("/") && !key.hasPrefix("_"), "The SyncedStorage key \"\(key)\" can't contain \"/\", which separates a list from its items, or start with \"_\", which CloudKit reserves.")
-        self.defaultValue = wrappedValue
-        self.key = key
-        self.query = query
-    }
-
-    /// The value kept on the device, or the default value when nothing is stored, where an array or `Collection` of identifiable elements syncs each element on its own and reads through the filter in the order written or the sort's; setting `nil` removes it.
+    /// The value kept on the device, or the default value when nothing is stored, where setting `nil` removes it.
     public var wrappedValue: Value {
         get {
-            if let Items: any SyncedItems.Type = Value.self as? any SyncedItems.Type, let items: Value = Items.init(syncedUnder: key) as? Value { return query?.read(items) ?? items }
-            if let items: any SyncedItems = defaultValue as? any SyncedItems { return items.attached(to: key) as? Value ?? defaultValue }
             guard let data: Data = SyncEngine.shared.value(key), let value: Value = DecodedValues.decode(Value.self, from: data) else { return defaultValue }
             return value
         }
         nonmutating set {
-            if Value.self is any SyncedItems.Type, let items: any SyncedItems = (query?.merge(newValue) ?? newValue) as? any SyncedItems { return items.sync(under: key, positioned: !(query?.isSorted ?? false)) }
             let data: Data? = (try? JSONEncoder().encode(newValue)).flatMap { $0 == Data("null".utf8) ? nil : $0 }
             SyncEngine.shared.write([key: data])
         }
@@ -118,125 +93,6 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
     /// Fetches the latest values from iCloud in the background, moving the status to syncing and then to success or failure.
     func refresh() {
         SyncEngine.shared.refresh(key)
-    }
-}
-
-@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
-public extension SyncedStorage where Value: Identifiable {
-
-    /// A change to an item of a list that hasn't reached iCloud yet.
-    enum Change: Sendable {
-
-        /// An item added on this device.
-        case insert(Value)
-
-        /// An item changed on this device.
-        case update(Value)
-
-        /// An item removed on this device, as it was last synced.
-        case remove(Value)
-
-        /// An item iCloud rejected with the error, which stays on the device and is tried again on every refresh and launch until a save succeeds.
-        case failed(Value, CKError)
-    }
-
-    /// A list kept by SyncedStorage that works like an array and reports how its sync is going.
-    struct Collection: Codable, ExpressibleByArrayLiteral, MutableCollection, RandomAccessCollection, RangeReplaceableCollection, Sendable {
-
-        fileprivate let key: String?
-        fileprivate var items: [Value]
-
-        /// Creates an empty list.
-        public init() {
-            self.init([], key: nil)
-        }
-
-        /// Creates a list of the items.
-        public init(arrayLiteral items: Value...) {
-            self.init(items, key: nil)
-        }
-
-        /// Decodes the list from an array of its items.
-        public init(from decoder: any Decoder) throws {
-            self.init(try [Value](from: decoder), key: nil)
-        }
-
-        /// Creates a list of the items that reports the sync of the list kept under the key.
-        fileprivate init(_ items: [Value], key: String?) {
-            self.key = key
-            self.items = items
-        }
-
-        /// The item kept in the data, if any.
-        private static func item(_ data: Data?) -> Value? {
-            data.flatMap { DecodedValues.decode(SyncedItem<Value>.self, from: $0)?.value }
-        }
-
-        /// The entries ordered by when they were written, oldest first.
-        private static func oldestFirst(_ entries: [String: SyncEntry]) -> [SyncEntry] {
-            entries.values.sorted { ($0.modified ?? .distantPast) < ($1.modified ?? .distantPast) }
-        }
-
-        /// The position after the last item.
-        public var endIndex: Int {
-            items.endIndex
-        }
-
-        /// The changes made on this device that haven't reached iCloud yet, failed ones included, oldest first, kept on the device until they do.
-        public var pending: [Change] {
-            guard let key else { return [] }
-            return Self.oldestFirst(SyncEngine.shared.entries(under: key)).compactMap { entry in
-                if case .failure(let error) = entry.status, let item: Value = Self.item(entry.value ?? entry.confirmed) { return .failed(item, error as? CKError ?? CKError(.internalError)) }
-                guard entry.isPending else { return nil }
-                if let item: Value = Self.item(entry.value) { return entry.confirmed == nil && entry.record == nil ? .insert(item) : .update(item) }
-                return Self.item(entry.confirmed).map(Change.remove)
-            }
-        }
-
-        /// The position of the first item.
-        public var startIndex: Int {
-            items.startIndex
-        }
-
-        /// The state of the list's last sync, starting at the last success kept on the device.
-        public var status: SyncStatus {
-            guard let key else { return .unknown }
-            return SyncEngine.shared.status(key)
-        }
-
-        /// The item at the position.
-        public subscript(position: Int) -> Value {
-            get { items[position] }
-            set { items[position] = newValue }
-        }
-
-        /// Encodes the list as an array of its items.
-        public func encode(to encoder: any Encoder) throws {
-            try items.encode(to: encoder)
-        }
-
-        /// When the item was last written, on any device, or `nil` when it isn't kept.
-        public func modified(_ item: Value) -> Date? {
-            guard let key else { return nil }
-            return SyncEngine.shared.entry("\(key)/\(item.id)")?.modified
-        }
-
-        /// Fetches the latest items from iCloud and sends every waiting change in the background, reporting the result through `status`.
-        public func refresh() {
-            guard let key else { return }
-            SyncEngine.shared.refresh(key)
-        }
-
-        /// Fetches the latest items from iCloud and sends every waiting change, throwing the error a failure gave, such as a lost connection.
-        public func refresh() async throws {
-            guard let key else { return }
-            try await SyncEngine.shared.refresh(key)
-        }
-
-        /// Replaces the items in the range with the new ones.
-        public mutating func replaceSubrange<C: Swift.Collection>(_ subrange: Range<Int>, with newItems: C) where C.Element == Value {
-            items.replaceSubrange(subrange, with: newItems)
-        }
     }
 }
 
@@ -276,39 +132,6 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         if key.utf8.count > 255 { return "The key \"\(key)\" is over the 255 characters a CloudKit record name has room for." }
         if let data: Data, data.count >= 1_000_000 { return "The value for \"\(key)\" is \(data.count) bytes, over the 1 MB a CloudKit record holds." }
         return nil
-    }
-
-    /// Positions for items in their new order that keep the old positions of the most items still in order, so a move or insert rewrites as few records as possible.
-    static func positions(keeping old: [Double?]) -> [Double] {
-        var links: [Int?] = Array(repeating: nil, count: old.count)
-        var tails: [(index: Int, position: Double)] = []
-        for (index, position) in old.enumerated() {
-            guard let position: Double else { continue }
-            let slot: Int = tails.firstIndex { $0.position >= position } ?? tails.count
-            links[index] = slot > 0 ? tails[slot - 1].index : nil
-            if slot == tails.count { tails.append((index, position)) } else { tails[slot] = (index, position) }
-        }
-        var kept: [Int: Double] = [:]
-        var link: Int? = tails.last?.index
-        while let index: Int = link {
-            kept[index] = old[index]
-            link = links[index]
-        }
-        var positions: [Double] = []
-        for index: Int in old.indices {
-            if let position: Double = kept[index] {
-                positions.append(position)
-                continue
-            }
-            let following: Double? = old.indices[(index + 1)...].lazy.compactMap { kept[$0] }.first
-            switch (positions.last, following) {
-            case let (previous?, next?): positions.append((previous + next) / 2)
-            case let (previous?, nil): positions.append(previous + 1)
-            case let (nil, next?): positions.append(next - 1)
-            case (nil, nil): positions.append(0)
-            }
-        }
-        return zip(positions, positions.dropFirst()).allSatisfy(<) ? positions : old.indices.map { Double($0) }
     }
 
     /// The name of the file that keeps the key, which for an item of a list is the list's key.
@@ -417,13 +240,13 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
     }
 
     /// The entry kept on the device for the key.
-    fileprivate func entry(_ key: String) -> SyncEntry? {
+    func entry(_ key: String) -> SyncEntry? {
         registrar.access(self, keyPath: \.revision)
         return entries.withLock { $0[key] }
     }
 
-    /// The entries kept on the device under the key, as the item keys `key/id` of an array synced item by item.
-    fileprivate func entries(under key: String) -> [String: SyncEntry] {
+    /// The entries kept on the device under the key, as the item keys `key/id` of a list ListStorage syncs item by item.
+    func entries(under key: String) -> [String: SyncEntry] {
         registrar.access(self, keyPath: \.revision)
         start()
         return entries.withLock { entries in entries.filter { $0.key.hasPrefix(key + "/") } }
@@ -443,7 +266,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         return entries.withLock { $0[key]?.value }
     }
 
-    /// The values kept on the device under the key, as the item keys `key/id` of an array synced item by item.
+    /// The values kept on the device under the key, as the item keys `key/id` of a list ListStorage syncs item by item.
     func values(under key: String) -> [String: Data] {
         registrar.access(self, keyPath: \.revision)
         start()
@@ -623,121 +446,8 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
     }
 }
 
-/// A value that SyncedStorage keeps as separate records, one per item, so changes to different items on different devices all survive.
-protocol SyncedItems {
-
-    /// Reads the items kept under the key, or `nil` when none were ever stored.
-    init?(syncedUnder key: String)
-
-    /// The same items, reporting the sync of the list kept under the key where they can.
-    func attached(to key: String) -> Self
-
-    /// Keeps the items under the key, writing only the items that were added, changed, removed or, when positioned, moved.
-    func sync(under key: String, positioned: Bool)
-}
-
-extension Array: SyncedItems where Element: Codable & Identifiable {
-
-    /// Reads the items kept under the key in order, or `nil` when none were ever stored.
-    init?(syncedUnder key: String) {
-        guard SyncEngine.shared.value(key) != nil else { return nil }
-        let items: [(key: String, item: SyncedItem<Element>)] = SyncEngine.shared.values(under: key).compactMap { itemKey, data in DecodedValues.decode(SyncedItem<Element>.self, from: data).map { (itemKey, $0) } }
-        self = items.sorted { ($0.item.position, $0.key) < ($1.item.position, $1.key) }.map(\.item.value)
-    }
-
-    /// The same array, which keeps no sync details.
-    func attached(to key: String) -> Self {
-        self
-    }
-
-    /// Keeps each element as its own record under `key/id`, writing only the elements that were added, changed, removed or, when positioned, moved, since a sorted list takes its order from the sort.
-    func sync(under key: String, positioned: Bool) {
-        let stored: [String: Data] = SyncEngine.shared.values(under: key)
-        let keys: [String] = map { "\(key)/\($0.id)" }
-        let old: [Double?] = keys.map { stored[$0].flatMap { DecodedValues.decode(SyncedItem<Element>.self, from: $0)?.position } }
-        let positions: [Double] = positioned ? SyncEngine.positions(keeping: old) : old.map { $0 ?? 0 }
-        let encoder: JSONEncoder = JSONEncoder()
-        encoder.outputFormatting = .sortedKeys
-        var changes: [String: Data?] = Dictionary(uniqueKeysWithValues: Set(stored.keys).subtracting(keys).map { ($0, Data?.none) })
-        for (index, element) in enumerated() {
-            guard let data: Data = try? encoder.encode(SyncedItem(position: positions[index], value: element)), data != stored[keys[index]] else { continue }
-            changes[keys[index]] = data
-        }
-        if SyncEngine.shared.value(key) == nil { changes[key] = Data("[]".utf8) }
-        SyncEngine.shared.write(changes)
-    }
-}
-
-@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
-extension SyncedStorage.Collection: SyncedItems {
-
-    /// Reads the items kept under the key in order, reporting that list's sync, or `nil` when none were ever stored.
-    init?(syncedUnder key: String) {
-        guard let items: [Value] = [Value](syncedUnder: key) else { return nil }
-        self.init(items, key: key)
-    }
-
-    /// The same items, reporting the sync of the list kept under the key.
-    func attached(to key: String) -> Self {
-        Self(items, key: key)
-    }
-
-    /// Keeps each item as its own record under `key/id`, as an array does.
-    func sync(under key: String, positioned: Bool) {
-        items.sync(under: key, positioned: positioned)
-    }
-}
-
-@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
-extension SyncedStorage.Change: Equatable where Value: Equatable {}
-
-@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
-extension SyncedStorage.Collection: Equatable where Value: Equatable {
-
-    /// Whether the two lists hold the same items in the same order.
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.items == rhs.items
-    }
-}
-
-/// How a list synced item by item reads through a filter and sort, and writes back without removing the elements the filter hides.
-fileprivate struct SyncedQuery<Value>: Sendable {
-
-    let isSorted: Bool
-    let merge: @Sendable (Value) -> Value
-    let read: @Sendable (Value) -> Value
-
-    /// Creates the query for the elements kept under the key.
-    init<I: Codable & Identifiable & Sendable>(_ key: String, filter: Predicate<I>?, sort descriptors: [SortDescriptor<I>]) where Value: RangeReplaceableCollection, Value.Element == I {
-        let shows: @Sendable (I) -> Bool = { element in filter.map { (try? $0.evaluate(element)) ?? false } ?? true }
-        self.isSorted = !descriptors.isEmpty
-        self.merge = { shown in
-            guard filter != nil else { return shown }
-            let visible: [I] = Array(shown)
-            let kept: Set<I.ID> = Set(visible.map(\.id))
-            var remaining: IndexingIterator<[I]> = visible.makeIterator()
-            let merged: [I] = ([I](syncedUnder: key) ?? []).filter { !shows($0) || kept.contains($0.id) }.compactMap { shows($0) ? remaining.next() : $0 }
-            var result: Value = shown
-            result.replaceSubrange(result.startIndex..<result.endIndex, with: merged + Array(remaining))
-            return result
-        }
-        self.read = { items in
-            var result: Value = items
-            result.replaceSubrange(result.startIndex..<result.endIndex, with: items.filter(shows).sorted(using: descriptors))
-            return result
-        }
-    }
-}
-
-/// One element of an array synced item by item, with its position in the array.
-fileprivate struct SyncedItem<Element: Codable>: Codable {
-
-    let position: Double
-    let value: Element
-}
-
 /// A key's value as kept on the device, with its sync status, the code of its last CloudKit failure, and the archived server fields of its record.
-fileprivate struct SyncEntry: Codable, Sendable {
+struct SyncEntry: Codable, Sendable {
 
     var confirmed: Data?
     var failure: Int?

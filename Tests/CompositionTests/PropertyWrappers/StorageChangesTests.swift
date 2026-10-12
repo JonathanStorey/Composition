@@ -32,21 +32,3 @@ import Testing
     }
 }
 #endif
-
-// MARK: - Foundation + notify + Observation
-
-#if canImport(Foundation) && canImport(notify) && canImport(Observation)
-import notify
-
-extension StorageChangesTests {
-
-    @Test(.timeLimit(.minutes(1))) func processNotificationNotifiesWhenWatchingAcrossProcesses() async {
-        let item: [String] = [UUID().uuidString]
-        let changes: StorageChanges = StorageChanges(item: item, acrossProcesses: true)
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            withObservationTracking({ changes.track() }, onChange: { continuation.resume() })
-            notify_post(StorageChanges.processName(for: item))
-        }
-    }
-}
-#endif

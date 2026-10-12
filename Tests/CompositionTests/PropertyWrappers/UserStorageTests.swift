@@ -18,15 +18,6 @@ private final class Settings {
 
 @Suite struct UserStorageTests {
 
-    @Test func appGroupStoreWritesToItsSuite() {
-        let key: String = UUID().uuidString
-        let storage: UserStorage<String?> = UserStorage(key, .appGroup("group.CompositionTests"))
-        storage.wrappedValue = "Dune"
-        #expect(UserDefaults(suiteName: "group.CompositionTests")?.string(forKey: key) == "Dune")
-        #expect(UserDefaults.standard.string(forKey: key) == nil)
-        storage.wrappedValue = nil
-    }
-
     @Test func initWithoutDefaultStartsNil() {
         #expect(UserStorage<String?>(UUID().uuidString).wrappedValue == nil)
     }

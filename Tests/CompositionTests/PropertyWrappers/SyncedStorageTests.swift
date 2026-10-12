@@ -11,7 +11,60 @@ import Observation
 import Testing
 @testable import Composition
 
+/// A to-do item, identifiable so SyncedStorage keeps each one as its own record.
+private struct Todo: Codable, Equatable, Identifiable, Sendable {
+
+    let id: Int
+    var title: String
+}
+
 @Suite struct SyncedStorageTests {
+
+    @Test func arrayOfIdentifiableElementsIsDefaultUntilWritten() {
+        let storage: SyncedStorage<[Todo]> = SyncedStorage(wrappedValue: [Todo(id: 1, title: "Read")], UUID().uuidString)
+        #expect(storage.wrappedValue == [Todo(id: 1, title: "Read")])
+        storage.wrappedValue = []
+        #expect(storage.wrappedValue.isEmpty)
+    }
+
+    @Test func arrayOfIdentifiableElementsKeepsEachElementAsItsOwnEntry() {
+        let key: String = UUID().uuidString
+        let storage: SyncedStorage<[Todo]> = SyncedStorage(wrappedValue: [], key)
+        storage.wrappedValue = [Todo(id: 1, title: "Read"), Todo(id: 2, title: "Write")]
+        #expect(storage.wrappedValue == [Todo(id: 1, title: "Read"), Todo(id: 2, title: "Write")])
+        #expect(SyncEngine.shared.values(under: key).keys.sorted() == ["\(key)/1", "\(key)/2"])
+        storage.wrappedValue = [Todo(id: 2, title: "Write")]
+        #expect(storage.wrappedValue == [Todo(id: 2, title: "Write")])
+        #expect(SyncEngine.shared.value("\(key)/1") == nil)
+    }
+
+    @Test func arrayOfIdentifiableElementsKeepsItsOrder() {
+        let storage: SyncedStorage<[Todo]> = SyncedStorage(wrappedValue: [], UUID().uuidString)
+        let todos: [Todo] = (1...4).map { Todo(id: $0, title: "\($0)") }
+        storage.wrappedValue = todos
+        storage.wrappedValue = [todos[3], todos[0], todos[2], todos[1]]
+        #expect(storage.wrappedValue.map(\.id) == [4, 1, 3, 2])
+    }
+
+    @Test func arrayOfIdentifiableElementsRewritesOnlyChangedElements() {
+        let key: String = UUID().uuidString
+        let storage: SyncedStorage<[Todo]> = SyncedStorage(wrappedValue: [], key)
+        storage.wrappedValue = [Todo(id: 1, title: "Read"), Todo(id: 2, title: "Write")]
+        let untouched: Data? = SyncEngine.shared.value("\(key)/1")
+        storage.wrappedValue = [Todo(id: 1, title: "Read"), Todo(id: 2, title: "Edit")]
+        #expect(SyncEngine.shared.value("\(key)/1") == untouched)
+    }
+
+    @Test func positionsKeepItemsStillInOrder() {
+        #expect(SyncEngine.positions(keeping: [0, 1, 2]) == [0, 1, 2])
+        #expect(SyncEngine.positions(keeping: [2, 0, 1]) == [-1, 0, 1])
+    }
+
+    @Test func positionsPlaceNewItemsBetweenTheirNeighbors() {
+        #expect(SyncEngine.positions(keeping: [0, nil, 1]) == [0, 0.5, 1])
+        #expect(SyncEngine.positions(keeping: [nil, 0, 1, nil]) == [-1, 0, 1, 2])
+        #expect(SyncEngine.positions(keeping: [nil, nil]) == [0, 1])
+    }
 
     @Test func prefersLocalOnlyWhenTheWriteIsNewer() {
         let earlier: Date = Date(timeIntervalSince1970: 1_000)

@@ -15,11 +15,11 @@ private struct Version: TreeNode {
 
 @Suite struct TreeCollectionTests {
 
-    let first: Version
-    let grandchild: Version
-    let root: Version = Version(parent: nil)
-    let second: Version
-    let versions: [Version]
+    private let first: Version
+    private let grandchild: Version
+    private let root: Version = Version(parent: nil)
+    private let second: Version
+    private let versions: [Version]
 
     init() {
         first = Version(parent: root.id)

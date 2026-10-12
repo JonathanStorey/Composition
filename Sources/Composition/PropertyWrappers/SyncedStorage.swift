@@ -1,7 +1,16 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/SyncedStorage.swift
 // dependencies: []
-// permissions: [aps-environment, com.apple.developer.icloud-container-identifiers, com.apple.developer.icloud-services]
+// permissions: [aps-environment, com.apple.developer.icloud-container-identifiers, com.apple.developer.icloud-services, UIBackgroundModes]
+
+// Setup in Xcode:
+// 1. Select the app target, open Signing & Capabilities, click + Capability, and add iCloud.
+// 2. Under iCloud, check CloudKit and select or create the container named iCloud. followed by the bundle identifier, which SyncedStorage uses.
+// 3. Click + Capability again and add Push Notifications, so other devices' changes arrive without waiting for the next launch.
+// 4. On iOS, also add Background Modes and check Remote notifications.
+// 5. Run on a device or simulator signed in to iCloud. Values stay on the device while signed out and sync once an account is available.
+// 6. Nothing is needed in the CloudKit Console during development, since the first save creates the SyncedStorage record type in the Development environment.
+// 7. Before TestFlight or the App Store, open the CloudKit Console at https://icloud.developer.apple.com, choose the container, and click Deploy Schema Changes to copy the schema to Production.
 
 // MARK: - Foundation
 

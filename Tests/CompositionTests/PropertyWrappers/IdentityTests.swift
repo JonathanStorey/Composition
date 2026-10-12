@@ -5,6 +5,7 @@
 // MARK: - CloudKit + Foundation + Network + Observation + os + Security
 
 #if canImport(CloudKit) && canImport(Foundation) && canImport(Network) && canImport(Observation) && canImport(os) && canImport(Security)
+import CloudKit
 import Foundation
 import Testing
 @testable import Composition
@@ -35,11 +36,23 @@ import Testing
 
 @Suite struct InternetConnectionTests {
 
-    @Test func confirmFailsAsOfflineWhenThePageWontLoad() async {
+    @Test func confirmFailsAsABadResponseWhenAPortalAnswers() async throws {
+        let key: String = UUID().uuidString
+        let url: URL = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try "<HTML><BODY>Sign in to Wi-Fi</BODY></HTML>".write(to: url, atomically: true, encoding: .utf8)
+        let connection: InternetConnection = InternetConnection(checking: url, storedUnder: key)
+        await connection.confirm()?.value
+        guard case .failure(let error) = connection.status else { Issue.record("Expected a failure"); return }
+        #expect((error as? URLError)?.code == .badServerResponse)
+        #expect(UserDefaults.standard.string(forKey: key) == nil)
+    }
+
+    @Test func confirmFailsWithTheNetworkErrorWhenThePageWontLoad() async {
         let key: String = UUID().uuidString
         let connection: InternetConnection = InternetConnection(checking: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString), storedUnder: key)
         await connection.confirm()?.value
-        #expect(connection.status == .failure(.offline))
+        guard case .failure(let error) = connection.status else { Issue.record("Expected a failure"); return }
+        #expect(error is URLError)
         #expect(UserDefaults.standard.string(forKey: key) == nil)
     }
 
@@ -51,12 +64,13 @@ import Testing
         await connection.confirm()?.value
         let identity: UUID? = UserDefaults.standard.string(forKey: key).flatMap(UUID.init(uuidString:))
         #expect(identity?.version == 7)
-        #expect(connection.status == identity.flatMap(Date.init(timestamp:)).map(SyncStatus.success))
+        guard case .success(let date) = connection.status else { Issue.record("Expected a success"); return }
+        #expect(date == identity.flatMap(Date.init(timestamp:)))
         UserDefaults.standard.removeObject(forKey: key)
     }
 
     @Test func statusStartsUnknownBeforeTheFirstCheck() {
-        #expect(InternetConnection(storedUnder: UUID().uuidString).status == .unknown)
+        guard case .unknown = InternetConnection(storedUnder: UUID().uuidString).status else { Issue.record("Expected unknown"); return }
     }
 }
 #endif
@@ -78,8 +92,9 @@ import SwiftUI
         let identity: Identity = Identity(of: .iCloud)
         identity.refresh()
         #expect(identity.wrappedValue == .zero)
-        #expect(identity.status == .failure(.unavailable))
         #expect(identity.lastSynced == nil)
+        guard case .failure(let error) = identity.status else { Issue.record("Expected a failure"); return }
+        #expect((error as? CKError)?.code == .missingEntitlement)
     }
     #endif
 
@@ -87,18 +102,15 @@ import SwiftUI
         let identity: Identity = Identity(of: .install)
         let created: Date? = Date(timestamp: identity.wrappedValue)
         identity.projectedValue.refresh()
-        #expect(identity.projectedValue.status == created.map(SyncStatus.success))
         #expect(identity.projectedValue.lastSynced == created)
+        guard case .success(let date) = identity.projectedValue.status else { Issue.record("Expected a success"); return }
+        #expect(date == created)
     }
 
     @Test func refreshKeepsScopesFixedForTheirLifetime() {
         let identities: [UUID] = [Identity(of: .device), Identity(of: .install), Identity(of: .launch)].map(\.wrappedValue)
         [Identity(of: .device), Identity(of: .install), Identity(of: .launch)].forEach { $0.refresh() }
         #expect([Identity(of: .device), Identity(of: .install), Identity(of: .launch)].map(\.wrappedValue) == identities)
-    }
-
-    @Test func scopeIsKept() {
-        #expect(Identity(of: .scene).scope == .scene)
     }
 
     @Test func storedScopesAreSharedAcrossWrappers() {

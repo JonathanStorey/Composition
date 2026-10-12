@@ -40,11 +40,11 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
 
     private let defaultValue: Value
     private let key: String
+    private let sort: (@Sendable (Value) -> Value)?
 
     /// Creates storage for the key that returns the default value until something is stored.
     public init(wrappedValue: Value, _ key: String) {
-        self.defaultValue = wrappedValue
-        self.key = key
+        self.init(wrappedValue: wrappedValue, key, sorting: nil)
     }
 
     /// Creates storage for the key that returns `nil` until something is stored.
@@ -52,15 +52,38 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
         self.init(wrappedValue: nil, key)
     }
 
-    /// The value kept on the device, or the default value when nothing is stored, where an array of identifiable elements syncs each element on its own; setting `nil` removes it.
+    /// Creates storage for the key whose identifiable elements, each synced on its own, read sorted by the descriptors.
+    public init<I: Codable & Identifiable & Sendable>(wrappedValue: Value, _ key: String, sort descriptors: [SortDescriptor<I>]) where Value == [I] {
+        self.init(wrappedValue: wrappedValue, key, sorting: { $0.sorted(using: descriptors) })
+    }
+
+    /// Creates storage for the key whose identifiable elements, each synced on its own, read sorted by the key path.
+    public init<I: Codable & Identifiable & Sendable, C: Comparable>(wrappedValue: Value, _ key: String, sort keyPath: KeyPath<I, C>, order: SortOrder = .forward) where Value == [I] {
+        self.init(wrappedValue: wrappedValue, key, sort: [SortDescriptor(keyPath, order: order)])
+    }
+
+    /// Creates storage for the key whose identifiable elements, each synced on its own, read sorted by the optional key path.
+    public init<I: Codable & Identifiable & Sendable, C: Comparable>(wrappedValue: Value, _ key: String, sort keyPath: KeyPath<I, C?>, order: SortOrder = .forward) where Value == [I] {
+        self.init(wrappedValue: wrappedValue, key, sort: [SortDescriptor(keyPath, order: order)])
+    }
+
+    /// Creates storage for the key that reads back through the sort, when there is one.
+    private init(wrappedValue: Value, _ key: String, sorting sort: (@Sendable (Value) -> Value)?) {
+        self.defaultValue = wrappedValue
+        self.key = key
+        self.sort = sort
+    }
+
+    /// The value kept on the device, or the default value when nothing is stored, where an array of identifiable elements syncs each element on its own and reads in the order written or the sort's; setting `nil` removes it.
     public var wrappedValue: Value {
         get {
-            if let Items: any SyncedItems.Type = Value.self as? any SyncedItems.Type { return Items.init(syncedUnder: key) as? Value ?? defaultValue }
+            if let Items: any SyncedItems.Type = Value.self as? any SyncedItems.Type, let items: Value = Items.init(syncedUnder: key) as? Value { return sort?(items) ?? items }
+            if Value.self is any SyncedItems.Type { return defaultValue }
             guard let data: Data = SyncEngine.shared.value(key), let value: Value = try? JSONDecoder().decode(Value.self, from: data) else { return defaultValue }
             return value
         }
         nonmutating set {
-            if Value.self is any SyncedItems.Type, let items: any SyncedItems = newValue as? any SyncedItems { return items.sync(under: key) }
+            if Value.self is any SyncedItems.Type, let items: any SyncedItems = newValue as? any SyncedItems { return items.sync(under: key, positioned: sort == nil) }
             let data: Data? = (try? JSONEncoder().encode(newValue)).flatMap { $0 == Data("null".utf8) ? nil : $0 }
             SyncEngine.shared.write([key: data])
         }
@@ -422,8 +445,8 @@ protocol SyncedItems {
     /// Reads the items kept under the key, or `nil` when none were ever stored.
     init?(syncedUnder key: String)
 
-    /// Keeps the items under the key, writing only the items that were added, changed, moved or removed.
-    func sync(under key: String)
+    /// Keeps the items under the key, writing only the items that were added, changed, removed or, when positioned, moved.
+    func sync(under key: String, positioned: Bool)
 }
 
 extension Array: SyncedItems where Element: Codable & Identifiable {
@@ -435,11 +458,12 @@ extension Array: SyncedItems where Element: Codable & Identifiable {
         self = items.sorted { ($0.item.position, $0.key) < ($1.item.position, $1.key) }.map(\.item.value)
     }
 
-    /// Keeps each element as its own record under `key/id`, writing only the elements that were added, changed, moved or removed.
-    func sync(under key: String) {
+    /// Keeps each element as its own record under `key/id`, writing only the elements that were added, changed, removed or, when positioned, moved, since a sorted list takes its order from the sort.
+    func sync(under key: String, positioned: Bool) {
         let stored: [String: Data] = SyncEngine.shared.values(under: key)
         let keys: [String] = map { "\(key)/\($0.id)" }
-        let positions: [Double] = SyncEngine.positions(keeping: keys.map { stored[$0].flatMap { try? JSONDecoder().decode(SyncedItem<Element>.self, from: $0).position } })
+        let old: [Double?] = keys.map { stored[$0].flatMap { try? JSONDecoder().decode(SyncedItem<Element>.self, from: $0).position } }
+        let positions: [Double] = positioned ? SyncEngine.positions(keeping: old) : old.map { $0 ?? 0 }
         let encoder: JSONEncoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         var changes: [String: Data?] = Dictionary(uniqueKeysWithValues: Set(stored.keys).subtracting(keys).map { ($0, Data?.none) })

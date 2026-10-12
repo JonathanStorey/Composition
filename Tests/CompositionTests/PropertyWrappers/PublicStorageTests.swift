@@ -37,6 +37,14 @@ import Testing
         #expect(storage.wrappedValue.isEmpty)
     }
 
+    @Test func sortedStorageReadsTheUsersEntry() {
+        let storage: PublicStorage<Int> = PublicStorage(UUID().uuidString, sort: \.self, order: .reverse)
+        storage.entry = 5
+        #expect(storage.wrappedValue == [5])
+        storage.entry = nil
+        #expect(storage.wrappedValue.isEmpty)
+    }
+
     @Test func wrappedValueIsEmptyForANewKey() {
         let storage: PublicStorage<Int> = PublicStorage(UUID().uuidString)
         #expect(storage.wrappedValue.isEmpty)

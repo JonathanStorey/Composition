@@ -16,6 +16,7 @@ private struct Todo: Codable, Equatable, Identifiable, Sendable {
 
     let id: Int
     var title: String
+    var due: Date? = nil
 }
 
 @Suite struct SyncedStorageTests {
@@ -53,6 +54,27 @@ private struct Todo: Codable, Equatable, Identifiable, Sendable {
         let untouched: Data? = SyncEngine.shared.value("\(key)/1")
         storage.wrappedValue = [Todo(id: 1, title: "Read"), Todo(id: 2, title: "Edit")]
         #expect(SyncEngine.shared.value("\(key)/1") == untouched)
+    }
+
+    @Test func arrayWithASortKeepsPositionsWhenReordered() {
+        let key: String = UUID().uuidString
+        let storage: SyncedStorage<[Todo]> = SyncedStorage(wrappedValue: [], key, sort: \.title)
+        storage.wrappedValue = [Todo(id: 1, title: "Write"), Todo(id: 2, title: "Read")]
+        let stored: [String: Data] = SyncEngine.shared.values(under: key)
+        storage.wrappedValue = [Todo(id: 2, title: "Read"), Todo(id: 1, title: "Write")]
+        #expect(SyncEngine.shared.values(under: key) == stored)
+    }
+
+    @Test func arrayWithASortReadsSorted() {
+        let storage: SyncedStorage<[Todo]> = SyncedStorage(wrappedValue: [], UUID().uuidString, sort: \.title, order: .reverse)
+        storage.wrappedValue = [Todo(id: 1, title: "Read"), Todo(id: 2, title: "Write")]
+        #expect(storage.wrappedValue.map(\.id) == [2, 1])
+    }
+
+    @Test func arrayWithAnOptionalSortPutsNilFirst() {
+        let storage: SyncedStorage<[Todo]> = SyncedStorage(wrappedValue: [], UUID().uuidString, sort: \.due)
+        storage.wrappedValue = [Todo(id: 1, title: "Read", due: .distantFuture), Todo(id: 2, title: "Write")]
+        #expect(storage.wrappedValue.map(\.id) == [2, 1])
     }
 
     @Test func positionsKeepItemsStillInOrder() {

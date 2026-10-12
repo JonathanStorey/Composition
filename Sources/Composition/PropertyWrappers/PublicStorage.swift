@@ -21,21 +21,34 @@ import Foundation
 import Observation
 import os
 
-/// Reads every user's entry for a key in the app's public iCloud database, oldest first.
+/// Reads every user's entry for a key in the app's public iCloud database, oldest first or in the order the sort gives.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
 public struct PublicStorage<Value: Codable & Sendable>: Sendable {
 
     private let key: String
+    private let sort: [SortDescriptor<Value>]
 
-    /// Creates storage for the key, shared by every user of the app.
-    public init(_ key: String) {
+    /// Creates storage for the key, shared by every user of the app, whose entries read oldest first or sorted by the descriptors.
+    public init(_ key: String, sort descriptors: [SortDescriptor<Value>] = []) {
         self.key = key
+        self.sort = descriptors
     }
 
-    /// Every user's entry, oldest first, refreshed from iCloud when read at most once a minute.
+    /// Creates storage for the key, shared by every user of the app, whose entries read sorted by the key path.
+    public init<C: Comparable>(_ key: String, sort keyPath: KeyPath<Value, C>, order: SortOrder = .forward) {
+        self.init(key, sort: [SortDescriptor(keyPath, order: order)])
+    }
+
+    /// Creates storage for the key, shared by every user of the app, whose entries read sorted by the optional key path.
+    public init<C: Comparable>(_ key: String, sort keyPath: KeyPath<Value, C?>, order: SortOrder = .forward) {
+        self.init(key, sort: [SortDescriptor(keyPath, order: order)])
+    }
+
+    /// Every user's entry, oldest first or in the order the sort gives, refreshed from iCloud when read at most once a minute.
     public var wrappedValue: [Value] {
-        PublicStore.shared.entries(key).compactMap { try? JSONDecoder().decode(Value.self, from: $0) }
+        let entries: [Value] = PublicStore.shared.entries(key).compactMap { try? JSONDecoder().decode(Value.self, from: $0) }
+        return sort.isEmpty ? entries : entries.sorted(using: sort)
     }
 
     /// The current user's entry, kept on the device and sent to iCloud; setting `nil` removes it.

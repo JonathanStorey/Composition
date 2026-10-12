@@ -17,7 +17,7 @@ import Security
 enum Identities {
 
     /// Kept in this device's Keychain, or the install's when the Keychain refuses it.
-    static let device: UUID = identity(in: .localOnly, or: install)
+    static let device: UUID = identity(or: install)
 
     /// Kept in Application Support and excluded from backup.
     static let install: UUID = identity(at: .applicationSupportDirectory.appending(path: Bundle.main.bundleIdentifier ?? "Composition").appending(path: "Identity"))
@@ -44,9 +44,9 @@ enum Identities {
         return identity
     }
 
-    /// Reads the identity stored in the Keychain at the location, or stores a new one there, returning the fallback when the Keychain refuses it.
-    private static func identity(in location: EncryptedStorage<UUID?>.Location, or fallback: @autoclosure () -> UUID) -> UUID {
-        let storage: EncryptedStorage<UUID?> = EncryptedStorage("\(location)", location, service: "Composition.Identity")
+    /// Reads the identity stored in this device's Keychain, or stores a new one there, returning the fallback when the Keychain refuses it.
+    private static func identity(or fallback: @autoclosure () -> UUID) -> UUID {
+        let storage: EncryptedStorage<UUID?> = EncryptedStorage("localOnly", .thisDevice, service: "Composition.Identity")
         if let identity: UUID = storage.wrappedValue, identity.version == 7 { return identity }
         storage.wrappedValue = .timestamp
         return storage.wrappedValue ?? fallback()

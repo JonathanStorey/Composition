@@ -80,6 +80,10 @@ public struct ListStorage<Value: Codable & Identifiable & Sendable>: Sendable {
     }
 }
 
+/// Another name for `ListStorage` that says it keeps identifiable items.
+@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
+public typealias IdentifiedStorage<Value: Codable & Identifiable & Sendable> = ListStorage<Value>
+
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 public extension ListStorage {
 

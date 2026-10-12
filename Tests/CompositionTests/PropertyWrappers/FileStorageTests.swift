@@ -1,10 +1,10 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/FileStorageTests.swift
-// dependencies: [PropertyWrappers/FileStorage.swift]
+// dependencies: [PropertyWrappers/FileStorage.swift, Protocols/FileRepresentable.swift]
 
-// MARK: - Foundation + Observation + os
+// MARK: - Foundation + Observation + os + UniformTypeIdentifiers
 
-#if canImport(Foundation) && canImport(Observation) && canImport(os)
+#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(UniformTypeIdentifiers)
 import Foundation
 import Observation
 import Testing
@@ -91,20 +91,20 @@ import Testing
         #expect(data.flatMap { try? PropertyListDecoder().decode([String: Int].self, from: $0) } == ["Dune": 1965])
     }
 
+    @Test func wrappedValueKeepsAStringAsJSONUnderAnUnrelatedExtension() {
+        let path: String = "\(UUID().uuidString).json"
+        let storage: FileStorage<String?> = FileStorage(path, .temp)
+        storage.wrappedValue = "Dune"
+        StoredFile.flushAll()
+        #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data("\"Dune\"".utf8))
+    }
+
     @Test func wrappedValueKeepsAStringAsText() {
         let path: String = UUID().uuidString
         let storage: FileStorage<String> = FileStorage(wrappedValue: "", path, .temp)
         storage.wrappedValue = "Dune"
         StoredFile.flushAll()
         #expect((try? String(contentsOf: URL.temporaryDirectory.appending(path: "\(path).txt"), encoding: .utf8)) == "Dune")
-    }
-
-    @Test func wrappedValueKeepsAStringAsTextUnderAnyExtension() {
-        let path: String = "\(UUID().uuidString).md"
-        let storage: FileStorage<String?> = FileStorage(path, .temp)
-        storage.wrappedValue = "# Dune"
-        StoredFile.flushAll()
-        #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data("# Dune".utf8))
     }
 
     @Test func wrappedValueKeepsDataAsIs() {
@@ -157,9 +157,9 @@ import Testing
 }
 #endif
 
-// MARK: - Foundation + Observation + os + SwiftUI
+// MARK: - Foundation + Observation + os + SwiftUI + UniformTypeIdentifiers
 
-#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(SwiftUI)
+#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(SwiftUI) && canImport(UniformTypeIdentifiers)
 import SwiftUI
 
 extension FileStorageTests {

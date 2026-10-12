@@ -13,34 +13,30 @@
 //   3. .iCloud keeps files hidden in the container. For .iCloudDrive, show the files in iCloud Drive by adding NSUbiquitousContainers to the Info tab: a dictionary keyed by the container identifier, holding NSUbiquitousContainerIsDocumentScopePublic set to YES, NSUbiquitousContainerName set to the folder's name, and NSUbiquitousContainerSupportedFolderLevels set to Any. Raise the build number so iCloud Drive notices the change.
 //   4. Run on a device or simulator signed in to iCloud. While iCloud is unavailable the file stays on the device and moves to iCloud at the first launch that can reach it.
 
-// MARK: - Foundation + Observation + os + UniformTypeIdentifiers
+// MARK: - Foundation + Observation + os
 
-#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(UniformTypeIdentifiers)
+#if canImport(Foundation) && canImport(Observation) && canImport(os)
 import Foundation
 import Observation
 import os
-import UniformTypeIdentifiers
 
-/// Reads and writes a value like `AppStorage`, kept in its own file inside the location in its own content type when it is `FileRepresentable` and the path's extension fits, as a property list under ".plist", and as JSON otherwise, cached in memory, written in the background, and reloaded when another process or iCloud changes the file.
+/// Reads and writes a value like `AppStorage`, kept in its own file inside the location in its own format when it is `FileRepresentable` and as JSON otherwise, cached in memory, written in the background, and reloaded when another process or iCloud changes the file.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
 public struct FileStorage<Value: Codable & Sendable>: Sendable {
 
     private let defaultValue: Value
     private let file: StoredFile
-    private let format: Format
+    private let isRepresentable: Bool
 
-    /// Creates storage for the path that returns the default value until something is stored, where a path without an extension, such as "Settings/theme", gets the `FileRepresentable` type's preferred extension or ".json", and a `FileRepresentable` value is kept in its own content type when the path's type and its own are related either way, stopping on a path that could leave the location.
+    /// Creates storage for the path that returns the default value until something is stored, where a path without an extension, such as "Settings/theme", gets the `FileRepresentable` type's preferred extension or ".json", stopping on a path that could leave the location.
     public init(wrappedValue: Value, _ path: String, _ location: Location = .app) {
         let violation: String? = StoredFile.pathViolation(path)
         precondition(violation == nil, violation ?? "")
         let representable: (any FileRepresentable.Type)? = Value.self as? any FileRepresentable.Type
-        let filePath: String = StoredFile.withExtension(path, representable?.preferredFilenameExtension ?? "json")
-        let pathExtension: String = URL(filePath: filePath).pathExtension
-        let pathType: UTType? = UTType(filenameExtension: pathExtension)
         self.defaultValue = wrappedValue
-        self.file = location.file(filePath)
-        self.format = if let representable, let pathType, pathType.conforms(to: representable.contentType) || representable.contentType.conforms(to: pathType) { .file } else if pathExtension.lowercased() == "plist" { .propertyList } else { .json }
+        self.file = location.file(StoredFile.withExtension(path, representable?.preferredFilenameExtension ?? "json"))
+        self.isRepresentable = representable != nil
     }
 
     /// Creates storage for the path that returns `nil` until something is stored.
@@ -52,21 +48,18 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
     public var wrappedValue: Value {
         get {
             guard let data: Data = file.data else { return defaultValue }
-            let value: Value? = switch format {
-            case .file: DecodedValues.decode(data) { try (Value.self as? any FileRepresentable.Type)?.init(fileContents: $0) as? Value }
-            case .json: DecodedValues.decode(data) { try JSONDecoder().decode(Value.self, from: $0) }
-            case .propertyList: DecodedValues.decode(data) { try PropertyListDecoder().decode(Value.self, from: $0) }
+            let value: Value? = if isRepresentable {
+                DecodedValues.decode(data) { try (Value.self as? any FileRepresentable.Type)?.init(fileContents: $0) as? Value }
+            } else {
+                DecodedValues.decode(data) { try JSONDecoder().decode(Value.self, from: $0) }
             }
             return value ?? defaultValue
         }
         nonmutating set {
             let mirror: Mirror = Mirror(reflecting: newValue)
             guard mirror.displayStyle != .optional || !mirror.children.isEmpty else { return file.write(nil) }
-            switch format {
-            case .file: file.write(try? (newValue as? any FileRepresentable)?.fileContents)
-            case .json: file.write(try? JSONEncoder().encode(newValue))
-            case .propertyList: file.write(try? PropertyListEncoder().encode(newValue))
-            }
+            let contents: Data? = if isRepresentable { try? (newValue as? any FileRepresentable)?.fileContents() } else { try? JSONEncoder().encode(newValue) }
+            file.write(contents)
         }
     }
 }
@@ -306,12 +299,6 @@ fileprivate struct Contents: Sendable {
     var writes: Int = 0
 }
 
-/// How a file's contents are written: in the value's own content type, as JSON, or as a property list.
-fileprivate enum Format: Sendable {
-
-    case file, json, propertyList
-}
-
 /// Values decoded from stored files, remembered by the data they came from so reading unchanged data again skips the decoder, and dropped when memory runs low.
 fileprivate enum DecodedValues {
 
@@ -339,9 +326,9 @@ fileprivate final class DecodedValue {
 }
 #endif
 
-// MARK: - Foundation + Observation + os + SwiftUI + UniformTypeIdentifiers
+// MARK: - Foundation + Observation + os + SwiftUI
 
-#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(SwiftUI) && canImport(UniformTypeIdentifiers)
+#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(SwiftUI)
 import SwiftUI
 
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)

@@ -108,11 +108,10 @@ private struct Todo: Codable, Equatable, Identifiable, Sendable {
     }
     #endif
 
-    @Test func collectionStartsUnknownWithNothingPendingOrFailed() {
+    @Test func collectionStartsUnknownWithNothingPending() {
         let todos: SyncedStorage<Todo>.Collection = SyncedStorage<SyncedStorage<Todo>.Collection>(wrappedValue: [], UUID().uuidString).wrappedValue
         guard case .unknown = todos.status else { Issue.record("Expected unknown"); return }
         #expect(todos.pending.isEmpty)
-        #expect(todos.failed.isEmpty)
     }
 
     @Test func collectionWithAFilterReadsOnlyMatchingItems() {

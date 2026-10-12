@@ -135,6 +135,9 @@ public extension SyncedStorage where Value: Identifiable {
 
         /// An item removed on this device, as it was last synced.
         case remove(Value)
+
+        /// An item iCloud rejected with the error, which stays on the device and is tried again on every refresh and launch until a save succeeds.
+        case failed(Value, CKError)
     }
 
     /// A list kept by SyncedStorage that works like an array and reports how its sync is going.
@@ -179,19 +182,12 @@ public extension SyncedStorage where Value: Identifiable {
             items.endIndex
         }
 
-        /// The items iCloud rejected, each with the error it gave, which stay on the device and are tried again on every refresh and launch until a save succeeds.
-        public var failed: [(item: Value, error: any Error)] {
-            guard let key else { return [] }
-            return Self.oldestFirst(SyncEngine.shared.entries(under: key)).compactMap { entry in
-                guard case .failure(let error) = entry.status, let item: Value = Self.item(entry.value ?? entry.confirmed) else { return nil }
-                return (item, error)
-            }
-        }
-
-        /// The changes made on this device that haven't reached iCloud yet, oldest first, kept on the device until they do.
+        /// The changes made on this device that haven't reached iCloud yet, failed ones included, oldest first, kept on the device until they do.
         public var pending: [Change] {
             guard let key else { return [] }
-            return Self.oldestFirst(SyncEngine.shared.entries(under: key)).filter(\.isPending).compactMap { entry in
+            return Self.oldestFirst(SyncEngine.shared.entries(under: key)).compactMap { entry in
+                if case .failure(let error) = entry.status, let item: Value = Self.item(entry.value ?? entry.confirmed) { return .failed(item, error as? CKError ?? CKError(.internalError)) }
+                guard entry.isPending else { return nil }
                 if let item: Value = Self.item(entry.value) { return entry.confirmed == nil && entry.record == nil ? .insert(item) : .update(item) }
                 return Self.item(entry.confirmed).map(Change.remove)
             }

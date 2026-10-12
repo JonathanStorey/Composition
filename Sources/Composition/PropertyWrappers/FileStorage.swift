@@ -29,13 +29,13 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
     private let file: StoredFile
     private let isRaw: Bool
 
-    /// Creates storage for the path that returns the default value until something is stored, where `Data` keeps its path and extension, as in "Images/avatar.png", and any other value is kept as JSON with ".json" added to a name without one, as in "Settings/theme", stopping on a path that could leave the location or misuses an extension.
+    /// Creates storage for the path that returns the default value until something is stored, where `Data` keeps its extension, as in "Images/avatar.png", or gets ".dat" without one, and any other value is kept as JSON with ".json" added to a name without an extension, as in "Settings/theme", stopping on a path that could leave the location or gives JSON an extension.
     public init(wrappedValue: Value, _ path: String, _ location: Location = .app) {
         let isRaw: Bool = Value.self == Data.self || Value.self == Data?.self
         let violation: String? = StoredFile.pathViolation(path, isFile: isRaw)
         precondition(violation == nil, violation ?? "")
         self.defaultValue = wrappedValue
-        self.file = location.folder.file(isRaw ? path : "\(path).json")
+        self.file = location.folder.file(isRaw ? StoredFile.withExtension(path) : "\(path).json")
         self.isRaw = isRaw
     }
 
@@ -194,14 +194,17 @@ final class StoredFile: NSObject, NSFilePresenter, Observable, Sendable {
         files.withLock { Array($0.values) }.forEach { $0.queue.sync {} }
     }
 
-    /// Why the path can't name a file inside its location, or `nil` when it can: a relative path of names, none starting with ".", whose last name has an extension for a file and none for a name that gets ".json".
+    /// Why the path can't name a file inside its location, or `nil` when it can: a relative path of names, none starting with ".", whose last name has no extension unless it's a file kept as given.
     static func pathViolation(_ path: String, isFile: Bool) -> String? {
         let components: [Substring] = path.split(separator: "/", omittingEmptySubsequences: false)
         guard !path.hasPrefix("/"), components.allSatisfy({ !$0.isEmpty && !$0.hasPrefix(".") }) else { return "The FileStorage path \"\(path)\" must be relative, without empty components or ones starting with \".\"." }
-        let hasExtension: Bool = components.last?.contains(".") ?? false
-        if isFile, !hasExtension { return "The FileStorage path \"\(path)\" for data needs a file name with an extension, such as \"Images/avatar.png\"." }
-        if !isFile, hasExtension { return "The FileStorage name \"\(path)\" can't have an extension, since FileStorage adds \".json\", as in \"Settings/theme\"." }
+        if !isFile, components.last?.contains(".") == true { return "The FileStorage name \"\(path)\" can't have an extension, since FileStorage adds \".json\", as in \"Settings/theme\"." }
         return nil
+    }
+
+    /// The path as given when its last name has an extension, or with ".dat" added when it has none.
+    static func withExtension(_ path: String) -> String {
+        path.split(separator: "/").last?.contains(".") == true ? path : "\(path).dat"
     }
 
     /// The shared file at the URL, created on first use.

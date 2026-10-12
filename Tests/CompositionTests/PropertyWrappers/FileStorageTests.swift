@@ -40,15 +40,15 @@ import Testing
     @Test func pathViolationAllowsNamesForJSONAndFilePathsForData() {
         #expect(StoredFile.pathViolation("Settings/Colors/theme", isFile: false) == nil)
         #expect(StoredFile.pathViolation("Images/avatar.png", isFile: true) == nil)
+        #expect(StoredFile.pathViolation("Images/avatar", isFile: true) == nil)
     }
 
-    @Test func pathViolationCatchesPathsThatLeaveTheLocationOrMisuseExtensions() {
+    @Test func pathViolationCatchesPathsThatLeaveTheLocationOrGiveJSONAnExtension() {
         for path: String in ["", "/theme", "Settings/", "Settings//theme", "../theme", "Settings/./theme", ".hidden"] {
             #expect(StoredFile.pathViolation(path, isFile: false) != nil)
             #expect(StoredFile.pathViolation(path, isFile: true) != nil)
         }
         #expect(StoredFile.pathViolation("theme.json", isFile: false) != nil)
-        #expect(StoredFile.pathViolation("Images/avatar", isFile: true) != nil)
     }
 
     #if compiler(>=6.2) && os(macOS)
@@ -56,6 +56,11 @@ import Testing
         await #expect(processExitsWith: .failure) { _ = FileStorage<Int>(wrappedValue: 0, "../theme", .temp) }
     }
     #endif
+
+    @Test func withExtensionAddsDatOnlyWhenThereIsNone() {
+        #expect(StoredFile.withExtension("Images/avatar.png") == "Images/avatar.png")
+        #expect(StoredFile.withExtension("Exports.2026/report") == "Exports.2026/report.dat")
+    }
 
     @Test func wrappedValueChangeNotifiesObservers() async {
         let storage: FileStorage<Int?> = FileStorage(UUID().uuidString, .temp)

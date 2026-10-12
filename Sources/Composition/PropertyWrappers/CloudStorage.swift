@@ -14,17 +14,16 @@ import Observation
 @propertyWrapper
 public struct CloudStorage<Value: Codable & Sendable>: Sendable {
 
-    /// The value returned when nothing is stored.
-    public let defaultValue: Value
-    /// The key the value is stored under.
-    public let key: String
     private let changes: StorageChanges
+    private let defaultValue: Value
+    private let key: String
 
     /// Creates storage for the key that returns the default value until something is stored.
     public init(wrappedValue: Value, _ key: String) {
         self.defaultValue = wrappedValue
         self.key = key
         self.changes = StorageChanges(item: ["iCloud", key], observing: [NSUbiquitousKeyValueStore.didChangeExternallyNotification])
+        _ = synchronizesAtLaunch
     }
 
     /// Creates storage for the key that returns `nil` until something is stored.
@@ -50,6 +49,9 @@ public struct CloudStorage<Value: Codable & Sendable>: Sendable {
         }
     }
 }
+
+/// Asks iCloud for the latest values once per launch, as Apple advises, so changes made on other devices arrive and notify.
+fileprivate let synchronizesAtLaunch: Bool = NSUbiquitousKeyValueStore.default.synchronize()
 #endif
 
 // MARK: - Foundation + Observation + SwiftUI

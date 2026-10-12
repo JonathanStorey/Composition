@@ -21,14 +21,6 @@ import Testing
         backedUp.wrappedValue = nil
     }
 
-    @Test func initDefaultsToLocalOnly() {
-        #expect(EncryptedStorage<String?>("token").location == .localOnly)
-    }
-
-    @Test func initTakesLocationAsSecondArgument() {
-        #expect(EncryptedStorage<String?>("token", .iCloud).location == .iCloud)
-    }
-
     @Test func keychainStorageIsEncryptedStorage() {
         let storage: EncryptedStorage<Int> = KeychainStorage(wrappedValue: 3, UUID().uuidString, service: "CompositionTests")
         #expect(storage.wrappedValue == 3)

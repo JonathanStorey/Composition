@@ -2,63 +2,43 @@
 // path: PropertyWrappers/SyncedStorageTests.swift
 // dependencies: [PropertyWrappers/SyncedStorage.swift]
 
-// MARK: - Foundation
-
-#if canImport(Foundation)
-import Foundation
-import Testing
-@testable import Composition
-
-@Suite struct SyncStatusTests {
-
-    @Test func statusSurvivesEncoding() throws {
-        let status: SyncStatus = .failure(.quotaExceeded)
-        #expect(try JSONDecoder().decode(SyncStatus.self, from: JSONEncoder().encode(status)) == status)
-    }
-}
-#endif
-
 // MARK: - CloudKit + Foundation + Observation + os + Security
 
 #if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security)
+import CloudKit
+import Foundation
 import Observation
+import Testing
+@testable import Composition
 
 @Suite struct SyncedStorageTests {
-
-    @Test func initDefaultsToLatestConflict() {
-        #expect(SyncedStorage<String?>("theme").conflict == .latest)
-    }
-
-    @Test func initTakesConflictAsSecondArgument() {
-        #expect(SyncedStorage<String?>("theme", .first).conflict == .first)
-    }
 
     @Test func prefersLocalOnlyWhenTheWriteIsNewer() {
         let earlier: Date = Date(timeIntervalSince1970: 1_000)
         let later: Date = Date(timeIntervalSince1970: 2_000)
-        #expect(SyncEngine.prefersLocal(written: later, over: earlier, keepsFirst: false))
-        #expect(!SyncEngine.prefersLocal(written: earlier, over: later, keepsFirst: false))
-        #expect(SyncEngine.prefersLocal(written: earlier, over: nil, keepsFirst: false))
+        #expect(SyncEngine.prefersLocal(written: later, over: earlier))
+        #expect(!SyncEngine.prefersLocal(written: earlier, over: later))
+        #expect(SyncEngine.prefersLocal(written: earlier, over: nil))
     }
 
-    @Test func prefersServerOnATieOrWhenKeepingTheFirst() {
+    @Test func prefersServerOnATie() {
         let date: Date = Date(timeIntervalSince1970: 1_000)
-        #expect(!SyncEngine.prefersLocal(written: date, over: date, keepsFirst: false))
-        #expect(!SyncEngine.prefersLocal(written: date.addingTimeInterval(1), over: date, keepsFirst: true))
-        #expect(!SyncEngine.prefersLocal(written: nil, over: nil, keepsFirst: false))
+        #expect(!SyncEngine.prefersLocal(written: date, over: date))
+        #expect(!SyncEngine.prefersLocal(written: nil, over: nil))
     }
 
     #if os(macOS)
     @Test func refreshFailsWithoutTheCloudKitEntitlement() {
         let storage: SyncedStorage<Int?> = SyncedStorage(UUID().uuidString)
         storage.refresh()
-        #expect(storage.status == .failure(.unavailable))
+        guard case .failure(let error) = storage.status else { Issue.record("Expected a failure"); return }
+        #expect((error as? CKError)?.code == .missingEntitlement)
     }
     #endif
 
     @Test func statusStartsUnknownForANewKey() {
         let storage: SyncedStorage<Int?> = SyncedStorage(UUID().uuidString)
-        #expect(storage.status == .unknown)
+        guard case .unknown = storage.status else { Issue.record("Expected unknown"); return }
         #expect(storage.lastSynced == nil)
     }
 
@@ -72,7 +52,7 @@ import Observation
     @Test func wrappedValueChangeLeavesStatusUnknown() {
         let storage: SyncedStorage<Int?> = SyncedStorage(UUID().uuidString)
         storage.wrappedValue = 3
-        #expect(storage.status == .unknown)
+        guard case .unknown = storage.status else { Issue.record("Expected unknown"); return }
         storage.wrappedValue = nil
     }
 

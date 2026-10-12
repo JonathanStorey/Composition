@@ -14,15 +14,11 @@ import Security
 @propertyWrapper
 public struct EncryptedStorage<Value: Codable & Sendable>: Sendable {
 
-    /// The value returned when nothing is stored.
-    public let defaultValue: Value
-    /// The account name the value is stored under.
-    public let key: String
-    /// Where the Keychain keeps the value.
-    public let location: Location
-    /// The service name that groups this wrapper's values.
-    public let service: String
     private let changes: StorageChanges
+    private let defaultValue: Value
+    private let key: String
+    private let location: Location
+    private let service: String
 
     /// Creates storage for the key that returns the default value until something is stored.
     public init(wrappedValue: Value, _ key: String, _ location: Location = .localOnly, service: String = Bundle.main.bundleIdentifier ?? "Composition") {

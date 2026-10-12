@@ -71,11 +71,11 @@ final class InternetConnection: Observable, Sendable {
         self.url = url
     }
 
-    /// Whether the URL loads a page saying "Success", which captive portals and dead connections can't return.
-    private static func loads(_ url: URL) async -> Bool {
+    /// Loads the URL, throwing the network's error, or a bad server response when a captive portal or anything but a page saying "Success" answers.
+    private static func load(_ url: URL) async throws {
         let request: URLRequest = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 10)
-        guard let loaded: (data: Data, response: URLResponse) = try? await URLSession.shared.data(for: request) else { return false }
-        return ((loaded.response as? HTTPURLResponse)?.statusCode ?? 200) == 200 && String(decoding: loaded.data, as: UTF8.self).contains("Success")
+        let (data, response): (Data, URLResponse) = try await URLSession.shared.data(for: request)
+        guard ((response as? HTTPURLResponse)?.statusCode ?? 200) == 200, String(decoding: data, as: UTF8.self).contains("Success") else { throw URLError(.badServerResponse) }
     }
 
     /// The identity of the last confirmed connection, or zero before the first, watching the network from the first read.
@@ -97,18 +97,19 @@ final class InternetConnection: Observable, Sendable {
     /// Loads the page in the background, moving the status to syncing and then to success with a new identity, or to failure, returning `nil` when a check is already under way.
     @discardableResult func confirm() -> Task<Void, Never>? {
         let starts: Bool = update { state in
-            guard state.status != .syncing else { return false }
+            if case .syncing = state.status { return false }
             state.status = .syncing
             return true
         }
         guard starts else { return nil }
         return Task {
-            let confirmed: Bool = await Self.loads(url)
-            let identity: UUID = .timestamp
-            if confirmed { UserDefaults.standard.set(identity.uuidString, forKey: key) }
-            update { state in
-                if confirmed { state.identity = identity }
-                state.status = confirmed ? .success(Date(timestamp: identity) ?? .now) : .failure(.offline)
+            do {
+                try await Self.load(url)
+                let identity: UUID = .timestamp
+                UserDefaults.standard.set(identity.uuidString, forKey: key)
+                update { $0 = (identity, .success(Date(timestamp: identity) ?? .now)) }
+            } catch {
+                update { $0.status = .failure(error) }
             }
         }
     }
@@ -127,7 +128,7 @@ final class InternetConnection: Observable, Sendable {
                 if path.status == .satisfied {
                     self?.confirm()
                 } else {
-                    self?.update { $0.status = .failure(.offline) }
+                    self?.update { $0.status = .failure(URLError(.notConnectedToInternet)) }
                 }
             }
             created.start(queue: DispatchQueue(label: "Composition.InternetConnection"))
@@ -172,8 +173,7 @@ public struct Identity: DynamicProperty {
         case internet
     }
 
-    /// How widely the identity is shared and how long it lasts.
-    public let scope: Scope
+    private let scope: Scope
     @SceneStorage("Composition.Identity.scene") private var sceneIdentity: String?
     @State private var viewIdentity: UUID = .timestamp
 

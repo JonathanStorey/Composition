@@ -14,13 +14,10 @@ import Observation
 @propertyWrapper
 public struct UserStorage<Value: Codable & Sendable>: Sendable {
 
-    /// The value returned when nothing is stored.
-    public let defaultValue: Value
-    /// The key the value is stored under.
-    public let key: String
-    /// The user defaults the value is stored in.
-    public let store: Store
     private let changes: StorageChanges
+    private let defaultValue: Value
+    private let key: String
+    private let store: Store
 
     /// Creates storage for the key that returns the default value until something is stored.
     public init(wrappedValue: Value, _ key: String, _ store: Store = .standard) {

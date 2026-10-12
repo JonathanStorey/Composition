@@ -19,15 +19,12 @@ private final class Settings {
 @Suite struct UserStorageTests {
 
     @Test func appGroupStoreWritesToItsSuite() {
-        let storage: UserStorage<String?> = UserStorage(UUID().uuidString, .appGroup("group.CompositionTests"))
+        let key: String = UUID().uuidString
+        let storage: UserStorage<String?> = UserStorage(key, .appGroup("group.CompositionTests"))
         storage.wrappedValue = "Dune"
-        #expect(UserDefaults(suiteName: "group.CompositionTests")?.string(forKey: storage.key) == "Dune")
-        #expect(UserDefaults.standard.string(forKey: storage.key) == nil)
+        #expect(UserDefaults(suiteName: "group.CompositionTests")?.string(forKey: key) == "Dune")
+        #expect(UserDefaults.standard.string(forKey: key) == nil)
         storage.wrappedValue = nil
-    }
-
-    @Test func initDefaultsToStandardStore() {
-        #expect(UserStorage<String?>("volume").store == .standard)
     }
 
     @Test func initWithoutDefaultStartsNil() {
@@ -66,18 +63,20 @@ private final class Settings {
     }
 
     @Test func wrappedValueStoresCodableValuesAsJSON() {
-        let storage: UserStorage<[String]?> = UserStorage(UUID().uuidString)
+        let key: String = UUID().uuidString
+        let storage: UserStorage<[String]?> = UserStorage(key)
         storage.wrappedValue = ["Dune", "Emma"]
         #expect(storage.wrappedValue == ["Dune", "Emma"])
-        #expect(UserDefaults.standard.object(forKey: storage.key) is Data)
+        #expect(UserDefaults.standard.object(forKey: key) is Data)
         storage.wrappedValue = nil
-        #expect(UserDefaults.standard.object(forKey: storage.key) == nil)
+        #expect(UserDefaults.standard.object(forKey: key) == nil)
     }
 
     @Test func wrappedValueStoresPropertyListValuesAsIs() {
-        let storage: UserStorage<String?> = UserStorage(UUID().uuidString)
+        let key: String = UUID().uuidString
+        let storage: UserStorage<String?> = UserStorage(key)
         storage.wrappedValue = "Dune"
-        #expect(UserDefaults.standard.string(forKey: storage.key) == "Dune")
+        #expect(UserDefaults.standard.string(forKey: key) == "Dune")
         storage.wrappedValue = nil
     }
 }
@@ -115,10 +114,11 @@ import SwiftUI
 extension UserStorageTests {
 
     @Test func projectedValueWritesThroughToUserDefaults() {
-        let storage: UserStorage<Bool> = UserStorage(wrappedValue: false, UUID().uuidString)
+        let key: String = UUID().uuidString
+        let storage: UserStorage<Bool> = UserStorage(wrappedValue: false, key)
         storage.projectedValue.wrappedValue = true
-        #expect(UserDefaults.standard.bool(forKey: storage.key))
-        UserDefaults.standard.removeObject(forKey: storage.key)
+        #expect(UserDefaults.standard.bool(forKey: key))
+        UserDefaults.standard.removeObject(forKey: key)
     }
 }
 #endif

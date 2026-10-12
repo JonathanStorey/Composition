@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/PublicStorage.swift
-// dependencies: [PropertyWrappers/SyncedStorage.swift]
+// dependencies: [PropertyWrappers/StorageCache.swift, PropertyWrappers/StorageFile.swift, PropertyWrappers/SyncedStorage.swift]
 // permissions: [com.apple.developer.icloud-container-identifiers, com.apple.developer.icloud-services]
 
 // Setup in Xcode:
@@ -49,18 +49,18 @@ public struct PublicStorage<Value: Codable & Sendable>: Sendable {
 
     /// Every user's entry that passes the filter, oldest first or in the order the sort gives, refreshed from iCloud when read at most once a minute.
     public var wrappedValue: [Value] {
-        let entries: [Value] = PublicStore.shared.entries(key).compactMap { try? JSONDecoder().decode(Value.self, from: $0) }.filter { entry in filter.map { (try? $0.evaluate(entry)) ?? false } ?? true }
+        let entries: [Value] = PublicStore.shared.entries(key).compactMap { StorageCache.decode(Value.self, from: $0) }.filter { entry in filter.map { (try? $0.evaluate(entry)) ?? false } ?? true }
         return sort.isEmpty ? entries : entries.sorted(using: sort)
     }
 
     /// The current user's entry, kept on the device and sent to iCloud; setting `nil` removes it.
     var entry: Value? {
-        get { PublicStore.shared.entry(key).flatMap { try? JSONDecoder().decode(Value.self, from: $0) } }
+        get { PublicStore.shared.entry(key).flatMap { StorageCache.decode(Value.self, from: $0) } }
         nonmutating set { PublicStore.shared.write(newValue.flatMap { try? JSONEncoder().encode($0) }, key) }
     }
 }
 
-/// Keeps each key's entries on the device and syncs them through the public iCloud database, one record per user, where the newest write wins.
+/// Keeps each key's entries in a file on the device and syncs them through the public iCloud database, one record per user, where the newest write wins.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 final class PublicStore: Observable, Sendable {
 
@@ -70,15 +70,15 @@ final class PublicStore: Observable, Sendable {
 
     /// Restores the entries kept on the device.
     private init() {
-        let stored: [String: PublicEntry] = UserDefaults.standard.data(forKey: Self.entriesKey).flatMap { try? JSONDecoder().decode([String: PublicEntry].self, from: $0) } ?? [:]
+        let stored: [String: PublicEntry] = Self.file.read() ?? [:]
         self.entries = OSAllocatedUnfairLock(initialState: stored)
     }
 
     /// The store every public value shares.
     static let shared: PublicStore = PublicStore()
 
-    /// The user defaults key the entries are kept under.
-    private static let entriesKey: String = "Composition.PublicStorage.entries"
+    /// The file the entries are kept in.
+    private static let file: StorageFile<[String: PublicEntry]> = StorageFile("PublicStorage")
 
     /// The record type every entry is saved as.
     private static let recordType: CKRecord.RecordType = "PublicStorage"
@@ -198,13 +198,12 @@ final class PublicStore: Observable, Sendable {
 
     /// Changes the entries, keeps them on the device, and tells observers.
     private func update(_ key: String, _ change: @Sendable (inout PublicEntry) -> Void) {
-        let data: Data? = registrar.withMutation(of: self, keyPath: \.revision) {
+        registrar.withMutation(of: self, keyPath: \.revision) {
             entries.withLock { entries in
                 change(&entries[key, default: PublicEntry()])
-                return try? JSONEncoder().encode(entries)
+                Self.file.write(entries)
             }
         }
-        UserDefaults.standard.set(data, forKey: Self.entriesKey)
     }
 }
 

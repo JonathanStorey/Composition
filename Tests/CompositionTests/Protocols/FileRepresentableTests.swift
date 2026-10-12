@@ -28,8 +28,8 @@ import UniformTypeIdentifiers
         #expect(throws: CocoaError.self) { try String(fileContents: Data([0xFF, 0xFE, 0xFD])) }
     }
 
-    @Test func stringPrefersTheTxtExtension() {
-        #expect(UTType.utf8PlainText.preferredFilenameExtension == "txt")
+    @Test func stringPrefersTheTxtExtensionOfItsParentType() {
+        #expect(UTType.utf8PlainText.preferredFilenameExtension == nil)
         #expect(String.preferredFilenameExtension == "txt")
     }
 

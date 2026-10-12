@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/SyncedStorage.swift
-// dependencies: []
+// dependencies: [PropertyWrappers/StorageCache.swift, PropertyWrappers/StorageFile.swift]
 // permissions: [aps-environment, com.apple.developer.icloud-container-identifiers, com.apple.developer.icloud-services, UIBackgroundModes]
 
 // Setup in Xcode:
@@ -88,7 +88,7 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
         get {
             if let Items: any SyncedItems.Type = Value.self as? any SyncedItems.Type, let items: Value = Items.init(syncedUnder: key) as? Value { return query?.read(items) ?? items }
             if Value.self is any SyncedItems.Type { return defaultValue }
-            guard let data: Data = SyncEngine.shared.value(key), let value: Value = try? JSONDecoder().decode(Value.self, from: data) else { return defaultValue }
+            guard let data: Data = SyncEngine.shared.value(key), let value: Value = StorageCache.decode(Value.self, from: data) else { return defaultValue }
             return value
         }
         nonmutating set {
@@ -110,7 +110,7 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
 
     /// The value as of its last round trip to iCloud, or the default value before the first.
     var syncedValue: Value {
-        guard let data: Data = SyncEngine.shared.syncedValue(key), let value: Value = try? JSONDecoder().decode(Value.self, from: data) else { return defaultValue }
+        guard let data: Data = SyncEngine.shared.syncedValue(key), let value: Value = StorageCache.decode(Value.self, from: data) else { return defaultValue }
         return value
     }
 
@@ -120,7 +120,7 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
     }
 }
 
-/// Keeps every synced value on the device and syncs them through the private iCloud database, where the newest write wins, tracking each key's status.
+/// Keeps every synced value in a file on the device and syncs them through the private iCloud database, where the newest write wins, tracking each key's status.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
 
@@ -130,7 +130,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
 
     /// Restores the values kept on the device, each starting at its last success, or unknown when it never synced.
     private init() {
-        let stored: [String: SyncEntry] = UserDefaults.standard.data(forKey: Self.entriesKey).flatMap { try? JSONDecoder().decode([String: SyncEntry].self, from: $0) } ?? [:]
+        let stored: [String: SyncEntry] = Self.entriesFile.read() ?? [:]
         self.entries = OSAllocatedUnfairLock(initialState: stored.mapValues { entry in
             var restored: SyncEntry = entry
             restored.status = entry.synced.map(SyncStatus.success) ?? .unknown
@@ -141,11 +141,11 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
     /// The engine every synced value shares.
     static let shared: SyncEngine = SyncEngine()
 
-    /// The user defaults key the values are kept under.
-    private static let entriesKey: String = "Composition.SyncedStorage.entries"
+    /// The file the engine's state is kept in.
+    private static let engineFile: StorageFile<CKSyncEngine.State.Serialization> = StorageFile("SyncEngine")
 
-    /// The user defaults key the engine's state is kept under.
-    private static let serializationKey: String = "Composition.SyncedStorage.engine"
+    /// The file the values are kept in.
+    private static let entriesFile: StorageFile<[String: SyncEntry]> = StorageFile("SyncedStorage")
 
     /// Whether a write waiting on the device should replace the server's value, which only a strictly newer write does.
     static func prefersLocal(written local: Date?, over server: Date?) -> Bool {
@@ -221,7 +221,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
     func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
         switch event {
         case .stateUpdate(let update):
-            UserDefaults.standard.set(try? JSONEncoder().encode(update.stateSerialization), forKey: Self.serializationKey)
+            Self.engineFile.write(update.stateSerialization)
         case .accountChange(let change):
             if case .signIn = change.changeType { return }
             updateAll { entry in entry = SyncEntry(value: entry.value) }
@@ -407,13 +407,12 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
 
     /// Changes the entries, keeps them on the device, and tells observers.
     private func save(_ change: @Sendable (inout [String: SyncEntry]) -> Void) {
-        let data: Data? = registrar.withMutation(of: self, keyPath: \.revision) {
+        registrar.withMutation(of: self, keyPath: \.revision) {
             entries.withLock { entries in
                 change(&entries)
-                return try? JSONEncoder().encode(entries)
+                Self.entriesFile.write(entries)
             }
         }
-        UserDefaults.standard.set(data, forKey: Self.entriesKey)
     }
 
     /// Creates the engine on first use, queuing every write an earlier launch left unsent, or returns `nil` when the app can't use CloudKit.
@@ -421,7 +420,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         guard hasCloudKitEntitlement else { return nil }
         return engine.withLockUnchecked { stored in
             if let stored { return stored }
-            let serialization: CKSyncEngine.State.Serialization? = UserDefaults.standard.data(forKey: Self.serializationKey).flatMap { try? JSONDecoder().decode(CKSyncEngine.State.Serialization.self, from: $0) }
+            let serialization: CKSyncEngine.State.Serialization? = Self.engineFile.read()
             let created: CKSyncEngine = CKSyncEngine(CKSyncEngine.Configuration(database: CKContainer.default().privateCloudDatabase, stateSerialization: serialization, delegate: self))
             let unsent: [CKSyncEngine.PendingRecordZoneChange] = entries.withLock { $0.filter(\.value.isPending) }.map { key, entry in entry.value == nil ? .deleteRecord(CKRecord.ID(recordName: key, zoneID: zoneID)) : .saveRecord(CKRecord.ID(recordName: key, zoneID: zoneID)) }
             if serialization == nil { created.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))]) }
@@ -458,12 +457,12 @@ protocol SyncedItems {
     func sync(under key: String, positioned: Bool)
 }
 
-extension Array: SyncedItems where Element: Codable & Identifiable {
+extension Array: SyncedItems where Element: Codable & Identifiable & Sendable {
 
     /// Reads the items kept under the key in order, or `nil` when none were ever stored.
     init?(syncedUnder key: String) {
         guard SyncEngine.shared.value(key) != nil else { return nil }
-        let items: [(key: String, item: SyncedItem<Element>)] = SyncEngine.shared.values(under: key).compactMap { itemKey, data in (try? JSONDecoder().decode(SyncedItem<Element>.self, from: data)).map { (itemKey, $0) } }
+        let items: [(key: String, item: SyncedItem<Element>)] = SyncEngine.shared.values(under: key).compactMap { itemKey, data in StorageCache.decode(SyncedItem<Element>.self, from: data).map { (itemKey, $0) } }
         self = items.sorted { ($0.item.position, $0.key) < ($1.item.position, $1.key) }.map(\.item.value)
     }
 
@@ -471,7 +470,7 @@ extension Array: SyncedItems where Element: Codable & Identifiable {
     func sync(under key: String, positioned: Bool) {
         let stored: [String: Data] = SyncEngine.shared.values(under: key)
         let keys: [String] = map { "\(key)/\($0.id)" }
-        let old: [Double?] = keys.map { stored[$0].flatMap { try? JSONDecoder().decode(SyncedItem<Element>.self, from: $0).position } }
+        let old: [Double?] = keys.map { stored[$0].flatMap { StorageCache.decode(SyncedItem<Element>.self, from: $0)?.position } }
         let positions: [Double] = positioned ? SyncEngine.positions(keeping: old) : old.map { $0 ?? 0 }
         let encoder: JSONEncoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
@@ -508,7 +507,7 @@ fileprivate struct SyncedQuery<Value>: Sendable {
 }
 
 /// One element of an array synced item by item, with its position in the array.
-fileprivate struct SyncedItem<Element: Codable>: Codable {
+fileprivate struct SyncedItem<Element: Codable & Sendable>: Codable, Sendable {
 
     let position: Double
     let value: Element

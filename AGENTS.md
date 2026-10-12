@@ -26,7 +26,7 @@ Sources/Composition/
 ├── Collections/       Custom collection types, one per file (Branch.swift)
 ├── Extensions/        Extensions on existing types, one file per type (String.swift, View.swift)
 ├── Macros/            Public macro declarations, one macro per file
-├── PropertyWrappers/  One property wrapper per file
+├── PropertyWrappers/  One property wrapper per file, plus one file per internal helper they share
 ├── Protocols/         One protocol per file, with its default implementation
 └── ViewModifiers/     One ViewModifier per file
 Tests/CompositionTests/  Mirrors the Sources folder structure

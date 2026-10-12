@@ -2,9 +2,9 @@
 // path: PropertyWrappers/EncryptedStorageTests.swift
 // dependencies: [PropertyWrappers/EncryptedStorage.swift]
 
-// MARK: - Foundation + Observation + Security
+// MARK: - Foundation + Observation + os + Security
 
-#if canImport(Foundation) && canImport(Observation) && canImport(Security)
+#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security)
 import Foundation
 import Observation
 import Testing
@@ -66,6 +66,17 @@ import Testing
         storage.wrappedValue = nil
     }
 
+    @Test func wrappedValueReadsAnotherWrappersWriteAfterARead() {
+        let key: String = UUID().uuidString
+        let reader: EncryptedStorage<Int?> = EncryptedStorage(key, .device, service: "CompositionTests")
+        let writer: EncryptedStorage<Int?> = EncryptedStorage(key, .device, service: "CompositionTests")
+        #expect(reader.wrappedValue == nil)
+        writer.wrappedValue = 4
+        #expect(reader.wrappedValue == 4)
+        writer.wrappedValue = nil
+        #expect(reader.wrappedValue == nil)
+    }
+
     @Test func wrappedValueStoresReadsAndRemovesValue() {
         let storage: EncryptedStorage<UUID?> = EncryptedStorage(UUID().uuidString, .device, service: "CompositionTests")
         let identifier: UUID = UUID()
@@ -77,9 +88,9 @@ import Testing
 }
 #endif
 
-// MARK: - Foundation + Observation + Security + SwiftUI
+// MARK: - Foundation + Observation + os + Security + SwiftUI
 
-#if canImport(Foundation) && canImport(Observation) && canImport(Security) && canImport(SwiftUI)
+#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(SwiftUI)
 import SwiftUI
 
 extension EncryptedStorageTests {

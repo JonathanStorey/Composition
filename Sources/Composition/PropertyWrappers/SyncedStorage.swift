@@ -384,6 +384,11 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
 
     /// Fetches the latest values from iCloud in the background and sends every waiting write, failed ones included, recording the result as the key's status.
     func refresh(_ key: String) {
+        guard start() != nil else {
+            report(.failure(CKError(.missingEntitlement)), for: key)
+            return
+        }
+        report(.syncing, for: key)
         Task { try? await refresh(key) }
     }
 

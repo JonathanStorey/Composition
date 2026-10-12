@@ -52,15 +52,17 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
         self.init(wrappedValue: nil, key)
     }
 
-    /// The value kept on the device, or the default value when nothing is stored; setting `nil` removes it.
+    /// The value kept on the device, or the default value when nothing is stored, where an array of identifiable elements syncs each element on its own; setting `nil` removes it.
     public var wrappedValue: Value {
         get {
+            if let Items: any SyncedItems.Type = Value.self as? any SyncedItems.Type { return Items.init(syncedUnder: key) as? Value ?? defaultValue }
             guard let data: Data = SyncEngine.shared.value(key), let value: Value = try? JSONDecoder().decode(Value.self, from: data) else { return defaultValue }
             return value
         }
         nonmutating set {
+            if Value.self is any SyncedItems.Type, let items: any SyncedItems = newValue as? any SyncedItems { return items.sync(under: key) }
             let data: Data? = (try? JSONEncoder().encode(newValue)).flatMap { $0 == Data("null".utf8) ? nil : $0 }
-            SyncEngine.shared.write(data, key)
+            SyncEngine.shared.write([key: data])
         }
     }
 
@@ -117,6 +119,39 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
     static func prefersLocal(written local: Date?, over server: Date?) -> Bool {
         guard let local: Date else { return false }
         return local > server ?? .distantPast
+    }
+
+    /// Positions for items in their new order that keep the old positions of the most items still in order, so a move or insert rewrites as few records as possible.
+    static func positions(keeping old: [Double?]) -> [Double] {
+        var links: [Int?] = Array(repeating: nil, count: old.count)
+        var tails: [(index: Int, position: Double)] = []
+        for (index, position) in old.enumerated() {
+            guard let position: Double else { continue }
+            let slot: Int = tails.firstIndex { $0.position >= position } ?? tails.count
+            links[index] = slot > 0 ? tails[slot - 1].index : nil
+            if slot == tails.count { tails.append((index, position)) } else { tails[slot] = (index, position) }
+        }
+        var kept: [Int: Double] = [:]
+        var link: Int? = tails.last?.index
+        while let index: Int = link {
+            kept[index] = old[index]
+            link = links[index]
+        }
+        var positions: [Double] = []
+        for index: Int in old.indices {
+            if let position: Double = kept[index] {
+                positions.append(position)
+                continue
+            }
+            let following: Double? = old.indices[(index + 1)...].lazy.compactMap { kept[$0] }.first
+            switch (positions.last, following) {
+            case let (previous?, next?): positions.append((previous + next) / 2)
+            case let (previous?, nil): positions.append(previous + 1)
+            case let (nil, next?): positions.append(next - 1)
+            case (nil, nil): positions.append(0)
+            }
+        }
+        return zip(positions, positions.dropFirst()).allSatisfy(<) ? positions : old.indices.map { Double($0) }
     }
 
     /// Rebuilds a record from its archived server fields.
@@ -218,17 +253,27 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         return entries.withLock { $0[key]?.value }
     }
 
-    /// Keeps the value on the device and queues it for iCloud, leaving the status to the sync's result or the next refresh.
-    func write(_ data: Data?, _ key: String) {
+    /// The values kept on the device under the key, as the item keys `key/id` of an array synced item by item.
+    func values(under key: String) -> [String: Data] {
+        registrar.access(self, keyPath: \.revision)
+        start()
+        return entries.withLock { entries in entries.filter { $0.key.hasPrefix(key + "/") }.compactMapValues(\.value) }
+    }
+
+    /// Keeps each key's value on the device, where `nil` removes it, and queues them for iCloud together, leaving the status to the sync's result or the next refresh.
+    func write(_ changes: [String: Data?]) {
         let date: Date = .now
-        guard let engine: CKSyncEngine = start() else { return update(key) { $0.modified = date; $0.value = data } }
-        update(key) { entry in
-            entry.isPending = true
-            entry.modified = date
-            entry.value = data
+        let engine: CKSyncEngine? = start()
+        let queues: Bool = engine != nil
+        save { entries in
+            for (key, data) in changes {
+                if queues { entries[key, default: SyncEntry()].isPending = true }
+                entries[key, default: SyncEntry()].modified = date
+                entries[key, default: SyncEntry()].value = data
+            }
         }
-        let id: CKRecord.ID = CKRecord.ID(recordName: key, zoneID: zoneID)
-        engine.state.add(pendingRecordZoneChanges: [data == nil ? .deleteRecord(id) : .saveRecord(id)])
+        let pending: [CKSyncEngine.PendingRecordZoneChange] = changes.map { key, data in data == nil ? .deleteRecord(CKRecord.ID(recordName: key, zoneID: zoneID)) : .saveRecord(CKRecord.ID(recordName: key, zoneID: zoneID)) }
+        engine?.state.add(pendingRecordZoneChanges: pending)
     }
 
     /// Marks a saved record's key as synced at the server's time.
@@ -360,6 +405,49 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
             }
         }
     }
+}
+
+/// A value that SyncedStorage keeps as separate records, one per item, so changes to different items on different devices all survive.
+protocol SyncedItems {
+
+    /// Reads the items kept under the key, or `nil` when none were ever stored.
+    init?(syncedUnder key: String)
+
+    /// Keeps the items under the key, writing only the items that were added, changed, moved or removed.
+    func sync(under key: String)
+}
+
+extension Array: SyncedItems where Element: Codable & Identifiable {
+
+    /// Reads the items kept under the key in order, or `nil` when none were ever stored.
+    init?(syncedUnder key: String) {
+        guard SyncEngine.shared.value(key) != nil else { return nil }
+        let items: [(key: String, item: SyncedItem<Element>)] = SyncEngine.shared.values(under: key).compactMap { itemKey, data in (try? JSONDecoder().decode(SyncedItem<Element>.self, from: data)).map { (itemKey, $0) } }
+        self = items.sorted { ($0.item.position, $0.key) < ($1.item.position, $1.key) }.map(\.item.value)
+    }
+
+    /// Keeps each element as its own record under `key/id`, writing only the elements that were added, changed, moved or removed.
+    func sync(under key: String) {
+        let stored: [String: Data] = SyncEngine.shared.values(under: key)
+        let keys: [String] = map { "\(key)/\($0.id)" }
+        let positions: [Double] = SyncEngine.positions(keeping: keys.map { stored[$0].flatMap { try? JSONDecoder().decode(SyncedItem<Element>.self, from: $0).position } })
+        let encoder: JSONEncoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        var changes: [String: Data?] = Dictionary(uniqueKeysWithValues: Set(stored.keys).subtracting(keys).map { ($0, Data?.none) })
+        for (index, element) in enumerated() {
+            guard let data: Data = try? encoder.encode(SyncedItem(position: positions[index], value: element)), data != stored[keys[index]] else { continue }
+            changes[keys[index]] = data
+        }
+        if SyncEngine.shared.value(key) == nil { changes[key] = Data("[]".utf8) }
+        SyncEngine.shared.write(changes)
+    }
+}
+
+/// One element of an array synced item by item, with its position in the array.
+fileprivate struct SyncedItem<Element: Codable>: Codable {
+
+    let position: Double
+    let value: Element
 }
 
 /// A key's value as kept on the device, with its sync status, which lasts only for the launch, and the archived server fields of its record.

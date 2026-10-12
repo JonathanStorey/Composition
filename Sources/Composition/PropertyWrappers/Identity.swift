@@ -46,7 +46,7 @@ enum Identities {
 
     /// Reads the identity stored in this device's Keychain, or stores a new one there, returning the fallback when the Keychain refuses it.
     private static func identity(or fallback: @autoclosure () -> UUID) -> UUID {
-        let storage: EncryptedStorage<UUID?> = EncryptedStorage("localOnly", .thisDevice, service: "Composition.Identity")
+        let storage: EncryptedStorage<UUID?> = EncryptedStorage("localOnly", .device, service: "Composition.Identity")
         if let identity: UUID = storage.wrappedValue, identity.version == 7 { return identity }
         storage.wrappedValue = .timestamp
         return storage.wrappedValue ?? fallback()

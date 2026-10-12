@@ -21,16 +21,16 @@ public struct EncryptedStorage<Value: Codable & Sendable>: Sendable {
     private let service: String
 
     /// Creates storage for the key that returns the default value until something is stored.
-    public init(wrappedValue: Value, _ key: String, _ location: Location = .synced, service: String = Bundle.main.bundleIdentifier ?? "Composition") {
+    public init(wrappedValue: Value, _ key: String, _ location: Location = .iCloud, service: String = Bundle.main.bundleIdentifier ?? "Composition") {
         self.defaultValue = wrappedValue
         self.key = key
         self.location = location
         self.service = service
-        self.changes = StorageChanges(item: ["Keychain", service, key, "\(location == .synced)"])
+        self.changes = StorageChanges(item: ["Keychain", service, key, "\(location == .iCloud)"])
     }
 
     /// Creates storage for the key that returns `nil` until something is stored.
-    public init(_ key: String, _ location: Location = .synced, service: String = Bundle.main.bundleIdentifier ?? "Composition") where Value: ExpressibleByNilLiteral {
+    public init(_ key: String, _ location: Location = .iCloud, service: String = Bundle.main.bundleIdentifier ?? "Composition") where Value: ExpressibleByNilLiteral {
         self.init(wrappedValue: nil, key, location, service: service)
     }
 
@@ -57,7 +57,7 @@ public struct EncryptedStorage<Value: Codable & Sendable>: Sendable {
 
     /// The attributes that identify this wrapper's Keychain item.
     private var item: [CFString: Any] {
-        [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: key, kSecAttrSynchronizable: location == .synced, kSecUseDataProtectionKeychain: usesDataProtectionKeychain]
+        [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: key, kSecAttrSynchronizable: location == .iCloud, kSecUseDataProtectionKeychain: usesDataProtectionKeychain]
     }
 }
 
@@ -72,22 +72,22 @@ public extension EncryptedStorage {
     enum Location: Hashable, Sendable {
 
         /// Synced to the user's other devices through iCloud Keychain, or kept on this device when iCloud Keychain is off.
-        case synced
+        case iCloud
 
         /// Kept on this device only, never synced, backed up, or restored onto another device.
-        case thisDevice
+        case device
 
         /// The Keychain accessibility that matches the location.
         fileprivate var accessibility: CFString {
             switch self {
-            case .synced: kSecAttrAccessibleAfterFirstUnlock
-            case .thisDevice: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            case .iCloud: kSecAttrAccessibleAfterFirstUnlock
+            case .device: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
             }
         }
     }
 }
 
-/// Whether to use the data protection keychain, which macOS needs for synced and this-device items but only grants to apps signed with an entitlement for it.
+/// Whether to use the data protection keychain, which macOS needs for iCloud and device-only items but only grants to apps signed with an entitlement for it.
 fileprivate let usesDataProtectionKeychain: Bool = {
     #if os(macOS)
     guard let task: SecTask = SecTaskCreateFromSelf(nil) else { return false }

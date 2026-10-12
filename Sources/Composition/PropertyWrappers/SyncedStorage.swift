@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/SyncedStorage.swift
-// dependencies: [PropertyWrappers/StorageCache.swift, PropertyWrappers/StorageFile.swift]
+// dependencies: []
 // permissions: [aps-environment, com.apple.developer.icloud-container-identifiers, com.apple.developer.icloud-services, UIBackgroundModes]
 
 // Setup in Xcode:
@@ -88,7 +88,7 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
         get {
             if let Items: any SyncedItems.Type = Value.self as? any SyncedItems.Type, let items: Value = Items.init(syncedUnder: key) as? Value { return query?.read(items) ?? items }
             if Value.self is any SyncedItems.Type { return defaultValue }
-            guard let data: Data = SyncEngine.shared.value(key), let value: Value = StorageCache.decode(Value.self, from: data) else { return defaultValue }
+            guard let data: Data = SyncEngine.shared.value(key), let value: Value = DecodedValues.decode(Value.self, from: data) else { return defaultValue }
             return value
         }
         nonmutating set {
@@ -110,7 +110,7 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
 
     /// The value as of its last round trip to iCloud, or the default value before the first.
     var syncedValue: Value {
-        guard let data: Data = SyncEngine.shared.syncedValue(key), let value: Value = StorageCache.decode(Value.self, from: data) else { return defaultValue }
+        guard let data: Data = SyncEngine.shared.syncedValue(key), let value: Value = DecodedValues.decode(Value.self, from: data) else { return defaultValue }
         return value
     }
 
@@ -142,10 +142,10 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
     static let shared: SyncEngine = SyncEngine()
 
     /// The file the engine's state is kept in.
-    private static let engineFile: StorageFile<CKSyncEngine.State.Serialization> = StorageFile("SyncEngine")
+    private static let engineFile: DeviceFile<CKSyncEngine.State.Serialization> = DeviceFile("SyncedStorage.engine")
 
     /// The file the values are kept in.
-    private static let entriesFile: StorageFile<[String: SyncEntry]> = StorageFile("SyncedStorage")
+    private static let entriesFile: DeviceFile<[String: SyncEntry]> = DeviceFile("SyncedStorage")
 
     /// Whether a write waiting on the device should replace the server's value, which only a strictly newer write does.
     static func prefersLocal(written local: Date?, over server: Date?) -> Bool {
@@ -153,10 +153,10 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         return local > server ?? .distantPast
     }
 
-    /// The CloudKit limit a record named after the key, with the suffix's length after it, and holding the data would break, or `nil` when it fits: an ASCII name of at most 255 characters that doesn't start with an underscore, and data under 1 MB.
-    static func recordViolation(named key: String, holding data: Data?, reserving suffix: Int = 0) -> String? {
+    /// The CloudKit limit a record named after the key and holding the data would break, or `nil` when it fits: an ASCII name of at most 255 characters that doesn't start with an underscore, and data under 1 MB.
+    static func recordViolation(named key: String, holding data: Data?) -> String? {
         if key.hasPrefix("_") || !key.allSatisfy(\.isASCII) { return "The key \"\(key)\" must be ASCII and not start with an underscore to name a CloudKit record." }
-        if key.utf8.count + suffix > 255 { return "The key \"\(key)\" is over the \(255 - suffix) characters a CloudKit record name has room for." }
+        if key.utf8.count > 255 { return "The key \"\(key)\" is over the 255 characters a CloudKit record name has room for." }
         if let data: Data, data.count >= 1_000_000 { return "The value for \"\(key)\" is \(data.count) bytes, over the 1 MB a CloudKit record holds." }
         return nil
     }
@@ -462,7 +462,7 @@ extension Array: SyncedItems where Element: Codable & Identifiable {
     /// Reads the items kept under the key in order, or `nil` when none were ever stored.
     init?(syncedUnder key: String) {
         guard SyncEngine.shared.value(key) != nil else { return nil }
-        let items: [(key: String, item: SyncedItem<Element>)] = SyncEngine.shared.values(under: key).compactMap { itemKey, data in StorageCache.decode(SyncedItem<Element>.self, from: data).map { (itemKey, $0) } }
+        let items: [(key: String, item: SyncedItem<Element>)] = SyncEngine.shared.values(under: key).compactMap { itemKey, data in DecodedValues.decode(SyncedItem<Element>.self, from: data).map { (itemKey, $0) } }
         self = items.sorted { ($0.item.position, $0.key) < ($1.item.position, $1.key) }.map(\.item.value)
     }
 
@@ -470,7 +470,7 @@ extension Array: SyncedItems where Element: Codable & Identifiable {
     func sync(under key: String, positioned: Bool) {
         let stored: [String: Data] = SyncEngine.shared.values(under: key)
         let keys: [String] = map { "\(key)/\($0.id)" }
-        let old: [Double?] = keys.map { stored[$0].flatMap { StorageCache.decode(SyncedItem<Element>.self, from: $0)?.position } }
+        let old: [Double?] = keys.map { stored[$0].flatMap { DecodedValues.decode(SyncedItem<Element>.self, from: $0)?.position } }
         let positions: [Double] = positioned ? SyncEngine.positions(keeping: old) : old.map { $0 ?? 0 }
         let encoder: JSONEncoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
@@ -530,8 +530,69 @@ fileprivate struct SyncEntry: Codable, Sendable {
     }
 }
 
+/// A value kept as JSON in the named file in the app's Application Support folder, written in the background so a change never waits on the disk.
+@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
+fileprivate final class DeviceFile<Contents: Codable & Sendable>: Sendable {
+
+    private let pending: OSAllocatedUnfairLock<Contents?> = OSAllocatedUnfairLock(initialState: nil)
+    private let queue: DispatchQueue
+    private let url: URL
+
+    /// Creates the file with the name, in a Composition folder kept apart for each app.
+    init(_ name: String) {
+        self.queue = DispatchQueue(label: "Composition.\(name)", qos: .utility)
+        self.url = URL.applicationSupportDirectory.appending(components: Bundle.main.bundleIdentifier ?? "Composition", "Composition", "\(name).json")
+    }
+
+    /// The contents last written, once any write still waiting finishes, or `nil` when nothing was written.
+    func read() -> Contents? {
+        queue.sync {}
+        return (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(Contents.self, from: $0) }
+    }
+
+    /// Writes the contents in the background, where newer contents replace any still waiting to be written.
+    func write(_ contents: Contents) {
+        let isIdle: Bool = pending.withLock { pending in
+            defer { pending = contents }
+            return pending == nil
+        }
+        guard isIdle else { return }
+        queue.async { [self] in
+            guard let latest: Contents = pending.withLock({ pending in defer { pending = nil }; return pending }), let data: Data = try? JSONEncoder().encode(latest) else { return }
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? data.write(to: url, options: .atomic)
+        }
+    }
+}
+
+/// Values decoded from stored JSON, remembered by the data they came from so reading unchanged data again skips the decoder, and dropped when memory runs low.
+fileprivate enum DecodedValues {
+
+    /// The decoded values, keyed by the data they came from.
+    nonisolated(unsafe) private static let cache: NSCache<NSData, DecodedValue> = NSCache()
+
+    /// The value the data decodes to, taken from the cache when the same data was decoded as the same type before.
+    static func decode<V: Decodable>(_ type: V.Type, from data: Data) -> V? {
+        if let decoded: DecodedValue = cache.object(forKey: data as NSData), let value: V = decoded.value as? V { return value }
+        guard let value: V = try? JSONDecoder().decode(V.self, from: data) else { return nil }
+        cache.setObject(DecodedValue(value), forKey: data as NSData)
+        return value
+    }
+}
+
+/// A decoded value, boxed so `NSCache` can hold it.
+fileprivate final class DecodedValue {
+
+    let value: Any
+
+    /// Boxes the value.
+    init(_ value: Any) {
+        self.value = value
+    }
+}
+
 /// Whether the app can use CloudKit, which macOS only grants to apps signed with the iCloud entitlement.
-let hasCloudKitEntitlement: Bool = {
+fileprivate let hasCloudKitEntitlement: Bool = {
     #if os(macOS)
     guard let task: SecTask = SecTaskCreateFromSelf(nil) else { return false }
     return SecTaskCopyValueForEntitlement(task, "com.apple.developer.icloud-services" as CFString, nil) != nil

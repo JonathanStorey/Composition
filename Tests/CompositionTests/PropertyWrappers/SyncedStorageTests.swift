@@ -130,7 +130,6 @@ private struct Todo: Codable, Equatable, Identifiable, Sendable {
         #expect(SyncEngine.recordViolation(named: "_todos", holding: nil) != nil)
         #expect(SyncEngine.recordViolation(named: "tâches", holding: nil) != nil)
         #expect(SyncEngine.recordViolation(named: String(repeating: "k", count: 256), holding: nil) != nil)
-        #expect(SyncEngine.recordViolation(named: String(repeating: "k", count: 222), holding: nil, reserving: 34) != nil)
     }
 
     #if os(macOS)

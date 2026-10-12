@@ -47,6 +47,11 @@ import Testing
         storage.entry = nil
     }
 
+    @Test func recordViolationLeavesRoomForTheUserSuffix() {
+        #expect(PublicStore.recordViolation(named: String(repeating: "k", count: 221), holding: nil) == nil)
+        #expect(PublicStore.recordViolation(named: String(repeating: "k", count: 222), holding: nil) != nil)
+    }
+
     @Test func sortedStorageReadsTheUsersEntry() {
         let storage: PublicStorage<Int> = PublicStorage(UUID().uuidString, sort: \.self, order: .reverse)
         storage.entry = 5

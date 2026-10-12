@@ -23,9 +23,11 @@ public protocol FileRepresentable {
 @available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, *)
 public extension FileRepresentable {
 
-    /// The extension a file gets when its path has none: the content type's preferred one, or "data" when it has none.
+    /// The extension a file gets when its path has none: the content type's preferred one, else its closest parent type's, such as "txt" for UTF-8 plain text, else "data".
     static var preferredFilenameExtension: String {
-        contentType.preferredFilenameExtension ?? "data"
+        if let preferred: String = contentType.preferredFilenameExtension { return preferred }
+        let named: [UTType] = contentType.supertypes.filter { $0.preferredFilenameExtension != nil }
+        return named.first { type in named.allSatisfy { type.conforms(to: $0) } }?.preferredFilenameExtension ?? "data"
     }
 }
 

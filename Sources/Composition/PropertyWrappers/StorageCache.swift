@@ -13,7 +13,7 @@ enum StorageCache {
 
     /// The value the data decodes to, taken from the cache when the same data was decoded as the same type before.
     static func decode<V: Decodable>(_ type: V.Type, from data: Data) -> V? {
-        if let value: V = values.object(forKey: data as NSData)?.value as? V { return value }
+        if let decoded: Decoded = values.object(forKey: data as NSData), let value: V = decoded.value as? V { return value }
         guard let value: V = try? JSONDecoder().decode(V.self, from: data) else { return nil }
         values.setObject(Decoded(value), forKey: data as NSData)
         return value

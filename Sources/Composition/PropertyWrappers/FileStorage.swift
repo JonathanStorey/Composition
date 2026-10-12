@@ -20,7 +20,7 @@ import Foundation
 import Observation
 import os
 
-/// Reads and writes a value like `AppStorage`, kept in its own file inside the location in its own format when it is `FileRepresentable`, as a property list under ".plist", and as JSON otherwise, cached in memory, written in the background, and reloaded when another process or iCloud changes the file.
+/// Reads and writes a value like `AppStorage`, kept in its own file inside the location in its own format when it is `FileRepresentable` under its own extension, as a property list under ".plist", and as JSON otherwise, cached in memory, written in the background, and reloaded when another process or iCloud changes the file.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
 public struct FileStorage<Value: Codable & Sendable>: Sendable {
@@ -29,15 +29,17 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
     private let file: StoredFile
     private let format: Format
 
-    /// Creates storage for the path that returns the default value until something is stored, where a path without an extension, such as "Settings/theme", gets the `FileRepresentable` type's extension or ".json", stopping on a path that could leave the location.
+    /// Creates storage for the path that returns the default value until something is stored, where a path without an extension, such as "Settings/theme", gets the `FileRepresentable` type's extension or ".json", and a `FileRepresentable` value under any other extension is kept as JSON, or as a property list under ".plist", except `Data`, which is always kept as is, stopping on a path that could leave the location.
     public init(wrappedValue: Value, _ path: String, _ location: Location = .app) {
         let violation: String? = StoredFile.pathViolation(path)
         precondition(violation == nil, violation ?? "")
         let representable: (any FileRepresentable.Type)? = Value.self as? any FileRepresentable.Type
         let filePath: String = StoredFile.withExtension(path, representable?.fileExtension ?? "json")
+        let pathExtension: String = URL(filePath: filePath).pathExtension.lowercased()
+        let isData: Bool = Value.self == Data.self || Value.self == Data?.self
         self.defaultValue = wrappedValue
         self.file = location.file(filePath)
-        self.format = representable != nil ? .file : filePath.lowercased().hasSuffix(".plist") ? .propertyList : .json
+        self.format = isData || pathExtension == representable?.fileExtension ? .file : pathExtension == "plist" ? .propertyList : .json
     }
 
     /// Creates storage for the path that returns `nil` until something is stored.

@@ -7,10 +7,10 @@
 #if canImport(Foundation)
 import Foundation
 
-/// A type that keeps itself in a file of its own format, such as text or CSV, instead of as JSON.
+/// A type that keeps itself in a file of its own format and extension, such as text in ".txt", instead of as JSON.
 public protocol FileRepresentable {
 
-    /// The extension a file gets when its path has none, such as "txt".
+    /// The type's one file extension, such as "txt", which a path without an extension gets and under which the value is kept in this format.
     static var fileExtension: String { get }
 
     /// Creates the value from a file's contents, throwing when they aren't in the type's format.

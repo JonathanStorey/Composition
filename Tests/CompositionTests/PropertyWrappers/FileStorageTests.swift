@@ -99,6 +99,14 @@ import Testing
         #expect((try? String(contentsOf: URL.temporaryDirectory.appending(path: "\(path).txt"), encoding: .utf8)) == "Dune")
     }
 
+    @Test func wrappedValueKeepsAStringUnderAnotherExtensionAsJSON() {
+        let path: String = "\(UUID().uuidString).json"
+        let storage: FileStorage<String> = FileStorage(wrappedValue: "", path, .temp)
+        storage.wrappedValue = "Dune"
+        StoredFile.flushAll()
+        #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data("\"Dune\"".utf8))
+    }
+
     @Test func wrappedValueKeepsDataAsIs() {
         let path: String = "\(UUID().uuidString).png"
         let storage: FileStorage<Data?> = FileStorage(path, .temp)

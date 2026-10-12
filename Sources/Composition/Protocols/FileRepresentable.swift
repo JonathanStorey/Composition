@@ -2,89 +2,69 @@
 // path: Protocols/FileRepresentable.swift
 // dependencies: []
 
-#if canImport(Foundation) && canImport(UniformTypeIdentifiers)
+#if canImport(Foundation)
 import Foundation
-import UniformTypeIdentifiers
 
-/// A type that keeps itself in a file of its own content type, such as UTF-8 text, instead of as JSON.
-@available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, *)
+/// A type that `FileStorage` keeps in a file of its own format, such as UTF-8 text, instead of as JSON.
 public protocol FileRepresentable {
 
-    /// The most specific content type the value's file contents have.
-    static var contentType: UTType { get }
+    /// The extension a file gets when its path has none, such as "txt".
+    static var preferredFilenameExtension: String { get }
 
-    /// Creates the value from a file's contents, throwing when they aren't of the content type.
+    /// Creates the value from a file's contents, throwing when they aren't in the type's format.
     init(fileContents: Data) throws
 
-    /// The value as the contents of a file of the content type.
-    var fileContents: Data { get throws }
+    /// Returns the value as the contents of a file.
+    func fileContents() throws -> Data
 }
 
-@available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, *)
-public extension FileRepresentable {
-
-    /// The extension a file gets when its path has none: the content type's preferred one, else its closest parent type's, such as "txt" for UTF-8 plain text, else "data".
-    static var preferredFilenameExtension: String {
-        if let preferred: String = contentType.preferredFilenameExtension { return preferred }
-        let named: [UTType] = contentType.supertypes.filter { $0.preferredFilenameExtension != nil }
-        return named.first { type in named.allSatisfy { type.conforms(to: $0) } }?.preferredFilenameExtension ?? "data"
-    }
-}
-
-@available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, *)
-public extension FileRepresentable where Self: LosslessStringConvertible {
-
-    /// Creates the value from UTF-8 text.
-    init(fileContents: Data) throws {
-        guard let text: String = String(data: fileContents, encoding: .utf8), let value: Self = Self(text) else { throw CocoaError(.fileReadCorruptFile) }
-        self = value
-    }
-
-    /// The value as UTF-8 text.
-    var fileContents: Data {
-        Data(description.utf8)
-    }
-}
-
-@available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, *)
 extension Data: FileRepresentable {
 
-    /// Bytes in no particular format, which any content type is.
-    public static var contentType: UTType { .data }
+    /// The extension for bytes in no particular format.
+    public static var preferredFilenameExtension: String { "data" }
 
     /// Creates the data from a file's contents, exactly as they are.
     public init(fileContents: Data) {
         self = fileContents
     }
 
-    /// The data, exactly as it is.
-    public var fileContents: Data { self }
+    /// Returns the data exactly as it is.
+    public func fileContents() -> Data {
+        self
+    }
 }
 
-@available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, *)
 extension Optional: FileRepresentable where Wrapped: FileRepresentable {
 
-    /// The wrapped type's content type.
-    public static var contentType: UTType { Wrapped.contentType }
+    /// The wrapped type's extension.
+    public static var preferredFilenameExtension: String { Wrapped.preferredFilenameExtension }
 
     /// Creates the wrapped value from a file's contents.
     public init(fileContents: Data) throws {
         self = try Wrapped(fileContents: fileContents)
     }
 
-    /// The wrapped value's contents, throwing for `nil`, which has no file.
-    public var fileContents: Data {
-        get throws {
-            guard let wrapped: Wrapped = self else { throw CocoaError(.fileNoSuchFile) }
-            return try wrapped.fileContents
-        }
+    /// Returns the wrapped value's contents, throwing for `nil`, which has no file.
+    public func fileContents() throws -> Data {
+        guard let wrapped: Wrapped = self else { throw CocoaError(.fileNoSuchFile) }
+        return try wrapped.fileContents()
     }
 }
 
-@available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, *)
 extension String: FileRepresentable {
 
-    /// UTF-8 plain text.
-    public static var contentType: UTType { .utf8PlainText }
+    /// The extension for plain text.
+    public static var preferredFilenameExtension: String { "txt" }
+
+    /// Creates the string from UTF-8 text.
+    public init(fileContents: Data) throws {
+        guard let string: String = String(data: fileContents, encoding: .utf8) else { throw CocoaError(.fileReadInapplicableStringEncoding) }
+        self = string
+    }
+
+    /// Returns the string as UTF-8 text.
+    public func fileContents() -> Data {
+        Data(utf8)
+    }
 }
 #endif

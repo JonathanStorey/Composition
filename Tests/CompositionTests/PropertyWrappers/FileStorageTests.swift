@@ -2,9 +2,9 @@
 // path: PropertyWrappers/FileStorageTests.swift
 // dependencies: [PropertyWrappers/FileStorage.swift, Protocols/FileRepresentable.swift]
 
-// MARK: - Foundation + Observation + os + UniformTypeIdentifiers
+// MARK: - Foundation + Observation + os
 
-#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(UniformTypeIdentifiers)
+#if canImport(Foundation) && canImport(Observation) && canImport(os)
 import Foundation
 import Observation
 import Testing
@@ -82,29 +82,20 @@ import Testing
         #expect(second.wrappedValue == "Dune")
     }
 
-    @Test func wrappedValueKeepsAPropertyListUnderPlist() {
-        let path: String = "\(UUID().uuidString).plist"
-        let storage: FileStorage<[String: Int]> = FileStorage(wrappedValue: [:], path, .temp)
-        storage.wrappedValue = ["Dune": 1965]
-        StoredFile.flushAll()
-        let data: Data? = try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))
-        #expect(data.flatMap { try? PropertyListDecoder().decode([String: Int].self, from: $0) } == ["Dune": 1965])
-    }
-
-    @Test func wrappedValueKeepsAStringAsJSONUnderAnUnrelatedExtension() {
-        let path: String = "\(UUID().uuidString).json"
-        let storage: FileStorage<String?> = FileStorage(path, .temp)
-        storage.wrappedValue = "Dune"
-        StoredFile.flushAll()
-        #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data("\"Dune\"".utf8))
-    }
-
     @Test func wrappedValueKeepsAStringAsText() {
         let path: String = UUID().uuidString
         let storage: FileStorage<String> = FileStorage(wrappedValue: "", path, .temp)
         storage.wrappedValue = "Dune"
         StoredFile.flushAll()
         #expect((try? String(contentsOf: URL.temporaryDirectory.appending(path: "\(path).txt"), encoding: .utf8)) == "Dune")
+    }
+
+    @Test func wrappedValueKeepsAStringAsTextUnderAnyExtension() {
+        let path: String = "\(UUID().uuidString).json"
+        let storage: FileStorage<String?> = FileStorage(path, .temp)
+        storage.wrappedValue = "# Dune"
+        StoredFile.flushAll()
+        #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data("# Dune".utf8))
     }
 
     @Test func wrappedValueKeepsDataAsIs() {
@@ -157,9 +148,9 @@ import Testing
 }
 #endif
 
-// MARK: - Foundation + Observation + os + SwiftUI + UniformTypeIdentifiers
+// MARK: - Foundation + Observation + os + SwiftUI
 
-#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(SwiftUI) && canImport(UniformTypeIdentifiers)
+#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(SwiftUI)
 import SwiftUI
 
 extension FileStorageTests {

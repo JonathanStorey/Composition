@@ -9,7 +9,7 @@ import Foundation
 import Observation
 import Security
 
-/// Reads and writes a value encrypted in the Keychain like `AppStorage`, kept on this device, carried by backups, or synced through iCloud Keychain.
+/// Reads and writes a value encrypted in the Keychain like `AppStorage`, synced through iCloud Keychain or kept on this device.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
 public struct EncryptedStorage<Value: Codable & Sendable>: Sendable {
@@ -21,16 +21,16 @@ public struct EncryptedStorage<Value: Codable & Sendable>: Sendable {
     private let service: String
 
     /// Creates storage for the key that returns the default value until something is stored.
-    public init(wrappedValue: Value, _ key: String, _ location: Location = .localOnly, service: String = Bundle.main.bundleIdentifier ?? "Composition") {
+    public init(wrappedValue: Value, _ key: String, _ location: Location = .synced, service: String = Bundle.main.bundleIdentifier ?? "Composition") {
         self.defaultValue = wrappedValue
         self.key = key
         self.location = location
         self.service = service
-        self.changes = StorageChanges(item: ["Keychain", service, key, "\(location == .iCloud)"])
+        self.changes = StorageChanges(item: ["Keychain", service, key, "\(location == .synced)"])
     }
 
     /// Creates storage for the key that returns `nil` until something is stored.
-    public init(_ key: String, _ location: Location = .localOnly, service: String = Bundle.main.bundleIdentifier ?? "Composition") where Value: ExpressibleByNilLiteral {
+    public init(_ key: String, _ location: Location = .synced, service: String = Bundle.main.bundleIdentifier ?? "Composition") where Value: ExpressibleByNilLiteral {
         self.init(wrappedValue: nil, key, location, service: service)
     }
 
@@ -57,7 +57,7 @@ public struct EncryptedStorage<Value: Codable & Sendable>: Sendable {
 
     /// The attributes that identify this wrapper's Keychain item.
     private var item: [CFString: Any] {
-        [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: key, kSecAttrSynchronizable: location == .iCloud, kSecUseDataProtectionKeychain: usesDataProtectionKeychain]
+        [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: key, kSecAttrSynchronizable: location == .synced, kSecUseDataProtectionKeychain: usesDataProtectionKeychain]
     }
 }
 
@@ -71,26 +71,23 @@ public extension EncryptedStorage {
     /// Where the Keychain keeps a value.
     enum Location: Hashable, Sendable {
 
+        /// Synced to the user's other devices through iCloud Keychain, or kept on this device when iCloud Keychain is off.
+        case synced
+
         /// Kept on this device only, never synced, backed up, or restored onto another device.
-        case localOnly
-
-        /// Kept off iCloud Keychain but carried to a new device by an encrypted backup.
-        case backedUp
-
-        /// Synced to the user's other devices through iCloud Keychain.
-        case iCloud
+        case thisDevice
 
         /// The Keychain accessibility that matches the location.
         fileprivate var accessibility: CFString {
             switch self {
-            case .localOnly: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-            case .backedUp, .iCloud: kSecAttrAccessibleAfterFirstUnlock
+            case .synced: kSecAttrAccessibleAfterFirstUnlock
+            case .thisDevice: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
             }
         }
     }
 }
 
-/// Whether to use the data protection keychain, which macOS needs for local and iCloud items but only grants to apps signed with an entitlement for it.
+/// Whether to use the data protection keychain, which macOS needs for synced and this-device items but only grants to apps signed with an entitlement for it.
 fileprivate let usesDataProtectionKeychain: Bool = {
     #if os(macOS)
     guard let task: SecTask = SecTaskCreateFromSelf(nil) else { return false }

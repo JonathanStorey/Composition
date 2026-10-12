@@ -380,7 +380,7 @@ fileprivate struct SyncEntry: Codable, Sendable {
 }
 
 /// Whether the app can use CloudKit, which macOS only grants to apps signed with the iCloud entitlement.
-fileprivate let hasCloudKitEntitlement: Bool = {
+let hasCloudKitEntitlement: Bool = {
     #if os(macOS)
     guard let task: SecTask = SecTaskCreateFromSelf(nil) else { return false }
     return SecTaskCopyValueForEntitlement(task, "com.apple.developer.icloud-services" as CFString, nil) != nil

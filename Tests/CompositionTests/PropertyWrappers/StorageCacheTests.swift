@@ -15,6 +15,11 @@ import Testing
         #expect(StorageCache.decode([Double].self, from: data) == [1.0, 2.0])
     }
 
+    @Test func decodeDecodesAnOptionalTypeTheFirstTime() {
+        let number: Int = Int.random(in: 1_000...9_999_999)
+        #expect(StorageCache.decode(Int?.self, from: Data("\(number)".utf8)) == number)
+    }
+
     @Test func decodeReturnsNilForDataThatDoesNotDecode() {
         #expect(StorageCache.decode(Int.self, from: Data("not json".utf8)) == nil)
     }

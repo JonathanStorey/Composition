@@ -3,6 +3,16 @@
 // dependencies: [PropertyWrappers/SyncedStorage.swift]
 // permissions: [com.apple.developer.icloud-container-identifiers, com.apple.developer.icloud-services]
 
+// Setup in Xcode:
+// 1. Select the app target, open Signing & Capabilities, click + Capability, and add iCloud.
+// 2. Under iCloud, check CloudKit and select or create a container. PublicStorage uses the first container in the list.
+// 3. Open the CloudKit Console at https://icloud.developer.apple.com, choose that container, then the Development environment.
+// 4. Under Schema, add a record type named PublicStorage with the fields key (String), modified (Date/Time) and value (Bytes).
+// 5. Under Indexes, add a Queryable index on PublicStorage's key field. Every read fails until it exists.
+// 6. Leave the Security Roles at their defaults, which let anyone read and only each record's creator change it.
+// 7. Run on a device or simulator signed in to iCloud. Reading works signed out, but writing needs an account.
+// 8. Before TestFlight or the App Store, click Deploy Schema Changes to copy the schema to Production.
+
 // MARK: - CloudKit + Foundation + Observation + os + Security
 
 #if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security)

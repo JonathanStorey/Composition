@@ -21,7 +21,7 @@ import Testing
         storage.entry = nil
     }
 
-    @Test func entryIsFirstBeforeItSyncs() {
+    @Test func entryAppearsBeforeItSyncs() {
         let storage: PublicStorage<[String]> = PublicStorage(UUID().uuidString)
         storage.entry = ["Dune", "Emma"]
         #expect(storage.entry == ["Dune", "Emma"])

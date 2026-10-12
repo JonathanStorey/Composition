@@ -21,7 +21,7 @@ import Foundation
 import Observation
 import os
 
-/// Reads every user's entry for a key in the app's public iCloud database, with the current user's entry first.
+/// Reads every user's entry for a key in the app's public iCloud database, newest first.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
 public struct PublicStorage<Value: Codable & Sendable>: Sendable {
@@ -33,7 +33,7 @@ public struct PublicStorage<Value: Codable & Sendable>: Sendable {
         self.key = key
     }
 
-    /// Every user's entry, with the current user's first, refreshed from iCloud when read at most once a minute.
+    /// Every user's entry, newest first, refreshed from iCloud when read at most once a minute.
     public var wrappedValue: [Value] {
         PublicStore.shared.entries(key).compactMap { try? JSONDecoder().decode(Value.self, from: $0) }
     }
@@ -76,11 +76,13 @@ final class PublicStore: Observable, Sendable {
     /// A placeholder property that observers track in place of the entries.
     private var revision: Void { () }
 
-    /// Every user's entry for the key, with the current user's first, syncing when the last sync is over a minute old.
+    /// Every user's entry for the key, newest first, syncing when the last sync is over a minute old.
     func entries(_ key: String) -> [Data] {
         registrar.access(self, keyPath: \.revision)
         sync(key, ifOlderThan: 60)
-        return entries.withLock { entries in [entries[key]?.mine].compactMap(\.self) + (entries[key]?.others ?? []) }
+        guard let entry: PublicEntry = entries.withLock({ $0[key] }) else { return [] }
+        let mine: [PublicValue] = entry.mine.map { [PublicValue(modified: entry.modified ?? .now, value: $0)] } ?? []
+        return (mine + entry.others).sorted { $0.modified > $1.modified }.map(\.value)
     }
 
     /// The current user's entry for the key, syncing when the last sync is over a minute old.
@@ -111,7 +113,10 @@ final class PublicStore: Observable, Sendable {
             records += page.matchResults.compactMap { try? $0.1.get() }
         }
         let name: String? = user.map { Self.recordName(key, $0) }
-        let others: [Data] = records.filter { $0.recordID.recordName != name }.sorted { $0.modificationDate ?? .distantPast > $1.modificationDate ?? .distantPast }.compactMap { $0["value"] as? Data }
+        let others: [PublicValue] = records.filter { $0.recordID.recordName != name }.compactMap { record in
+            guard let value: Data = record["value"] as? Data else { return nil }
+            return PublicValue(modified: record["modified"] as? Date ?? record.modificationDate ?? .distantPast, value: value)
+        }
         update(key) { $0.others = others }
         guard user != nil else { return }
         receive(records.first { $0.recordID.recordName == name }, key)
@@ -190,8 +195,15 @@ fileprivate struct PublicEntry: Codable, Sendable {
     var isPending: Bool = false
     var mine: Data?
     var modified: Date?
-    var others: [Data] = []
+    var others: [PublicValue] = []
     var owner: String?
+}
+
+/// A user's entry, with the time it was written.
+fileprivate struct PublicValue: Codable, Sendable {
+
+    let modified: Date
+    let value: Data
 }
 #endif
 

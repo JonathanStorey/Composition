@@ -24,6 +24,24 @@ import Testing
         #expect(CloudStorage<String?>(UUID().uuidString).wrappedValue == nil)
     }
 
+    @Test func limitViolationAllowsValuesThatFit() {
+        #expect(CloudStorage<Int>.limitViolation(writing: Data(count: 1_000), to: "volume", in: [:]) == nil)
+    }
+
+    @Test func limitViolationCatchesALongKey() {
+        #expect(CloudStorage<Int>.limitViolation(writing: Data(), to: String(repeating: "k", count: 65), in: [:]) != nil)
+    }
+
+    @Test func limitViolationCatchesTooManyKeys() {
+        let stored: [String: Any] = Dictionary(uniqueKeysWithValues: (0..<1_024).map { ("\($0)", true) })
+        #expect(CloudStorage<Int>.limitViolation(writing: Data(), to: "new", in: stored) != nil)
+        #expect(CloudStorage<Int>.limitViolation(writing: Data(), to: "0", in: stored) == nil)
+    }
+
+    @Test func limitViolationCatchesTooManyBytes() {
+        #expect(CloudStorage<Int>.limitViolation(writing: Data(count: 1_048_577), to: "photo", in: [:]) != nil)
+    }
+
     @Test func wrappedValueChangeNotifiesOtherWrappersForTheSameKey() async {
         let key: String = UUID().uuidString
         let reader: CloudStorage<Int?> = CloudStorage(key)

@@ -13,12 +13,13 @@
 //   3. .iCloud keeps files hidden in the container. For .iCloudDrive, show the files in iCloud Drive by adding NSUbiquitousContainers to the Info tab: a dictionary keyed by the container identifier, holding NSUbiquitousContainerIsDocumentScopePublic set to YES, NSUbiquitousContainerName set to the folder's name, and NSUbiquitousContainerSupportedFolderLevels set to Any. Raise the build number so iCloud Drive notices the change.
 //   4. Run on a device or simulator signed in to iCloud. While iCloud is unavailable the file stays on the device and moves to iCloud at the first launch that can reach it.
 
-// MARK: - Foundation + Observation + os
+// MARK: - Foundation + Observation + os + UniformTypeIdentifiers
 
-#if canImport(Foundation) && canImport(Observation) && canImport(os)
+#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(UniformTypeIdentifiers)
 import Foundation
 import Observation
 import os
+import UniformTypeIdentifiers
 
 /// Reads and writes a value like `AppStorage`, kept in its own file inside the location in its own format when it is `FileRepresentable` and as JSON otherwise, cached in memory, written in the background, and reloaded when another process or iCloud changes the file.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
@@ -29,13 +30,14 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
     private let file: StoredFile
     private let isRepresentable: Bool
 
-    /// Creates storage for the path that returns the default value until something is stored, where a path without an extension, such as "Settings/theme", gets the `FileRepresentable` type's preferred extension or ".json", stopping on a path that could leave the location.
+    /// Creates storage for the path that returns the default value until something is stored, where a path without an extension, such as "Settings/theme", gets the preferred extension of the `FileRepresentable` type's content type or ".json", stopping on a path that could leave the location.
     public init(wrappedValue: Value, _ path: String, _ location: Location = .app) {
         let violation: String? = StoredFile.pathViolation(path)
         precondition(violation == nil, violation ?? "")
         let representable: (any FileRepresentable.Type)? = Value.self as? any FileRepresentable.Type
+        let defaultExtension: String? = if let representable { representable.contentType.preferredFilenameExtension } else { "json" }
         self.defaultValue = wrappedValue
-        self.file = location.file(StoredFile.withExtension(path, representable?.preferredFilenameExtension ?? "json"))
+        self.file = location.file(defaultExtension.map { StoredFile.withExtension(path, $0) } ?? path)
         self.isRepresentable = representable != nil
     }
 
@@ -326,9 +328,9 @@ fileprivate final class DecodedValue {
 }
 #endif
 
-// MARK: - Foundation + Observation + os + SwiftUI
+// MARK: - Foundation + Observation + os + SwiftUI + UniformTypeIdentifiers
 
-#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(SwiftUI)
+#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(SwiftUI) && canImport(UniformTypeIdentifiers)
 import SwiftUI
 
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)

@@ -2,9 +2,9 @@
 // path: PropertyWrappers/FileStorageTests.swift
 // dependencies: [PropertyWrappers/FileStorage.swift, Protocols/FileRepresentable.swift]
 
-// MARK: - Foundation + Observation + os
+// MARK: - Foundation + Observation + os + UniformTypeIdentifiers
 
-#if canImport(Foundation) && canImport(Observation) && canImport(os)
+#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(UniformTypeIdentifiers)
 import Foundation
 import Observation
 import Testing
@@ -106,6 +106,14 @@ import Testing
         #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data([1, 2, 3]))
     }
 
+    @Test func wrappedValueKeepsDataUnderTheDataExtensionByDefault() {
+        let path: String = UUID().uuidString
+        let storage: FileStorage<Data?> = FileStorage(path, .temp)
+        storage.wrappedValue = Data([5])
+        StoredFile.flushAll()
+        #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: "\(path).data"))) == Data([5]))
+    }
+
     @Test func wrappedValueKeepsJSONUnderTheGivenExtension() {
         let path: String = "\(UUID().uuidString).txt"
         let storage: FileStorage<[Int]> = FileStorage(wrappedValue: [], path, .temp)
@@ -148,9 +156,9 @@ import Testing
 }
 #endif
 
-// MARK: - Foundation + Observation + os + SwiftUI
+// MARK: - Foundation + Observation + os + SwiftUI + UniformTypeIdentifiers
 
-#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(SwiftUI)
+#if canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(SwiftUI) && canImport(UniformTypeIdentifiers)
 import SwiftUI
 
 extension FileStorageTests {

@@ -2,14 +2,16 @@
 // path: Protocols/FileRepresentable.swift
 // dependencies: []
 
-#if canImport(Foundation)
+#if canImport(Foundation) && canImport(UniformTypeIdentifiers)
 import Foundation
+import UniformTypeIdentifiers
 
 /// A type that `FileStorage` keeps in a file of its own format, such as UTF-8 text, instead of as JSON.
+@available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, *)
 public protocol FileRepresentable {
 
-    /// The extension a file gets when its path has none, such as "txt".
-    static var preferredFilenameExtension: String { get }
+    /// The kind of file the value is kept in, whose preferred extension a path without one gets, such as "txt" for plain text.
+    static var contentType: UTType { get }
 
     /// Creates the value from a file's contents, throwing when they aren't in the type's format.
     init(fileContents: Data) throws
@@ -18,10 +20,11 @@ public protocol FileRepresentable {
     func fileContents() throws -> Data
 }
 
+@available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, *)
 extension Data: FileRepresentable {
 
-    /// The extension for bytes in no particular format.
-    public static var preferredFilenameExtension: String { "data" }
+    /// Bytes in no particular format, as a dynamic type that needs no registration and prefers the "data" extension.
+    public static var contentType: UTType { UTType(tag: "data", tagClass: .filenameExtension, conformingTo: .data) ?? .data }
 
     /// Creates the data from a file's contents, exactly as they are.
     public init(fileContents: Data) {
@@ -34,10 +37,11 @@ extension Data: FileRepresentable {
     }
 }
 
+@available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, *)
 extension Optional: FileRepresentable where Wrapped: FileRepresentable {
 
-    /// The wrapped type's extension.
-    public static var preferredFilenameExtension: String { Wrapped.preferredFilenameExtension }
+    /// The wrapped type's content type.
+    public static var contentType: UTType { Wrapped.contentType }
 
     /// Creates the wrapped value from a file's contents.
     public init(fileContents: Data) throws {
@@ -51,10 +55,11 @@ extension Optional: FileRepresentable where Wrapped: FileRepresentable {
     }
 }
 
+@available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, *)
 extension String: FileRepresentable {
 
-    /// The extension for plain text.
-    public static var preferredFilenameExtension: String { "txt" }
+    /// Plain text, which prefers the "txt" extension.
+    public static var contentType: UTType { .plainText }
 
     /// Creates the string from UTF-8 text.
     public init(fileContents: Data) throws {

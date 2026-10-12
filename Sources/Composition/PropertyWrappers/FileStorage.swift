@@ -27,11 +27,12 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
 
     private let defaultValue: Value
     private let file: StoredFile
+    private let isRaw: Bool
 
     /// Creates storage for the name, such as "Settings/theme", kept as JSON in "Settings/theme.json", that returns the default value until something is stored, stopping on a name that could leave the location or has an extension.
     public init(wrappedValue: Value, _ name: String, _ location: Location = .app) {
         precondition(StoredFile.pathViolation(name, isFile: false) == nil, StoredFile.pathViolation(name, isFile: false) ?? "")
-        self.init(wrappedValue: wrappedValue, file: location.folder.file("\(name).json"))
+        self.init(wrappedValue: wrappedValue, file: location.folder.file("\(name).json"), isRaw: false)
     }
 
     /// Creates storage for the name that returns `nil` until something is stored.
@@ -40,37 +41,38 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
     }
 
     /// Creates storage for the file path, such as "Images/avatar.png", that keeps the data exactly as given and returns the default value until something is stored, stopping on a path that could leave the location or has no extension.
-    public init(wrappedValue: Value, _ path: String, _ location: DataLocation = .app) where Value == Data {
+    public init(wrappedValue: Value, file path: String, _ location: DataLocation = .app) where Value == Data {
         precondition(StoredFile.pathViolation(path, isFile: true) == nil, StoredFile.pathViolation(path, isFile: true) ?? "")
-        self.init(wrappedValue: wrappedValue, file: location.folder.file(path))
+        self.init(wrappedValue: wrappedValue, file: location.folder.file(path), isRaw: true)
     }
 
     /// Creates storage for the file path that keeps the data exactly as given and returns the default value until something is stored.
-    public init(wrappedValue: Value, _ path: String, _ location: DataLocation = .app) where Value == Data? {
+    public init(wrappedValue: Value, file path: String, _ location: DataLocation = .app) where Value == Data? {
         precondition(StoredFile.pathViolation(path, isFile: true) == nil, StoredFile.pathViolation(path, isFile: true) ?? "")
-        self.init(wrappedValue: wrappedValue, file: location.folder.file(path))
+        self.init(wrappedValue: wrappedValue, file: location.folder.file(path), isRaw: true)
     }
 
     /// Creates storage for the file path that keeps the data exactly as given and returns `nil` until something is stored.
-    public init(_ path: String, _ location: DataLocation = .app) where Value == Data? {
-        self.init(wrappedValue: nil, path, location)
+    public init(file path: String, _ location: DataLocation = .app) where Value == Data? {
+        self.init(wrappedValue: nil, file: path, location)
     }
 
-    /// Creates storage for the file.
-    private init(wrappedValue: Value, file: StoredFile) {
+    /// Creates storage for the file, kept exactly as given when raw and as JSON otherwise.
+    private init(wrappedValue: Value, file: StoredFile, isRaw: Bool) {
         self.defaultValue = wrappedValue
         self.file = file
+        self.isRaw = isRaw
     }
 
-    /// The value kept in the file, or the default value when there is none or it can't be decoded, where `Data` is kept as is, anything else as JSON, and setting `nil` removes the file.
+    /// The value kept in the file, or the default value when there is none or it can't be decoded, where data from a `file:` path is kept exactly as given, anything else as JSON, and setting `nil` removes the file.
     public var wrappedValue: Value {
         get {
             guard let data: Data = file.data else { return defaultValue }
-            if let raw: Value = data as? Value { return raw }
+            if isRaw, let raw: Value = data as? Value { return raw }
             return DecodedValues.decode(Value.self, from: data) ?? defaultValue
         }
         nonmutating set {
-            if let data: Data = newValue as? Data { return file.write(data) }
+            if isRaw, let data: Data = newValue as? Data { return file.write(data) }
             file.write((try? JSONEncoder().encode(newValue)).flatMap { $0 == Data("null".utf8) ? nil : $0 })
         }
     }

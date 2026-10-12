@@ -19,7 +19,7 @@ import Testing
     }
 
     @Test func documentsHoldDataUntouched() {
-        let storage: FileStorage<Data?> = FileStorage("\(UUID().uuidString).png", .documents)
+        let storage: FileStorage<Data?> = FileStorage(file: "\(UUID().uuidString).png", .documents)
         #expect(storage.wrappedValue == nil)
     }
 
@@ -73,7 +73,7 @@ import Testing
 
     @Test func wrappedValueKeepsDataAsIs() {
         let path: String = "\(UUID().uuidString).png"
-        let storage: FileStorage<Data?> = FileStorage(path, .temp)
+        let storage: FileStorage<Data?> = FileStorage(file: path, .temp)
         storage.wrappedValue = Data([1, 2, 3])
         StoredFile.flushAll()
         #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data([1, 2, 3]))

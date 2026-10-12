@@ -49,11 +49,11 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
 
     private let defaultValue: Value
     private let key: String
-    private let sort: (@Sendable (Value) -> Value)?
+    private let query: SyncedQuery<Value>?
 
     /// Creates storage for the key that returns the default value until something is stored.
     public init(wrappedValue: Value, _ key: String) {
-        self.init(wrappedValue: wrappedValue, key, sorting: nil)
+        self.init(wrappedValue: wrappedValue, key, query: nil)
     }
 
     /// Creates storage for the key that returns `nil` until something is stored.
@@ -61,38 +61,38 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
         self.init(wrappedValue: nil, key)
     }
 
-    /// Creates storage for the key whose identifiable elements, each synced on its own, read sorted by the descriptors.
-    public init<I: Codable & Identifiable & Sendable>(wrappedValue: Value, _ key: String, sort descriptors: [SortDescriptor<I>]) where Value == [I] {
-        self.init(wrappedValue: wrappedValue, key, sorting: { $0.sorted(using: descriptors) })
+    /// Creates storage for the key whose identifiable elements, each synced on its own, read through the filter and sorted by the descriptors.
+    public init<I: Codable & Identifiable & Sendable>(wrappedValue: Value, _ key: String, filter: Predicate<I>? = nil, sort descriptors: [SortDescriptor<I>] = []) where Value == [I] {
+        self.init(wrappedValue: wrappedValue, key, query: SyncedQuery(key, filter: filter, sort: descriptors))
     }
 
-    /// Creates storage for the key whose identifiable elements, each synced on its own, read sorted by the key path.
-    public init<I: Codable & Identifiable & Sendable, C: Comparable>(wrappedValue: Value, _ key: String, sort keyPath: KeyPath<I, C> & Sendable, order: SortOrder = .forward) where Value == [I] {
-        self.init(wrappedValue: wrappedValue, key, sort: [SortDescriptor(keyPath, order: order)])
+    /// Creates storage for the key whose identifiable elements, each synced on its own, read through the filter and sorted by the key path.
+    public init<I: Codable & Identifiable & Sendable, C: Comparable>(wrappedValue: Value, _ key: String, filter: Predicate<I>? = nil, sort keyPath: KeyPath<I, C> & Sendable, order: SortOrder = .forward) where Value == [I] {
+        self.init(wrappedValue: wrappedValue, key, filter: filter, sort: [SortDescriptor(keyPath, order: order)])
     }
 
-    /// Creates storage for the key whose identifiable elements, each synced on its own, read sorted by the optional key path.
-    public init<I: Codable & Identifiable & Sendable, C: Comparable>(wrappedValue: Value, _ key: String, sort keyPath: KeyPath<I, C?> & Sendable, order: SortOrder = .forward) where Value == [I] {
-        self.init(wrappedValue: wrappedValue, key, sort: [SortDescriptor(keyPath, order: order)])
+    /// Creates storage for the key whose identifiable elements, each synced on its own, read through the filter and sorted by the optional key path.
+    public init<I: Codable & Identifiable & Sendable, C: Comparable>(wrappedValue: Value, _ key: String, filter: Predicate<I>? = nil, sort keyPath: KeyPath<I, C?> & Sendable, order: SortOrder = .forward) where Value == [I] {
+        self.init(wrappedValue: wrappedValue, key, filter: filter, sort: [SortDescriptor(keyPath, order: order)])
     }
 
-    /// Creates storage for the key that reads back through the sort, when there is one.
-    private init(wrappedValue: Value, _ key: String, sorting sort: (@Sendable (Value) -> Value)?) {
+    /// Creates storage for the key that reads and writes through the query, when there is one.
+    private init(wrappedValue: Value, _ key: String, query: SyncedQuery<Value>?) {
         self.defaultValue = wrappedValue
         self.key = key
-        self.sort = sort
+        self.query = query
     }
 
-    /// The value kept on the device, or the default value when nothing is stored, where an array of identifiable elements syncs each element on its own and reads in the order written or the sort's; setting `nil` removes it.
+    /// The value kept on the device, or the default value when nothing is stored, where an array of identifiable elements syncs each element on its own and reads through the filter in the order written or the sort's; setting `nil` removes it.
     public var wrappedValue: Value {
         get {
-            if let Items: any SyncedItems.Type = Value.self as? any SyncedItems.Type, let items: Value = Items.init(syncedUnder: key) as? Value { return sort?(items) ?? items }
+            if let Items: any SyncedItems.Type = Value.self as? any SyncedItems.Type, let items: Value = Items.init(syncedUnder: key) as? Value { return query?.read(items) ?? items }
             if Value.self is any SyncedItems.Type { return defaultValue }
             guard let data: Data = SyncEngine.shared.value(key), let value: Value = try? JSONDecoder().decode(Value.self, from: data) else { return defaultValue }
             return value
         }
         nonmutating set {
-            if Value.self is any SyncedItems.Type, let items: any SyncedItems = newValue as? any SyncedItems { return items.sync(under: key, positioned: sort == nil) }
+            if Value.self is any SyncedItems.Type, let items: any SyncedItems = (query?.merge(newValue) ?? newValue) as? any SyncedItems { return items.sync(under: key, positioned: !(query?.isSorted ?? false)) }
             let data: Data? = (try? JSONEncoder().encode(newValue)).flatMap { $0 == Data("null".utf8) ? nil : $0 }
             SyncEngine.shared.write([key: data])
         }
@@ -482,6 +482,28 @@ extension Array: SyncedItems where Element: Codable & Identifiable {
         }
         if SyncEngine.shared.value(key) == nil { changes[key] = Data("[]".utf8) }
         SyncEngine.shared.write(changes)
+    }
+}
+
+/// How an array synced item by item reads through a filter and sort, and writes back without removing the elements the filter hides.
+fileprivate struct SyncedQuery<Value>: Sendable {
+
+    let isSorted: Bool
+    let merge: @Sendable (Value) -> Value
+    let read: @Sendable (Value) -> Value
+
+    /// Creates the query for the elements kept under the key.
+    init<I: Codable & Identifiable & Sendable>(_ key: String, filter: Predicate<I>?, sort descriptors: [SortDescriptor<I>]) where Value == [I] {
+        let shows: @Sendable (I) -> Bool = { element in filter.map { (try? $0.evaluate(element)) ?? false } ?? true }
+        self.isSorted = !descriptors.isEmpty
+        self.merge = { shown in
+            guard filter != nil else { return shown }
+            let kept: Set<I.ID> = Set(shown.map(\.id))
+            var visible: IndexingIterator<[I]> = shown.makeIterator()
+            let merged: [I] = ([I](syncedUnder: key) ?? []).filter { !shows($0) || kept.contains($0.id) }.compactMap { shows($0) ? visible.next() : $0 }
+            return merged + Array(visible)
+        }
+        self.read = { $0.filter(shows).sorted(using: descriptors) }
     }
 }
 

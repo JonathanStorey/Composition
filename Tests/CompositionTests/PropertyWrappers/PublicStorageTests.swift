@@ -37,6 +37,16 @@ import Testing
         #expect(storage.wrappedValue.isEmpty)
     }
 
+    @Test func filteredStorageHidesEntriesThatFail() {
+        let storage: PublicStorage<Int> = PublicStorage(UUID().uuidString, filter: #Predicate<Int> { $0 > 3 })
+        storage.entry = 2
+        #expect(storage.wrappedValue.isEmpty)
+        #expect(storage.entry == 2)
+        storage.entry = 5
+        #expect(storage.wrappedValue == [5])
+        storage.entry = nil
+    }
+
     @Test func sortedStorageReadsTheUsersEntry() {
         let storage: PublicStorage<Int> = PublicStorage(UUID().uuidString, sort: \.self, order: .reverse)
         storage.entry = 5

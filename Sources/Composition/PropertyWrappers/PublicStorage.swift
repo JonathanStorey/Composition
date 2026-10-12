@@ -21,33 +21,35 @@ import Foundation
 import Observation
 import os
 
-/// Reads every user's entry for a key in the app's public iCloud database, oldest first or in the order the sort gives.
+/// Reads every user's entry for a key in the app's public iCloud database through an optional filter, oldest first or in the order the sort gives.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
 public struct PublicStorage<Value: Codable & Sendable>: Sendable {
 
+    private let filter: Predicate<Value>?
     private let key: String
     private let sort: [SortDescriptor<Value>]
 
-    /// Creates storage for the key, shared by every user of the app, whose entries read oldest first or sorted by the descriptors.
-    public init(_ key: String, sort descriptors: [SortDescriptor<Value>] = []) {
+    /// Creates storage for the key, shared by every user of the app, whose entries read through the filter, oldest first or sorted by the descriptors.
+    public init(_ key: String, filter: Predicate<Value>? = nil, sort descriptors: [SortDescriptor<Value>] = []) {
+        self.filter = filter
         self.key = key
         self.sort = descriptors
     }
 
-    /// Creates storage for the key, shared by every user of the app, whose entries read sorted by the key path.
-    public init<C: Comparable>(_ key: String, sort keyPath: KeyPath<Value, C> & Sendable, order: SortOrder = .forward) {
-        self.init(key, sort: [SortDescriptor(keyPath, order: order)])
+    /// Creates storage for the key, shared by every user of the app, whose entries read through the filter, sorted by the key path.
+    public init<C: Comparable>(_ key: String, filter: Predicate<Value>? = nil, sort keyPath: KeyPath<Value, C> & Sendable, order: SortOrder = .forward) {
+        self.init(key, filter: filter, sort: [SortDescriptor(keyPath, order: order)])
     }
 
-    /// Creates storage for the key, shared by every user of the app, whose entries read sorted by the optional key path.
-    public init<C: Comparable>(_ key: String, sort keyPath: KeyPath<Value, C?> & Sendable, order: SortOrder = .forward) {
-        self.init(key, sort: [SortDescriptor(keyPath, order: order)])
+    /// Creates storage for the key, shared by every user of the app, whose entries read through the filter, sorted by the optional key path.
+    public init<C: Comparable>(_ key: String, filter: Predicate<Value>? = nil, sort keyPath: KeyPath<Value, C?> & Sendable, order: SortOrder = .forward) {
+        self.init(key, filter: filter, sort: [SortDescriptor(keyPath, order: order)])
     }
 
-    /// Every user's entry, oldest first or in the order the sort gives, refreshed from iCloud when read at most once a minute.
+    /// Every user's entry that passes the filter, oldest first or in the order the sort gives, refreshed from iCloud when read at most once a minute.
     public var wrappedValue: [Value] {
-        let entries: [Value] = PublicStore.shared.entries(key).compactMap { try? JSONDecoder().decode(Value.self, from: $0) }
+        let entries: [Value] = PublicStore.shared.entries(key).compactMap { try? JSONDecoder().decode(Value.self, from: $0) }.filter { entry in filter.map { (try? $0.evaluate(entry)) ?? false } ?? true }
         return sort.isEmpty ? entries : entries.sorted(using: sort)
     }
 

@@ -25,6 +25,11 @@ import Testing
         #expect(number.wrappedValue == nil)
     }
 
+    @Test func hasExtensionLooksOnlyAtTheLastName() {
+        #expect(StoredFile.hasExtension("Images/avatar.png"))
+        #expect(!StoredFile.hasExtension("Exports.2026/report"))
+    }
+
     #if os(macOS)
     @Test func iCloudDriveKeepsDataOnTheDeviceWithoutAnAccount() {
         let storage: FileStorage<Data> = FileStorage(wrappedValue: Data(), "\(UUID().uuidString).pdf", .iCloudDrive)

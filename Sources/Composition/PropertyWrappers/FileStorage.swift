@@ -30,12 +30,13 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
     private let file: StoredFile
     private let isRepresentable: Bool
 
-    /// Creates storage for the path that returns the default value until something is stored, where a path without an extension, such as "Settings/theme", gets the preferred extension of the `FileRepresentable` type's content type or ".json", stopping on a path that could leave the location.
+    /// Creates storage for the path that returns the default value until something is stored, where a path without an extension, such as "Settings/theme", gets the preferred extension of the `FileRepresentable` type's content type or ".json", stopping on a path that could leave the location, and stopping debug builds on a path without an extension when the content type has none.
     public init(wrappedValue: Value, _ path: String, _ location: Location = .app) {
         let violation: String? = StoredFile.pathViolation(path)
         precondition(violation == nil, violation ?? "")
         let representable: (any FileRepresentable.Type)? = Value.self as? any FileRepresentable.Type
         let defaultExtension: String? = if let representable { representable.contentType.preferredFilenameExtension } else { "json" }
+        if defaultExtension == nil, !StoredFile.hasExtension(path) { assertionFailure("The FileStorage path \"\(path)\" needs an extension, since \(Value.self)'s content type has no preferred one.") }
         self.defaultValue = wrappedValue
         self.file = location.file(defaultExtension.map { StoredFile.withExtension(path, $0) } ?? path)
         self.isRepresentable = representable != nil
@@ -165,6 +166,11 @@ final class StoredFile: NSObject, NSFilePresenter, Observable, Sendable {
         files.withLock { Array($0.values) }.forEach { $0.queue.sync {} }
     }
 
+    /// A Boolean value indicating whether the path's last name has an extension.
+    static func hasExtension(_ path: String) -> Bool {
+        path.split(separator: "/").last?.contains(".") == true
+    }
+
     /// Why the path can't name a file inside its location, or `nil` when it can: a relative path of names, none empty or starting with ".".
     static func pathViolation(_ path: String) -> String? {
         guard !path.hasPrefix("/"), path.split(separator: "/", omittingEmptySubsequences: false).allSatisfy({ !$0.isEmpty && !$0.hasPrefix(".") }) else { return "The FileStorage path \"\(path)\" must be relative, without empty components or ones starting with \".\"." }
@@ -173,7 +179,7 @@ final class StoredFile: NSObject, NSFilePresenter, Observable, Sendable {
 
     /// The path as given when its last name has an extension, or with the default extension added when it has none.
     static func withExtension(_ path: String, _ defaultExtension: String) -> String {
-        path.split(separator: "/").last?.contains(".") == true ? path : "\(path).\(defaultExtension)"
+        hasExtension(path) ? path : "\(path).\(defaultExtension)"
     }
 
     /// The shared file at the URL, created on first use.

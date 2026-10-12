@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/FileStorage.swift
-// dependencies: [Protocols/FileRepresentable.swift]
+// dependencies: []
 // permissions: [com.apple.developer.icloud-container-identifiers, com.apple.developer.icloud-services, com.apple.developer.ubiquity-container-identifiers, com.apple.security.application-groups, LSSupportsOpeningDocumentsInPlace, NSUbiquitousContainers, UIFileSharingEnabled]
 
 // Setup in Xcode:
@@ -20,7 +20,7 @@ import Foundation
 import Observation
 import os
 
-/// Reads and writes a value like `AppStorage`, kept in its own file inside the location in its own format when it is `FileRepresentable` under its own extension, as a property list under ".plist", and as JSON otherwise, cached in memory, written in the background, and reloaded when another process or iCloud changes the file.
+/// Reads and writes a value like `AppStorage`, kept in its own file inside the location as raw bytes for `Data`, UTF-8 text for `String`, a property list under ".plist", and JSON otherwise, cached in memory, written in the background, and reloaded when another process or iCloud changes the file.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
 public struct FileStorage<Value: Codable & Sendable>: Sendable {
@@ -29,17 +29,15 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
     private let file: StoredFile
     private let format: Format
 
-    /// Creates storage for the path that returns the default value until something is stored, where a path without an extension, such as "Settings/theme", gets the `FileRepresentable` type's extension or ".json", and a `FileRepresentable` value under any other extension is kept as JSON, or as a property list under ".plist", except `Data`, which is always kept as is, stopping on a path that could leave the location.
+    /// Creates storage for the path that returns the default value until something is stored, where a path without an extension, such as "Settings/theme", gets ".data" for `Data`, ".txt" for `String` and ".json" for anything else, stopping on a path that could leave the location.
     public init(wrappedValue: Value, _ path: String, _ location: Location = .app) {
         let violation: String? = StoredFile.pathViolation(path)
         precondition(violation == nil, violation ?? "")
-        let representable: (any FileRepresentable.Type)? = Value.self as? any FileRepresentable.Type
-        let filePath: String = StoredFile.withExtension(path, representable?.fileExtension ?? "json")
-        let pathExtension: String = URL(filePath: filePath).pathExtension.lowercased()
-        let isData: Bool = Value.self == Data.self || Value.self == Data?.self
+        let format: Format = Value.self == Data.self || Value.self == Data?.self ? .data : Value.self == String.self || Value.self == String?.self ? .text : .json
+        let filePath: String = StoredFile.withExtension(path, format.rawValue)
         self.defaultValue = wrappedValue
         self.file = location.file(filePath)
-        self.format = isData || pathExtension == representable?.fileExtension ? .file : pathExtension == "plist" ? .propertyList : .json
+        self.format = format == .json && URL(filePath: filePath).pathExtension.lowercased() == Format.propertyList.rawValue ? .propertyList : format
     }
 
     /// Creates storage for the path that returns `nil` until something is stored.
@@ -52,9 +50,10 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
         get {
             guard let data: Data = file.data else { return defaultValue }
             let value: Value? = switch format {
-            case .file: DecodedValues.decode(data) { try (Value.self as? any FileRepresentable.Type)?.init(fileContents: $0) as? Value }
+            case .data: data as? Value
             case .json: DecodedValues.decode(data) { try JSONDecoder().decode(Value.self, from: $0) }
             case .propertyList: DecodedValues.decode(data) { try PropertyListDecoder().decode(Value.self, from: $0) }
+            case .text: String(decoding: data, as: UTF8.self) as? Value
             }
             return value ?? defaultValue
         }
@@ -62,9 +61,10 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
             let mirror: Mirror = Mirror(reflecting: newValue)
             guard mirror.displayStyle != .optional || !mirror.children.isEmpty else { return file.write(nil) }
             switch format {
-            case .file: file.write(try? (newValue as? any FileRepresentable)?.fileContents)
+            case .data: file.write(newValue as? Data)
             case .json: file.write(try? JSONEncoder().encode(newValue))
             case .propertyList: file.write(try? PropertyListEncoder().encode(newValue))
+            case .text: file.write((newValue as? String).map { Data($0.utf8) })
             }
         }
     }
@@ -305,10 +305,10 @@ fileprivate struct Contents: Sendable {
     var writes: Int = 0
 }
 
-/// How a file's contents are written: in the value's own format, as JSON, or as a property list.
-fileprivate enum Format: Sendable {
+/// How a file's contents are written, named by the extension a file in that format gets: raw bytes, JSON, a property list, or UTF-8 text.
+fileprivate enum Format: String, Sendable {
 
-    case file, json, propertyList
+    case data, json, propertyList = "plist", text = "txt"
 }
 
 /// Values decoded from stored files, remembered by the data they came from so reading unchanged data again skips the decoder, and dropped when memory runs low.

@@ -52,7 +52,7 @@ public struct SyncedStorage<Value: Codable & Sendable>: Sendable {
 
     /// Creates storage for the key that returns the default value until something is stored.
     public init(wrappedValue: Value, _ key: String) {
-        precondition(!key.contains("/") && !key.hasPrefix("_"), "The SyncedStorage key \"\(key)\" can't contain \"/\", which separates a ListStorage list from its items, or start with \"_\", which CloudKit reserves.")
+        precondition(!key.isEmpty && !key.contains("/") && !key.hasPrefix("_") && !key.hasPrefix("."), "The SyncedStorage key \"\(key)\" can't be empty, contain \"/\", which separates a ListStorage list from its items, start with \"_\", which CloudKit reserves, or start with \".\", which would hide its file.")
         self.defaultValue = wrappedValue
         self.key = key
     }
@@ -107,7 +107,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
     /// Restores the values kept on the device, each starting at its last success, or unknown when it never synced.
     private init() {
         let names: [String] = (try? FileManager.default.contentsOfDirectory(atPath: Self.folder.path(percentEncoded: false))) ?? []
-        let stored: [String: SyncEntry] = names.filter { $0.hasSuffix(".json") && !$0.hasPrefix("_") }.compactMap { Self.read([String: SyncEntry].self, named: String($0.dropLast(5))) }.reduce(into: [:]) { stored, file in stored.merge(file) { kept, _ in kept } }
+        let stored: [String: SyncEntry] = names.filter { $0.hasSuffix(".json") && !$0.hasPrefix("_") }.compactMap { Self.file(String($0.dropLast(5))).wrappedValue }.reduce(into: [:]) { stored, file in stored.merge(file) { kept, _ in kept } }
         self.entries = OSAllocatedUnfairLock(initialState: stored.mapValues { entry in
             var restored: SyncEntry = entry
             restored.status = entry.failure.map { .failure(CKError(CKError.Code(rawValue: $0) ?? .internalError)) } ?? entry.synced.map(SyncStatus.success) ?? .unknown
@@ -120,6 +120,9 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
 
     /// The folder in the app's own folder that keeps each key's values in a file named after the key, and the engine's state in `_engine.json`, a name no key can take.
     private static let folder: URL = StoredFile.appFolder.appending(components: "Composition", "SyncedStorage", directoryHint: .isDirectory)
+
+    /// The engine's state, kept so the next launch picks up where this one left off.
+    private static let state: FileStorage<CKSyncEngine.State.Serialization?> = FileStorage("Composition/SyncedStorage/_engine")
 
     /// Whether a write waiting on the device should replace the server's value, which only a strictly newer write does.
     static func prefersLocal(written local: Date?, over server: Date?) -> Bool {
@@ -135,14 +138,14 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         return nil
     }
 
+    /// The file in the folder that keeps the entries of every key named after the name.
+    private static func file(_ name: String) -> FileStorage<[String: SyncEntry]?> {
+        FileStorage("Composition/SyncedStorage/\(name)")
+    }
+
     /// The name of the file that keeps the key, which for an item of a list is the list's key.
     private static func fileName(_ key: String) -> String {
         String(key.prefix { $0 != "/" })
-    }
-
-    /// The contents of the named file in the folder, or `nil` when it was never written or can't be decoded.
-    private static func read<C: Decodable>(_ type: C.Type, named name: String) -> C? {
-        StoredFile.at(folder.appending(component: "\(name).json")).data.flatMap { try? JSONDecoder().decode(C.self, from: $0) }
     }
 
     /// Rebuilds a record from its archived server fields.
@@ -160,12 +163,6 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         return archiver.encodedData
     }
 
-    /// Writes the contents as JSON to the named file in the folder, in the background through the file's `StoredFile`.
-    private static func write<C: Encodable>(_ contents: C, named name: String) {
-        guard let data: Data = try? JSONEncoder().encode(contents) else { return }
-        StoredFile.at(folder.appending(component: "\(name).json")).write(data)
-    }
-
     /// A placeholder property that observers track in place of the values and statuses.
     private var revision: Void { () }
 
@@ -178,7 +175,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
     func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
         switch event {
         case .stateUpdate(let update):
-            Self.write(update.stateSerialization, named: "_engine")
+            Self.state.wrappedValue = update.stateSerialization
         case .accountChange(let change):
             switch change.changeType {
             case .signIn: return
@@ -420,7 +417,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
                 let result: R = change(&entries)
                 let files: Set<String> = Set((keys ?? Set(entries.keys)).map(Self.fileName))
                 for file: String in files {
-                    Self.write(entries.filter { Self.fileName($0.key) == file }, named: file)
+                    Self.file(file).wrappedValue = entries.filter { Self.fileName($0.key) == file }
                 }
                 return result
             }
@@ -432,7 +429,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         guard hasCloudKitEntitlement else { return nil }
         return engine.withLockUnchecked { stored in
             if let stored { return stored }
-            let serialization: CKSyncEngine.State.Serialization? = Self.read(CKSyncEngine.State.Serialization.self, named: "_engine")
+            let serialization: CKSyncEngine.State.Serialization? = Self.state.wrappedValue
             let created: CKSyncEngine = CKSyncEngine(CKSyncEngine.Configuration(database: CKContainer.default().privateCloudDatabase, stateSerialization: serialization, delegate: self))
             if serialization == nil { created.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))]) }
             requeue(created)

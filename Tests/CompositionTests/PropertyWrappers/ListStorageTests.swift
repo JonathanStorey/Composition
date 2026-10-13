@@ -42,9 +42,11 @@ private struct Todo: Codable, Equatable, Identifiable, Sendable {
     }
 
     #if compiler(>=6.2) && os(macOS)
-    @Test func keyWithASlashOrLeadingUnderscoreStopsTheApp() async {
+    @Test func keyThatCantNameARecordOrFileStopsTheApp() async {
         await #expect(processExitsWith: .failure) { _ = ListStorage<Todo>("todos/1") }
         await #expect(processExitsWith: .failure) { _ = ListStorage<Todo>("_todos") }
+        await #expect(processExitsWith: .failure) { _ = ListStorage<Todo>(".todos") }
+        await #expect(processExitsWith: .failure) { _ = ListStorage<Todo>("") }
     }
     #endif
 

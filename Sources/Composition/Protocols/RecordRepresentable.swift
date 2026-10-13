@@ -1,24 +1,55 @@
+// repository: https://github.com/JonathanStorey/Composition
+// path: Protocols/RecordRepresentable.swift
+// dependencies: []
 
-protocol RecordRepresentable {
+#if canImport(CloudKit) && canImport(Foundation)
+import CloudKit
+import Foundation
 
+/// A type that syncs as the fields of a CloudKit record, which the engine creates, names and places in a zone, so the value only reads and writes its own fields.
+public protocol RecordRepresentable {
+
+    /// Creates the value from the record's fields, like `Decodable`'s `init(from:)`, throwing when they don't hold one.
     init(from record: CKRecord) throws
 
-    func record<ID: LosslessStringConvertible>(type recordType: String, id recordID: KeyPath<Self, ID>? =nil, zone: String? = nil) throws -> Self
-
+    /// Writes the value's fields into the record, like `Encodable`'s `encode(to:)`, leaving its name, zone and server fields as they are.
+    func encode(to record: CKRecord) throws
 }
 
-internal extension Codable: RecordRepresentable {
+public extension RecordRepresentable {
 
-    func record<ID: LosslessStringConvertible>(type: String) throws -> Self {
-        let record = CKRecord(recordType: type)
-        record[data] = JSONEncoder().encode(self)
+    /// The CloudKit record type named after the type without its module, with nested and generic names joined by underscores, as `Library_Book` for `MyApp.Library.Book`, and a collection or optional named after its element.
+    static var recordType: String {
+        let reflected: String = String(reflecting: Self.self)
+        assert(!reflected.contains("("), "\(reflected) is private or local, so its name changes between builds and can't name a CloudKit record type.")
+        let name: String = recordTypeName(reflected[...])
+        assert(name.first?.isLetter == true && name.utf8.count <= 255, "The record type \"\(name)\" for \(reflected) must start with a letter and fit in 255 characters.")
+        return name
     }
 }
 
-internal extension Codable & Indentifiable: RecordRepresentable {
+public extension RecordRepresentable where Self: Codable {
 
-    func record<ID: LosslessStringConvertible>(type recordType: String, id recordID: /.id) throws -> Self {
-        let record = CKRecord(recordType: type, recordID: keyPath: /.id)
-        record[data] = JSONEncoder().encode(self)
+    /// Creates the value from the JSON kept in the record's `value` field.
+    init(from record: CKRecord) throws {
+        guard let data: Data = record["value"] as? Data else { throw DecodingError.valueNotFound(Self.self, DecodingError.Context(codingPath: [], debugDescription: "The record has no value field.")) }
+        self = try JSONDecoder().decode(Self.self, from: data)
+    }
+
+    /// Writes the value as JSON into the record's `value` field.
+    func encode(to record: CKRecord) throws {
+        let encoder: JSONEncoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        record["value"] = try encoder.encode(self)
     }
 }
+
+/// The reflected type name with each module dropped, nested and generic names joined by underscores, and `Optional`, `Array`, `ContiguousArray` and `Set` replaced by their element.
+func recordTypeName(_ reflected: Substring) -> String {
+    for container: String in ["Swift.Optional<", "Swift.Array<", "Swift.ContiguousArray<", "Swift.Set<"] where reflected.hasPrefix(container) && reflected.hasSuffix(">") {
+        return recordTypeName(reflected.dropFirst(container.count).dropLast())
+    }
+    let paths: [Substring] = reflected.split { "<>, ".contains($0) }
+    return paths.map { $0.split(separator: ".").dropFirst().joined(separator: "_") }.joined(separator: "_").filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") }
+}
+#endif

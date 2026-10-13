@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/SyncedStorage.swift
-// dependencies: []
+// dependencies: [PropertyWrappers/FileStorage.swift]
 // permissions: [aps-environment, com.apple.developer.icloud-container-identifiers, com.apple.developer.icloud-services, UIBackgroundModes]
 
 // Setup in Xcode:
@@ -34,9 +34,9 @@ public enum SyncStatus: Sendable {
 }
 #endif
 
-// MARK: - CloudKit + Foundation + Observation + os + Security
+// MARK: - CloudKit + Foundation + Observation + os + Security + UniformTypeIdentifiers
 
-#if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security)
+#if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(UniformTypeIdentifiers)
 import CloudKit
 import Observation
 import os
@@ -106,7 +106,8 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
 
     /// Restores the values kept on the device, each starting at its last success, or unknown when it never synced.
     private init() {
-        let stored: [String: SyncEntry] = Self.folder.readAll([String: SyncEntry].self).values.reduce(into: [:]) { stored, file in stored.merge(file) { kept, _ in kept } }
+        let names: [String] = (try? FileManager.default.contentsOfDirectory(atPath: Self.folder.path(percentEncoded: false))) ?? []
+        let stored: [String: SyncEntry] = names.filter { $0.hasSuffix(".json") && !$0.hasPrefix("_") }.compactMap { Self.read([String: SyncEntry].self, named: String($0.dropLast(5))) }.reduce(into: [:]) { stored, file in stored.merge(file) { kept, _ in kept } }
         self.entries = OSAllocatedUnfairLock(initialState: stored.mapValues { entry in
             var restored: SyncEntry = entry
             restored.status = entry.failure.map { .failure(CKError(CKError.Code(rawValue: $0) ?? .internalError)) } ?? entry.synced.map(SyncStatus.success) ?? .unknown
@@ -117,8 +118,8 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
     /// The engine every synced value shares.
     static let shared: SyncEngine = SyncEngine()
 
-    /// The folder that keeps each key's values in a file named after the key, and the engine's state in `_engine.json`, a name no key can take.
-    private static let folder: DeviceFolder = DeviceFolder("SyncedStorage")
+    /// The folder in the app's own folder that keeps each key's values in a file named after the key, and the engine's state in `_engine.json`, a name no key can take.
+    private static let folder: URL = StoredFile.appFolder.appending(components: "Composition", "SyncedStorage", directoryHint: .isDirectory)
 
     /// Whether a write waiting on the device should replace the server's value, which only a strictly newer write does.
     static func prefersLocal(written local: Date?, over server: Date?) -> Bool {
@@ -139,6 +140,11 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         String(key.prefix { $0 != "/" })
     }
 
+    /// The contents of the named file in the folder, or `nil` when it was never written or can't be decoded.
+    private static func read<C: Decodable>(_ type: C.Type, named name: String) -> C? {
+        StoredFile.at(folder.appending(component: "\(name).json")).data.flatMap { try? JSONDecoder().decode(C.self, from: $0) }
+    }
+
     /// Rebuilds a record from its archived server fields.
     private static func record(fromSystemFields data: Data) -> CKRecord? {
         guard let unarchiver: NSKeyedUnarchiver = try? NSKeyedUnarchiver(forReadingFrom: data) else { return nil }
@@ -154,6 +160,12 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         return archiver.encodedData
     }
 
+    /// Writes the contents as JSON to the named file in the folder, in the background through the file's `StoredFile`.
+    private static func write<C: Encodable>(_ contents: C, named name: String) {
+        guard let data: Data = try? JSONEncoder().encode(contents) else { return }
+        StoredFile.at(folder.appending(component: "\(name).json")).write(data)
+    }
+
     /// A placeholder property that observers track in place of the values and statuses.
     private var revision: Void { () }
 
@@ -166,7 +178,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
     func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
         switch event {
         case .stateUpdate(let update):
-            Self.folder.write(update.stateSerialization, named: "_engine")
+            Self.write(update.stateSerialization, named: "_engine")
         case .accountChange(let change):
             switch change.changeType {
             case .signIn: return
@@ -408,7 +420,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
                 let result: R = change(&entries)
                 let files: Set<String> = Set((keys ?? Set(entries.keys)).map(Self.fileName))
                 for file: String in files {
-                    Self.folder.write(entries.filter { Self.fileName($0.key) == file }, named: file)
+                    Self.write(entries.filter { Self.fileName($0.key) == file }, named: file)
                 }
                 return result
             }
@@ -420,7 +432,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
         guard hasCloudKitEntitlement else { return nil }
         return engine.withLockUnchecked { stored in
             if let stored { return stored }
-            let serialization: CKSyncEngine.State.Serialization? = Self.folder.read(CKSyncEngine.State.Serialization.self, named: "_engine")
+            let serialization: CKSyncEngine.State.Serialization? = Self.read(CKSyncEngine.State.Serialization.self, named: "_engine")
             let created: CKSyncEngine = CKSyncEngine(CKSyncEngine.Configuration(database: CKContainer.default().privateCloudDatabase, stateSerialization: serialization, delegate: self))
             if serialization == nil { created.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))]) }
             requeue(created)
@@ -464,57 +476,6 @@ struct SyncEntry: Codable, Sendable {
     }
 }
 
-/// A folder in the app's Application Support folder that keeps values as JSON files, written in the background so a change never waits on the disk.
-@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
-fileprivate final class DeviceFolder: Sendable {
-
-    private let pending: OSAllocatedUnfairLock<[String: any Encodable & Sendable]> = OSAllocatedUnfairLock(initialState: [:])
-    private let queue: DispatchQueue
-    private let url: URL
-
-    /// Creates the folder with the name, inside a Composition folder kept apart for each app.
-    init(_ name: String) {
-        self.queue = DispatchQueue(label: "Composition.\(name)", qos: .utility)
-        self.url = URL.applicationSupportDirectory.appending(components: Bundle.main.bundleIdentifier ?? "Composition", "Composition", name, directoryHint: .isDirectory)
-    }
-
-    /// The contents of the named file, once any write still waiting finishes, or `nil` when it was never written.
-    func read<C: Decodable>(_ type: C.Type, named name: String) -> C? {
-        queue.sync {}
-        return (try? Data(contentsOf: url.appending(component: "\(name).json"))).flatMap { try? JSONDecoder().decode(C.self, from: $0) }
-    }
-
-    /// The contents of every file whose name doesn't start with an underscore, by name.
-    func readAll<C: Decodable>(_ type: C.Type) -> [String: C] {
-        queue.sync {}
-        let names: [String] = (try? FileManager.default.contentsOfDirectory(atPath: url.path(percentEncoded: false))) ?? []
-        return names.filter { $0.hasSuffix(".json") && !$0.hasPrefix("_") }.reduce(into: [:]) { contents, file in
-            let name: String = String(file.dropLast(5))
-            contents[name] = read(C.self, named: name)
-        }
-    }
-
-    /// Writes the contents to the named file in the background, where newer contents replace any still waiting to be written.
-    func write<C: Encodable & Sendable>(_ contents: C, named name: String) {
-        let isIdle: Bool = pending.withLock { pending in
-            defer { pending[name] = contents }
-            return pending.isEmpty
-        }
-        guard isIdle else { return }
-        queue.async { [self] in
-            let files: [String: any Encodable & Sendable] = pending.withLock { pending in
-                defer { pending = [:] }
-                return pending
-            }
-            try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-            for (name, contents) in files {
-                guard let data: Data = try? JSONEncoder().encode(contents) else { continue }
-                try? data.write(to: url.appending(component: "\(name).json"), options: .atomic)
-            }
-        }
-    }
-}
-
 /// Values decoded from stored JSON, remembered by the data they came from so reading unchanged data again skips the decoder, and dropped when memory runs low.
 fileprivate enum DecodedValues {
 
@@ -552,9 +513,9 @@ fileprivate let hasCloudKitEntitlement: Bool = {
 }()
 #endif
 
-// MARK: - CloudKit + Foundation + Observation + os + Security + SwiftUI
+// MARK: - CloudKit + Foundation + Observation + os + Security + SwiftUI + UniformTypeIdentifiers
 
-#if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(SwiftUI)
+#if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(SwiftUI) && canImport(UniformTypeIdentifiers)
 import SwiftUI
 
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)

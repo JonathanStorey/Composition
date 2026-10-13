@@ -61,6 +61,26 @@ import Testing
     }
     #endif
 
+    @Test func unwatchedFileKeepsItsContentsWhenTheFileChangesOnDisk() async throws {
+        let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
+        let file: StoredFile = StoredFile.at(url)
+        #expect(file.data == nil)
+        try Data("9".utf8).write(to: url, options: .atomic)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(file.data == nil)
+    }
+
+    @Test func watchedFileReloadsWhenTheFileChangesOnDisk() async throws {
+        let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
+        let file: StoredFile = StoredFile.at(url, watched: true)
+        #expect(file.data == nil)
+        try Data("9".utf8).write(to: url, options: .atomic)
+        for _ in 0..<60 where file.data != Data("9".utf8) {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(file.data == Data("9".utf8))
+    }
+
     @Test func withExtensionAddsTheDefaultOnlyWhenThereIsNone() {
         #expect(StoredFile.withExtension("Settings/theme", "json") == "Settings/theme.json")
         #expect(StoredFile.withExtension("Exports.2026/report", "data") == "Exports.2026/report.data")
@@ -125,17 +145,6 @@ import Testing
         storage.wrappedValue = [3]
         StoredFile.flushAll()
         #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data("[3]".utf8))
-    }
-
-    @Test func wrappedValueReloadsWhenTheFileChangesOnDisk() async throws {
-        let path: String = UUID().uuidString
-        let storage: FileStorage<Int> = FileStorage(wrappedValue: 0, path, .temp)
-        #expect(storage.wrappedValue == 0)
-        try Data("9".utf8).write(to: URL.temporaryDirectory.appending(path: "\(path).json"), options: .atomic)
-        for _ in 0..<60 where storage.wrappedValue != 9 {
-            try await Task.sleep(for: .milliseconds(50))
-        }
-        #expect(storage.wrappedValue == 9)
     }
 
     @Test func wrappedValueRemovesTheFileWhenSetToNil() {

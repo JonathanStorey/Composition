@@ -3,9 +3,9 @@
 // dependencies: [Extensions/Date.swift, Extensions/String.swift, Extensions/UUID.swift, PropertyWrappers/EncryptedStorage.swift, PropertyWrappers/SyncedStorage.swift]
 // permissions: [aps-environment, com.apple.developer.icloud-container-identifiers, com.apple.developer.icloud-services, com.apple.security.network.client]
 
-// MARK: - CloudKit + Foundation + Network + Observation + os + Security
+// MARK: - CloudKit + Foundation + Network + Observation + os + Security + UniformTypeIdentifiers
 
-#if canImport(CloudKit) && canImport(Foundation) && canImport(Network) && canImport(Observation) && canImport(os) && canImport(Security)
+#if canImport(CloudKit) && canImport(Foundation) && canImport(Network) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(UniformTypeIdentifiers)
 import Foundation
 import Network
 import Observation
@@ -138,9 +138,9 @@ final class InternetConnection: Observable, Sendable {
 }
 #endif
 
-// MARK: - CloudKit + Foundation + Network + Observation + os + Security + SwiftUI
+// MARK: - CloudKit + Foundation + Network + Observation + os + Security + SwiftUI + UniformTypeIdentifiers
 
-#if canImport(CloudKit) && canImport(Foundation) && canImport(Network) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(SwiftUI)
+#if canImport(CloudKit) && canImport(Foundation) && canImport(Network) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(SwiftUI) && canImport(UniformTypeIdentifiers)
 import SwiftUI
 
 /// A version 7 UUID created on first read and shared by every wrapper of its scope, from a single view to the whole device, or renewed by each round trip to iCloud or the internet.

@@ -26,6 +26,13 @@ public extension RecordRepresentable {
         assert(name.first?.isLetter == true && name.utf8.count <= 255, "The record type \"\(name)\" for \(reflected) must start with a letter and fit in 255 characters.")
         return name
     }
+
+    /// A new record holding the value's fields, of the type, named by the id and placed in the zone, which defaults to the zone `SyncedStorage` uses.
+    func record(type recordType: String = Self.recordType, id recordName: String, zone zoneName: String = "Composition") throws -> CKRecord {
+        let record: CKRecord = CKRecord(recordType: recordType, recordID: CKRecord.ID(recordName: recordName, zoneID: CKRecordZone.ID(zoneName: zoneName)))
+        try encode(to: record)
+        return record
+    }
 }
 
 public extension RecordRepresentable where Self: Codable {
@@ -41,6 +48,14 @@ public extension RecordRepresentable where Self: Codable {
         let encoder: JSONEncoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         record["value"] = try encoder.encode(self)
+    }
+}
+
+public extension RecordRepresentable where Self: Identifiable {
+
+    /// A new record holding the value's fields, of the type, named by the value's `id` and placed in the zone, so values with the same `id` in the same zone are the same record.
+    func record(type recordType: String = Self.recordType, zone zoneName: String = "Composition") throws -> CKRecord {
+        try record(type: recordType, id: String(describing: id), zone: zoneName)
     }
 }
 

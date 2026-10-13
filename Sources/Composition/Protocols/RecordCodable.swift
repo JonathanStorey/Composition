@@ -6,7 +6,7 @@
 import CloudKit
 import Foundation
 
-/// A type that syncs as the fields of a CloudKit record, which the engine creates, names and places in a zone, so the value only reads and writes its own fields.
+/// A type that reads and writes itself as the fields of a CloudKit record, like `Codable`, leaving the record's type, name and zone to whoever creates it.
 public protocol RecordCodable {
 
     /// Creates the value from the record's fields, like `Decodable`'s `init(from:)`, throwing when they don't hold one.
@@ -14,16 +14,6 @@ public protocol RecordCodable {
 
     /// Writes the value's fields into the record, like `Encodable`'s `encode(to:)`, leaving its name, zone and server fields as they are.
     func encode(to record: CKRecord) throws
-}
-
-public extension RecordCodable {
-
-    /// A new record holding the value's fields, of the type, which defaults to one named after the value's type, named by the id and placed in the zone, which defaults to the zone `SyncedStorage` uses.
-    func record(type recordType: String = recordTypeName(of: Self.self), id recordName: String, zone zoneName: String = "Composition") throws -> CKRecord {
-        let record: CKRecord = CKRecord(recordType: recordType, recordID: CKRecord.ID(recordName: recordName, zoneID: CKRecordZone.ID(zoneName: zoneName)))
-        try encode(to: record)
-        return record
-    }
 }
 
 public extension RecordCodable where Self: Codable {
@@ -40,31 +30,5 @@ public extension RecordCodable where Self: Codable {
         encoder.outputFormatting = .sortedKeys
         record["value"] = try encoder.encode(self)
     }
-}
-
-public extension RecordCodable where Self: Identifiable {
-
-    /// A new record holding the value's fields, of the type, named by the value's `id` and placed in the zone, so values with the same `id` in the same zone are the same record.
-    func record(type recordType: String = recordTypeName(of: Self.self), zone zoneName: String = "Composition") throws -> CKRecord {
-        try record(type: recordType, id: String(describing: id), zone: zoneName)
-    }
-}
-
-/// The CloudKit record type named after the type without its module, with nested and generic names joined by underscores, as `Library_Book` for `MyApp.Library.Book`, and a collection or optional named after its element, stopping debug builds on a private or local type, whose name changes between builds.
-@usableFromInline func recordTypeName(of type: Any.Type) -> String {
-    let reflected: String = String(reflecting: type)
-    assert(!reflected.contains("("), "\(reflected) is private or local, so its name changes between builds and can't name a CloudKit record type.")
-    let name: String = recordTypeName(reflected[...])
-    assert(name.first?.isLetter == true && name.utf8.count <= 255, "The record type \"\(name)\" for \(reflected) must start with a letter and fit in 255 characters.")
-    return name
-}
-
-/// The reflected type name with each module dropped, nested and generic names joined by underscores, and `Optional`, `Array`, `ContiguousArray` and `Set` replaced by their element.
-fileprivate func recordTypeName(_ reflected: Substring) -> String {
-    for container: String in ["Swift.Optional<", "Swift.Array<", "Swift.ContiguousArray<", "Swift.Set<"] where reflected.hasPrefix(container) && reflected.hasSuffix(">") {
-        return recordTypeName(reflected.dropFirst(container.count).dropLast())
-    }
-    let paths: [Substring] = reflected.split { "<>, ".contains($0) }
-    return paths.map { $0.split(separator: ".").dropFirst().joined(separator: "_") }.joined(separator: "_").filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") }
 }
 #endif

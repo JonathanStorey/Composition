@@ -14,9 +14,11 @@ import Testing
 @Suite struct SyncedStorageTests {
 
     #if compiler(>=6.2) && os(macOS)
-    @Test func keyWithASlashOrLeadingUnderscoreStopsTheApp() async {
+    @Test func keyThatCantNameARecordOrFileStopsTheApp() async {
         await #expect(processExitsWith: .failure) { _ = SyncedStorage<Int>(wrappedValue: 0, "todos/1") }
         await #expect(processExitsWith: .failure) { _ = SyncedStorage<Int>(wrappedValue: 0, "_todos") }
+        await #expect(processExitsWith: .failure) { _ = SyncedStorage<Int>(wrappedValue: 0, ".todos") }
+        await #expect(processExitsWith: .failure) { _ = SyncedStorage<Int>(wrappedValue: 0, "") }
     }
     #endif
 

@@ -20,9 +20,9 @@ public struct ListStorage<Value: Codable & Identifiable & Sendable>: Sendable {
     private let filter: Predicate<Value>?
     private let key: String
 
-    /// Creates storage for the key whose items, starting empty, read through the filter and sorted by the descriptors, or in the order written without them, stopping on a key that contains "/" or starts with "_".
+    /// Creates storage for the key whose items, starting empty, read through the filter and sorted by the descriptors, or in the order written without them, stopping on a key that is empty, contains "/", or starts with "_" or ".".
     public init(_ key: String, filter: Predicate<Value>? = nil, sort descriptors: [SortDescriptor<Value>] = []) {
-        precondition(!key.contains("/") && !key.hasPrefix("_"), "The ListStorage key \"\(key)\" can't contain \"/\", which separates the list from its items, or start with \"_\", which CloudKit reserves.")
+        precondition(!key.isEmpty && !key.contains("/") && !key.hasPrefix("_") && !key.hasPrefix("."), "The ListStorage key \"\(key)\" can't be empty, contain \"/\", which separates the list from its items, start with \"_\", which CloudKit reserves, or start with \".\", which would hide its file.")
         self.descriptors = descriptors
         self.filter = filter
         self.key = key

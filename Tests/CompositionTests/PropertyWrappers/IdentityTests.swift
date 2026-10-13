@@ -2,9 +2,9 @@
 // path: PropertyWrappers/IdentityTests.swift
 // dependencies: [Extensions/Date.swift, Extensions/UUID.swift, PropertyWrappers/Identity.swift, PropertyWrappers/SyncedStorage.swift]
 
-// MARK: - CloudKit + Foundation + Network + Observation + os + Security
+// MARK: - CloudKit + Foundation + Network + Observation + os + Security + UniformTypeIdentifiers
 
-#if canImport(CloudKit) && canImport(Foundation) && canImport(Network) && canImport(Observation) && canImport(os) && canImport(Security)
+#if canImport(CloudKit) && canImport(Foundation) && canImport(Network) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(UniformTypeIdentifiers)
 import CloudKit
 import Foundation
 import Testing
@@ -75,9 +75,9 @@ import Testing
 }
 #endif
 
-// MARK: - CloudKit + Foundation + Network + Observation + os + Security + SwiftUI
+// MARK: - CloudKit + Foundation + Network + Observation + os + Security + SwiftUI + UniformTypeIdentifiers
 
-#if canImport(CloudKit) && canImport(Foundation) && canImport(Network) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(SwiftUI)
+#if canImport(CloudKit) && canImport(Foundation) && canImport(Network) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(SwiftUI) && canImport(UniformTypeIdentifiers)
 import SwiftUI
 
 @MainActor

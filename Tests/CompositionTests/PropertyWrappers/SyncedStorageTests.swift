@@ -1,10 +1,10 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/SyncedStorageTests.swift
-// dependencies: [PropertyWrappers/SyncedStorage.swift]
+// dependencies: [PropertyWrappers/FileStorage.swift, PropertyWrappers/SyncedStorage.swift]
 
-// MARK: - CloudKit + Foundation + Observation + os + Security
+// MARK: - CloudKit + Foundation + Observation + os + Security + UniformTypeIdentifiers
 
-#if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security)
+#if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(UniformTypeIdentifiers)
 import CloudKit
 import Foundation
 import Observation
@@ -91,6 +91,15 @@ import Testing
         #expect(SyncedStorage(wrappedValue: 7, UUID().uuidString).wrappedValue == 7)
     }
 
+    @Test func wrappedValueKeepsAFileForTheKeyInTheAppFolder() {
+        let key: String = UUID().uuidString
+        let storage: SyncedStorage<Int?> = SyncedStorage(key)
+        storage.wrappedValue = 4
+        StoredFile.flushAll()
+        #expect(FileManager.default.fileExists(atPath: StoredFile.appFolder.appending(components: "Composition", "SyncedStorage", "\(key).json").path(percentEncoded: false)))
+        storage.wrappedValue = nil
+    }
+
     @Test func wrappedValueKeepsValuesOnTheDevice() {
         let storage: SyncedStorage<[String]?> = SyncedStorage(UUID().uuidString)
         storage.wrappedValue = ["Dune", "Emma"]
@@ -101,9 +110,9 @@ import Testing
 }
 #endif
 
-// MARK: - CloudKit + Foundation + Observation + os + Security + SwiftUI
+// MARK: - CloudKit + Foundation + Observation + os + Security + SwiftUI + UniformTypeIdentifiers
 
-#if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(SwiftUI)
+#if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(SwiftUI) && canImport(UniformTypeIdentifiers)
 import SwiftUI
 
 extension SyncedStorageTests {

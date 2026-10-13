@@ -21,7 +21,7 @@ import Observation
 import os
 import UniformTypeIdentifiers
 
-/// Reads and writes a value like `AppStorage`, kept in its own file inside the location in its own format when it is `FileRepresentable` and as JSON otherwise, cached in memory, written in the background, and reloaded when another process or iCloud changes the file.
+/// Reads and writes a value like `AppStorage`, kept in its own file inside the location in its own format when it is `FileRepresentable` and as JSON otherwise, cached in memory, written in the background, and, in the locations another process or iCloud can change, reloaded when the file changes on disk.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 @propertyWrapper
 public struct FileStorage<Value: Codable & Sendable>: Sendable {
@@ -73,16 +73,16 @@ public extension FileStorage {
     /// The folder a file is kept in.
     enum Location: Hashable, Sendable {
 
-        /// The app's own folder in Application Support, backed up and hidden from the user.
+        /// The app's own folder in Application Support, backed up, hidden from the user, and changed only by the app, so it isn't watched for changes on disk.
         case app
 
-        /// The app's caches folder, which isn't backed up and which the system may empty when space runs low.
+        /// The app's caches folder, which isn't backed up, which the system may empty when space runs low, and which only the app changes.
         case caches
 
-        /// The app's Documents folder, backed up and visible in the Files app when the app shares its files.
+        /// The app's Documents folder, backed up, visible in the Files app when the app shares its files, and watched for the changes made through it.
         case documents
 
-        /// The shared container of the app group with the identifier, which the app and its extensions can all read and write.
+        /// The shared container of the app group with the identifier, which the app and its extensions can all read and write, watched for their changes.
         case group(String)
 
         /// The app's iCloud container, synced across the user's devices and hidden from iCloud Drive, or a folder on the device until iCloud is available.
@@ -91,10 +91,10 @@ public extension FileStorage {
         /// The Documents folder of the app's iCloud container, synced across the user's devices and visible in iCloud Drive when the app makes it public, or a folder on the device until iCloud is available.
         case iCloudDrive
 
-        /// The temporary folder, which isn't backed up and which the system may empty when the app isn't running.
+        /// The temporary folder, which isn't backed up, which the system may empty when the app isn't running, and which only the app changes.
         case temp
 
-        /// The shared file at the path inside the location, where an app group the app can't reach stops debug builds and falls back to the app's own folder, and iCloud falls back to the device until it's available.
+        /// The shared file at the path inside the location, watched for changes on disk only where another process or iCloud can make them, where an app group the app can't reach stops debug builds and falls back to the app's own folder, and iCloud falls back to the device until it's available.
         fileprivate func file(_ path: String) -> StoredFile {
             switch self {
             case .app:
@@ -102,21 +102,21 @@ public extension FileStorage {
             case .caches:
                 return StoredFile.at(URL.cachesDirectory.appending(component: StoredFile.bundleID, directoryHint: .isDirectory).appending(path: path))
             case .documents:
-                return StoredFile.at(URL.documentsDirectory.appending(path: path))
+                return StoredFile.at(URL.documentsDirectory.appending(path: path), watched: true)
             case .group(let identifier):
                 guard let container: URL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: identifier) else {
                     assertionFailure("The app can't reach the app group \"\(identifier)\". Add it under Signing & Capabilities > App Groups.")
                     return StoredFile.at(StoredFile.appFolder.appending(component: identifier, directoryHint: .isDirectory).appending(path: path))
                 }
-                return StoredFile.at(container.appending(path: path))
+                return StoredFile.at(container.appending(path: path), watched: true)
             case .iCloud:
                 let local: URL = StoredFile.localICloudFolder.appending(path: path)
                 guard let container: URL = StoredFile.iCloudContainer else { return StoredFile.at(local) }
-                return StoredFile.at(container.appending(path: path), ubiquitous: true, moving: local)
+                return StoredFile.at(container.appending(path: path), watched: true, ubiquitous: true, moving: local)
             case .iCloudDrive:
                 let local: URL = StoredFile.localICloudFolder.appending(component: "Documents", directoryHint: .isDirectory).appending(path: path)
                 guard let container: URL = StoredFile.iCloudContainer else { return StoredFile.at(local) }
-                return StoredFile.at(container.appending(component: "Documents", directoryHint: .isDirectory).appending(path: path), ubiquitous: true, moving: local)
+                return StoredFile.at(container.appending(component: "Documents", directoryHint: .isDirectory).appending(path: path), watched: true, ubiquitous: true, moving: local)
             case .temp:
                 return StoredFile.at(URL.temporaryDirectory.appending(path: path))
             }
@@ -124,7 +124,7 @@ public extension FileStorage {
     }
 }
 
-/// One file's contents, shared by every wrapper for the same file, kept in memory after the first read, written in the background, and reloaded when the file changes on disk.
+/// One file's contents, shared by every wrapper for the same file, kept in memory after the first read, written in the background, and, when watched, reloaded when the file changes on disk.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 final class StoredFile: NSObject, NSFilePresenter, Observable, Sendable {
 
@@ -136,18 +136,18 @@ final class StoredFile: NSObject, NSFilePresenter, Observable, Sendable {
     private let url: URL
     private let watcher: OSAllocatedUnfairLock<(any DispatchSourceFileSystemObject)?> = OSAllocatedUnfairLock(uncheckedState: nil)
 
-    /// Creates the file at the URL, watching its folder and, in iCloud Drive, presenting it, and moving in the local copy kept while iCloud was unavailable.
-    private init(_ url: URL, ubiquitous: Bool, moving local: URL?) {
+    /// Creates the file at the URL, watching its folder when asked and, in iCloud Drive, presenting it, and moving in the local copy kept while iCloud was unavailable.
+    private init(_ url: URL, watched: Bool, ubiquitous: Bool, moving local: URL?) {
         self.isUbiquitous = ubiquitous
         self.url = url
         super.init()
-        watch()
+        if watched { watch() }
         if ubiquitous { NSFileCoordinator.addFilePresenter(self) }
         if let local: URL { queue.async { [self] in move(local) } }
     }
 
     /// The app's own folder in Application Support, kept apart for each app on macOS, where apps share Application Support.
-    fileprivate static let appFolder: URL = URL.applicationSupportDirectory.appending(component: bundleID, directoryHint: .isDirectory)
+    static let appFolder: URL = URL.applicationSupportDirectory.appending(component: bundleID, directoryHint: .isDirectory)
 
     /// The app's bundle identifier, which names its folders.
     fileprivate static let bundleID: String = Bundle.main.bundleIdentifier ?? "Composition"
@@ -160,6 +160,16 @@ final class StoredFile: NSObject, NSFilePresenter, Observable, Sendable {
 
     /// Every file in use, by URL.
     private static let files: OSAllocatedUnfairLock<[URL: StoredFile]> = OSAllocatedUnfairLock(initialState: [:])
+
+    /// The shared file at the URL, created on first use, which reloads when the file changes on disk only when watched, since only another process or iCloud can change it behind the app's back.
+    static func at(_ url: URL, watched: Bool = false, ubiquitous: Bool = false, moving local: URL? = nil) -> StoredFile {
+        files.withLock { files in
+            if let file: StoredFile = files[url] { return file }
+            let file: StoredFile = StoredFile(url, watched: watched, ubiquitous: ubiquitous, moving: local)
+            files[url] = file
+            return file
+        }
+    }
 
     /// Waits for every write still waiting to reach the disk, in every file in use.
     static func flushAll() {
@@ -182,15 +192,6 @@ final class StoredFile: NSObject, NSFilePresenter, Observable, Sendable {
         hasExtension(path) ? path : "\(path).\(defaultExtension)"
     }
 
-    /// The shared file at the URL, created on first use.
-    fileprivate static func at(_ url: URL, ubiquitous: Bool = false, moving local: URL? = nil) -> StoredFile {
-        files.withLock { files in
-            if let file: StoredFile = files[url] { return file }
-            let file: StoredFile = StoredFile(url, ubiquitous: ubiquitous, moving: local)
-            files[url] = file
-            return file
-        }
-    }
 
     /// The file's contents, read once from disk and from memory after that, or `nil` when there is no file.
     var data: Data? {

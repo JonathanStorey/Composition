@@ -5,9 +5,9 @@
 
 // Setup in Xcode: follow the steps at the top of SyncedStorage.swift, since ListStorage syncs through the same engine and record type.
 
-// MARK: - CloudKit + Foundation + Observation + os + Security
+// MARK: - CloudKit + Foundation + Observation + os + Security + UniformTypeIdentifiers
 
-#if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security)
+#if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(UniformTypeIdentifiers)
 import CloudKit
 import Foundation
 
@@ -218,9 +218,9 @@ fileprivate final class DecodedValue {
 }
 #endif
 
-// MARK: - CloudKit + Foundation + Observation + os + Security + SwiftUI
+// MARK: - CloudKit + Foundation + Observation + os + Security + SwiftUI + UniformTypeIdentifiers
 
-#if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(SwiftUI)
+#if canImport(CloudKit) && canImport(Foundation) && canImport(Observation) && canImport(os) && canImport(Security) && canImport(SwiftUI) && canImport(UniformTypeIdentifiers)
 import SwiftUI
 
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)

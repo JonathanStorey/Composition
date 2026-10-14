@@ -1,13 +1,13 @@
 // repository: https://github.com/JonathanStorey/Composition
-// path: Protocols/CKRecordCodableTests.swift
-// dependencies: [Protocols/CKRecordCodable.swift]
+// path: Protocols/CKRecordableTests.swift
+// dependencies: [Protocols/CKRecordable.swift]
 
 #if canImport(CloudKit)
 import CloudKit
 import Testing
 @testable import Composition
 
-private struct Note: CKRecordCodable, Equatable {
+private struct Note: CKRecordable, Equatable {
 
     let title: String
 
@@ -25,7 +25,7 @@ private struct Note: CKRecordCodable, Equatable {
     }
 }
 
-@Suite struct CKRecordCodableTests {
+@Suite struct CKRecordableTests {
 
     @Test func roundTripsThroughARecord() throws {
         let record: CKRecord = CKRecord(recordType: "Note")

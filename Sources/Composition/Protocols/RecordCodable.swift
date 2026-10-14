@@ -43,6 +43,22 @@ public extension RecordCodable where Self: Codable {
     }
 }
 
+/// A change saved on the device that hasn't reached iCloud yet, holding the record, or the value it keeps.
+public enum PendingChange<V> {
+
+    /// A record iCloud doesn't have yet.
+    case insert(V)
+
+    /// A record iCloud has, changed on this device.
+    case update(V)
+
+    /// A record removed on this device.
+    case delete(CKRecord.ID)
+
+    /// A change iCloud rejected with the error, holding the value unless the change removed it, tried again on every refresh and launch until it succeeds.
+    case failed(CKRecord.ID, V?, CKError)
+}
+
 /// A description of the values to fetch from a record context, like SwiftData's `FetchDescriptor`.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 public struct RecordDescriptor<R: RecordCodable> {
@@ -186,12 +202,6 @@ public final class RecordContext: CKSyncEngineDelegate, Observable, Sendable {
         return store.withLockUnchecked { $0.staged.filter { !$0.value.isSave }.keys.map(\.id) }
     }
 
-    /// The error each record's last failed sync gave, removed once it syncs.
-    public var errors: [CKRecord.ID: CKError] {
-        registrar.access(self, keyPath: \.errors)
-        return store.withLockUnchecked { $0.errors }
-    }
-
     /// A Boolean value indicating whether the context has changes it hasn't saved.
     public var hasChanges: Bool {
         registrar.access(self, keyPath: \.changes)
@@ -207,16 +217,28 @@ public final class RecordContext: CKSyncEngineDelegate, Observable, Sendable {
         }
     }
 
-    /// A Boolean value indicating whether the context is fetching from or sending to iCloud.
-    public var isSyncing: Bool {
-        registrar.access(self, keyPath: \.isSyncing)
-        return store.withLockUnchecked { $0.syncs > 0 }
+    /// A Boolean value indicating whether the context is fetching changes from iCloud.
+    public var isFetching: Bool {
+        registrar.access(self, keyPath: \.isFetching)
+        return store.withLockUnchecked { $0.fetches > 0 }
+    }
+
+    /// A Boolean value indicating whether the context is sending changes to iCloud.
+    public var isSending: Bool {
+        registrar.access(self, keyPath: \.isSending)
+        return store.withLockUnchecked { $0.sends > 0 }
     }
 
     /// The last time a fetch from or send to iCloud finished, kept on the device.
     public var lastSync: Date? {
         registrar.access(self, keyPath: \.lastSync)
         return store.withLockUnchecked { $0.meta.lastSync }
+    }
+
+    /// The changes saved on the device that haven't reached iCloud yet, in the order of their record names, including the ones iCloud rejected.
+    public var pending: [PendingChange<CKRecord>] {
+        registrar.access(self, keyPath: \.pending)
+        return store.withLockUnchecked { $0.pendingChanges() }.map { $0.change.map { $0.copy() as? CKRecord ?? $0 } }
     }
 
     /// A placeholder property that observers of the unsaved changes track.
@@ -267,18 +289,14 @@ public final class RecordContext: CKSyncEngineDelegate, Observable, Sendable {
             receive(changes.modifications.map(\.record), deleting: changes.deletions.map(\.recordID))
         case .sentRecordZoneChanges(let sent):
             settle(sent, syncEngine)
-        case .willFetchChanges, .willSendChanges:
-            mutate { store, signals in
-                store.syncs += 1
-                signals.insert(.isSyncing)
-            }
-        case .didFetchChanges, .didSendChanges:
-            mutate { store, signals in
-                store.syncs = max(store.syncs - 1, 0)
-                store.meta.lastSync = .now
-                store.isMetaDirty = true
-                signals.formUnion([.isSyncing, .lastSync])
-            }
+        case .willFetchChanges:
+            track(\.fetches, 1, .isFetching)
+        case .didFetchChanges:
+            track(\.fetches, -1, .isFetching)
+        case .willSendChanges:
+            track(\.sends, 1, .isSending)
+        case .didSendChanges:
+            track(\.sends, -1, .isSending)
         default:
             break
         }
@@ -299,6 +317,14 @@ public final class RecordContext: CKSyncEngineDelegate, Observable, Sendable {
         return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: changes) { [self] id in outgoing(id) }
     }
 
+    /// The changes to values of the type in the zone that haven't reached iCloud yet, in the order of their record names, leaving out records that can't be decoded.
+    public func pending<R: RecordCodable>(_ type: R.Type, zone: String = "Composition") -> [PendingChange<R>] {
+        registrar.access(self, keyPath: \.pending)
+        let table: TableKey = TableKey(type: Self.recordType(of: R.self), zone: zone)
+        let changes: [(key: RecordKey, change: PendingChange<CKRecord>)] = store.withLockUnchecked { $0.pendingChanges() }.filter { $0.key.table == table }
+        return changes.compactMap { try? $0.change.map { try R(from: $0) } }
+    }
+
     /// A copy of the record with the identifier as the context has it, including unsaved changes, with its fields and server fields.
     public func record(for id: CKRecord.ID) -> CKRecord? {
         let key: RecordKey = RecordKey(id)
@@ -316,6 +342,7 @@ public final class RecordContext: CKSyncEngineDelegate, Observable, Sendable {
     /// Fetches the latest records from iCloud and sends every saved change, for `refreshable`, throwing when the app can't use CloudKit or the sync fails.
     public func refresh() async throws {
         guard let engine: CKSyncEngine = start() else { throw CKError(.missingEntitlement) }
+        store.withLockUnchecked { requeue(engine, &$0) }
         try await engine.fetchChanges()
         try await engine.sendChanges()
     }
@@ -372,7 +399,7 @@ public final class RecordContext: CKSyncEngineDelegate, Observable, Sendable {
             }
             store.isMetaDirty = true
             store.staged = [:]
-            signals.insert(.changes)
+            signals.formUnion([.changes, .pending])
             return (changes, zones)
         }
         engine?.state.add(pendingDatabaseChanges: zones.map { .saveZone(CKRecordZone(zoneName: $0)) })
@@ -410,7 +437,7 @@ public final class RecordContext: CKSyncEngineDelegate, Observable, Sendable {
     private func clear() {
         let zones: [URL] = mutate { store, signals in
             signals.formUnion(store.tables.keys.map { .table($0) })
-            signals.formUnion([.changes, .conflicts, .errors])
+            signals.formUnion([.changes, .conflicts, .pending])
             store.conflicts = [:]
             store.errors = [:]
             store.staged = [:]
@@ -436,18 +463,22 @@ public final class RecordContext: CKSyncEngineDelegate, Observable, Sendable {
     /// Changes the store under its lock, then writes what changed to disk and tells the observers of what the change touched.
     @discardableResult private func mutate<T>(_ change: (inout Store, inout Set<Signal>) throws -> T) rethrows -> T {
         var signals: Set<Signal> = []
-        let (result, writes): (T, [URL: Write]) = try store.withLockUnchecked { store in
+        let (result, writes, isPendingChanged): (T, [URL: Write], Bool) = try store.withLockUnchecked { store in
+            let pending: Set<RecordKey> = store.meta.pending
+            let failures: Set<CKRecord.ID> = Set(store.errors.keys)
             let result: T = try change(&store, &signals)
-            return (result, store.writes())
+            return (result, store.writes(), pending != store.meta.pending || failures != Set(store.errors.keys))
         }
+        if isPendingChanged { signals.insert(.pending) }
         writer.write(writes)
         for signal: Signal in signals {
             switch signal {
             case .changes: registrar.withMutation(of: self, keyPath: \.changes) {}
             case .conflicts: registrar.withMutation(of: self, keyPath: \.conflicts) {}
-            case .errors: registrar.withMutation(of: self, keyPath: \.errors) {}
-            case .isSyncing: registrar.withMutation(of: self, keyPath: \.isSyncing) {}
+            case .isFetching: registrar.withMutation(of: self, keyPath: \.isFetching) {}
+            case .isSending: registrar.withMutation(of: self, keyPath: \.isSending) {}
             case .lastSync: registrar.withMutation(of: self, keyPath: \.lastSync) {}
+            case .pending: registrar.withMutation(of: self, keyPath: \.pending) {}
             case .account: registrar.withMutation(of: self, keyPath: \.account) {}
             case .table(let key): registrar.withMutation(of: self, keyPath: \.[table: key]) {}
             }
@@ -507,6 +538,13 @@ public final class RecordContext: CKSyncEngineDelegate, Observable, Sendable {
         writer.write([folder: .remove])
     }
 
+    /// Queues every change saved on the device that hasn't reached iCloud, so unsent and rejected changes are tried again.
+    private func requeue(_ engine: CKSyncEngine, _ store: inout Store) {
+        let keys: Set<RecordKey> = store.meta.pending
+        let changes: [CKSyncEngine.PendingRecordZoneChange] = keys.map { key in store.withTable(key.table) { $0.records[key.name] } == nil ? .deleteRecord(key.id) : .saveRecord(key.id) }
+        engine.state.add(pendingRecordZoneChanges: changes)
+    }
+
     /// Records the account status, telling observers only when it changed.
     private func setAccount(_ account: CKAccountStatus) {
         mutate { store, signals in
@@ -528,13 +566,13 @@ public final class RecordContext: CKSyncEngineDelegate, Observable, Sendable {
                     return isCurrent
                 }
                 if isCurrent { store.meta.pending.remove(key) }
-                if store.errors.removeValue(forKey: saved.recordID) != nil { signals.insert(.errors) }
+                store.errors[saved.recordID] = nil
                 store.dirty.insert(key.table)
             }
             for id: CKRecord.ID in sent.deletedRecordIDs {
                 let key: RecordKey = RecordKey(id)
                 if !store.withTable(key.table, { $0.records[key.name] != nil }) { store.meta.pending.remove(key) }
-                if store.errors.removeValue(forKey: id) != nil { signals.insert(.errors) }
+                store.errors[id] = nil
             }
             for failure: CKSyncEngine.Event.SentRecordZoneChanges.FailedRecordSave in sent.failedRecordSaves {
                 let id: CKRecord.ID = failure.record.recordID
@@ -558,7 +596,6 @@ public final class RecordContext: CKSyncEngineDelegate, Observable, Sendable {
                     engine.state.add(pendingRecordZoneChanges: [.saveRecord(id)])
                 } else {
                     store.errors[id] = failure.error
-                    signals.insert(.errors)
                 }
             }
             for (id, error) in sent.failedRecordDeletes {
@@ -566,10 +603,10 @@ public final class RecordContext: CKSyncEngineDelegate, Observable, Sendable {
                     store.meta.pending.remove(RecordKey(id))
                 } else {
                     store.errors[id] = error
-                    signals.insert(.errors)
                 }
             }
             store.isMetaDirty = true
+            signals.insert(.pending)
         }
     }
 
@@ -594,14 +631,25 @@ public final class RecordContext: CKSyncEngineDelegate, Observable, Sendable {
             if let engine: CKSyncEngine = store.engine { return (engine, false) }
             let engine: CKSyncEngine = CKSyncEngine(CKSyncEngine.Configuration(database: container.privateCloudDatabase, stateSerialization: store.meta.state, delegate: self))
             if store.meta.state == nil { engine.state.add(pendingDatabaseChanges: store.meta.zones.map { .saveZone(CKRecordZone(zoneName: $0)) }) }
-            let keys: Set<RecordKey> = store.meta.pending
-            let pending: [CKSyncEngine.PendingRecordZoneChange] = keys.map { key in store.withTable(key.table) { $0.records[key.name] } == nil ? .deleteRecord(key.id) : .saveRecord(key.id) }
-            engine.state.add(pendingRecordZoneChanges: pending)
+            requeue(engine, &store)
             store.engine = engine
             return (engine, true)
         }
         if isNew { Task { [self] in setAccount((try? await container.accountStatus()) ?? .couldNotDetermine) } }
         return engine
+    }
+
+    /// Counts a fetch or send starting or finishing, telling observers when one starts or the last one finishes, and recording when it finished.
+    private func track(_ count: WritableKeyPath<Store, Int>, _ step: Int, _ signal: Signal) {
+        mutate { store, signals in
+            let wasActive: Bool = store[keyPath: count] > 0
+            store[keyPath: count] = max(store[keyPath: count] + step, 0)
+            if wasActive != (store[keyPath: count] > 0) { signals.insert(signal) }
+            guard step < 0 else { return }
+            store.meta.lastSync = .now
+            store.isMetaDirty = true
+            signals.insert(.lastSync)
+        }
     }
 }
 
@@ -615,6 +663,19 @@ fileprivate enum Change {
     var isSave: Bool {
         if case .save = self { return true }
         return false
+    }
+}
+
+fileprivate extension PendingChange {
+
+    /// The change with its value transformed, keeping its kind, identifier and error.
+    func map<T>(_ transform: (V) throws -> T) rethrows -> PendingChange<T> {
+        switch self {
+        case .insert(let value): return try .insert(transform(value))
+        case .update(let value): return try .update(transform(value))
+        case .delete(let id): return .delete(id)
+        case .failed(let id, let value, let error): return try .failed(id, value.map(transform), error)
+        }
     }
 }
 
@@ -662,9 +723,10 @@ fileprivate enum Signal: Hashable {
     case account
     case changes
     case conflicts
-    case errors
-    case isSyncing
+    case isFetching
+    case isSending
     case lastSync
+    case pending
     case table(TableKey)
 }
 
@@ -679,17 +741,29 @@ fileprivate struct Store {
     var dirty: Set<TableKey> = []
     var engine: CKSyncEngine?
     var errors: [CKRecord.ID: CKError] = [:]
+    var fetches: Int = 0
     var isAutosaving: Bool = false
     var isMetaDirty: Bool = false
     var meta: Meta
+    var sends: Int = 0
     var staged: [RecordKey: Change] = [:]
-    var syncs: Int = 0
     var tables: [TableKey: Table] = [:]
 
     /// Creates the store for the folder, reading what an earlier launch kept there.
     init(folder: URL) {
         self.folder = folder
         self.meta = (try? Data(contentsOf: folder.appending(component: "_context.plist"))).flatMap { try? PropertyListDecoder().decode(Meta.self, from: $0) } ?? Meta()
+    }
+
+    /// The changes saved on the device that haven't reached iCloud, with their keys, in the order of their record names.
+    mutating func pendingChanges() -> [(key: RecordKey, change: PendingChange<CKRecord>)] {
+        let keys: [RecordKey] = meta.pending.sorted { ($0.zone, $0.name) < ($1.zone, $1.name) }
+        return keys.map { key -> (key: RecordKey, change: PendingChange<CKRecord>) in
+            let record: CKRecord? = withTable(key.table) { $0.records[key.name] }
+            if let error: CKError = errors[key.id] { return (key, .failed(key.id, record, error)) }
+            guard let record: CKRecord else { return (key, .delete(key.id)) }
+            return (key, record.recordChangeTag == nil ? .insert(record) : .update(record))
+        }
     }
 
     /// The values of the type kept in the table, with the staged changes applied, in the order of their record names, decoding each record once.

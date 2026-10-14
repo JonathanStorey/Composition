@@ -127,6 +127,39 @@ extension RecordCodableTests {
         #expect(try context.fetch(RecordDescriptor<Note>()) == [Note(id: 1, rank: 1, title: "Final")])
     }
 
+    @Test func pendingListsSavedChangesUntilTheyReachICloud() throws {
+        let context: RecordContext = makeContext()
+        try context.insert(Note(id: 1, rank: 1, title: "One"))
+        #expect(context.pending.isEmpty)
+        context.save()
+        guard case .insert(let record)? = context.pending.first else {
+            Issue.record("Expected an insert, got \(context.pending).")
+            return
+        }
+        #expect(record.recordID.recordName == "Note.1")
+        context.delete(Note(id: 1, rank: 1, title: "One"))
+        context.save()
+        guard case .delete(let id)? = context.pending.first else {
+            Issue.record("Expected a delete, got \(context.pending).")
+            return
+        }
+        #expect(id.recordName == "Note.1")
+        #expect(!context.isFetching && !context.isSending)
+    }
+
+    @Test func pendingOfATypeDecodesItsValuesInItsZone() throws {
+        let context: RecordContext = makeContext()
+        try context.insert(Note(id: 1, rank: 1, title: "Home"))
+        try context.insert(Note(id: 2, rank: 1, title: "Work"), zone: "Work")
+        context.save()
+        #expect(context.pending.count == 2)
+        guard case .insert(let note)? = context.pending(Note.self).first, context.pending(Note.self).count == 1 else {
+            Issue.record("Expected one insert, got \(context.pending(Note.self)).")
+            return
+        }
+        #expect(note == Note(id: 1, rank: 1, title: "Home"))
+    }
+
     @Test func recordNameJoinsTheTypeAndIdentifier() {
         #expect(RecordContext.recordName(of: Note(id: 42, rank: 1, title: "Answer")) == "Note.42")
     }

@@ -19,6 +19,12 @@ import Foundation
         #expect(UUID.zero < UUID.max)
     }
 
+    @Test func initDescriptionReadsBackTheDescription() {
+        let uuid: UUID = UUID()
+        #expect(UUID(uuid.description) == uuid)
+        #expect(UUID("not a uuid") == nil)
+    }
+
     @Test func initTimestampEncodesSubMillisecondPrecision() throws {
         let uuid: UUID = try #require(UUID(timestamp: Date(timeIntervalSince1970: 1_700_000_000.000_500_1)))
         #expect(uuid.uuidString.hasPrefix("018BCFE5-6800-7800-"))

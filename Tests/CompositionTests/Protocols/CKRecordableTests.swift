@@ -1,31 +1,20 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Protocols/CKRecordableTests.swift
-// dependencies: [Coders/CKDecoder.swift, Coders/CKEncoder.swift, Protocols/CKRecordable.swift]
+// dependencies: [Coders/CKDecoder.swift, Coders/CKEncoder.swift, Extensions/UUID.swift, Protocols/CKRecordable.swift]
 
 #if canImport(CloudKit)
 import CloudKit
+import Foundation
 import Testing
 @testable import Composition
 
 private struct Note: CKRecordable, Equatable {
 
-    let title: String
-
-    init(title: String) {
-        self.title = title
-    }
-
-    init(from record: CKRecord) throws {
-        guard let title: String = record["title"] as? String else { throw DecodingError.valueNotFound(String.self, DecodingError.Context(codingPath: [], debugDescription: "The record has no title.")) }
-        self.title = title
-    }
-
-    func encode(to record: CKRecord) throws {
-        record["title"] = title
-    }
+    let id: UUID
+    var text: String
 }
 
-private struct Page: Codable, CKRecordable, Equatable, Identifiable {
+private struct Page: CKRecordable, Equatable {
 
     let id: Int
     var text: String
@@ -33,21 +22,18 @@ private struct Page: Codable, CKRecordable, Equatable, Identifiable {
 
 @Suite struct CKRecordableTests {
 
-    @Test func codableTypesReadAndWriteTheirOwnFields() throws {
-        let record: CKRecord = CKRecord(recordType: "Page", recordID: CKRecord.ID(recordName: "Page.7"))
-        try Page(id: 7, text: "Hello").encode(to: record)
-        #expect(Set(record.allKeys()) == ["id", "text"])
-        #expect(try Page(from: record) == Page(id: 7, text: "Hello"))
+    @Test func namesTheRecordByAnIdentifierThatReadsBack() throws {
+        let note: Note = Note(id: .timestamp, text: "Hello")
+        let record: CKRecord = try CKEncoder().encode(note)
+        #expect(record.recordID.recordName == "Note.\(note.id)")
+        #expect(UUID(String(record.recordID.recordName.dropFirst(5))) == note.id)
+        #expect(try CKDecoder().decode(Note.self, from: record) == note)
     }
 
-    @Test func roundTripsThroughARecord() throws {
-        let record: CKRecord = CKRecord(recordType: "Note")
-        try Note(title: "Dune").encode(to: record)
-        #expect(try Note(from: record) == Note(title: "Dune"))
-    }
-
-    @Test func throwsWhenTheRecordLacksTheField() {
-        #expect(throws: DecodingError.self) { try Note(from: CKRecord(recordType: "Note")) }
+    @Test func roundTripsAnIntegerIdentifier() throws {
+        let record: CKRecord = try CKEncoder().encode(Page(id: 7, text: "Hello"))
+        #expect(record.recordID.recordName == "Page.7")
+        #expect(try CKDecoder().decode(Page.self, from: record) == Page(id: 7, text: "Hello"))
     }
 }
 #endif

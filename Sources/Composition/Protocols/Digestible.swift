@@ -102,11 +102,17 @@ fileprivate extension Digester {
         let codingPath: [any CodingKey]
         let node: Node
 
+        /// Returns the 32-byte digest of an encodable value, digesting a nil value like `Optional.none`.
+        static func digest(of value: some Encodable, codingPath: [any CodingKey]) throws -> Data {
+            Digester.digest(of: try node(for: value, codingPath: codingPath) ?? .null)
+        }
+
         /// Returns the node for a value, `nil` for a nil optional, a leaf for a digestible value, and the encoded contents for everything else.
         static func node(for value: some Encodable, codingPath: [any CodingKey]) throws -> Node? {
             switch value {
             case let optional as any OptionalValue where optional.isNone: return nil
             case let digestible as any Digestible: return Node(leaf: digestible)
+            case let unordered as any UnorderedEncodable: return Node(digests: try unordered.digests(codingPath: codingPath))
             case let float as Float: return Node(leaf: Double(float))
             case let integer as any BinaryInteger:
                 guard let int: Int = Int(exactly: integer) else { throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: codingPath, debugDescription: "\(integer) does not fit in the 64-bit integer a digest feeds.")) }
@@ -206,14 +212,16 @@ fileprivate extension Digester.Encoder {
         }
     }
 
-    /// A value under construction: a digestible leaf, the members of a keyed container, or the elements of an unkeyed one.
+    /// A value under construction: a digestible leaf, the digests of an unordered collection, the members of a keyed container, or the elements of an unkeyed one.
     final class Node: Digestible {
 
+        var digests: [Data]?
         var elements: [Node]?
         var leaf: (any Digestible)?
         var members: [String: Node]?
 
-        init(leaf: (any Digestible)? = nil) {
+        init(digests: [Data]? = nil, leaf: (any Digestible)? = nil) {
+            self.digests = digests
             self.leaf = leaf
         }
 
@@ -224,14 +232,16 @@ fileprivate extension Digester.Encoder {
 
         /// Copies another node's contents into this one.
         func assign(_ node: Node) {
+            digests = node.digests
             elements = node.elements
             leaf = node.leaf
             members = node.members
         }
 
-        /// Feeds the leaf unchanged, the elements as an array, or the members as a dictionary.
+        /// Feeds the leaf unchanged, the digests sorted as a set, the elements as an array, or the members as a dictionary.
         func digest(into digester: inout Digester) {
             if let leaf { return leaf.digest(into: &digester) }
+            if let digests { return digests.sorted { $0.lexicographicallyPrecedes($1) }.forEach { digester.combine(bytes: $0) } }
             if let elements { return elements.digest(into: &digester) }
             members?.digest(into: &digester)
         }
@@ -354,6 +364,14 @@ private protocol PythonNamed {
     var pythonName: String { get }
 }
 
+/// An unordered collection whose elements are encodable but not digestible, so the encoder digests them itself instead of trusting their iteration order.
+private protocol UnorderedEncodable {
+
+    /// Returns the digest of each element, or of each key followed by its value, in no particular order.
+    @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+    func digests(codingPath: [any CodingKey]) throws -> [Data]
+}
+
 /// A type that can say whether it holds a nil optional, so the encoder can leave nil properties out.
 private protocol OptionalValue {
 
@@ -365,6 +383,24 @@ extension Optional: OptionalValue {
 
     /// A Boolean value indicating whether the value is nil.
     fileprivate var isNone: Bool { self == nil }
+}
+
+extension Dictionary: UnorderedEncodable where Key: Encodable, Value: Encodable {
+
+    /// Returns each key's digest followed by its value's digest, matching a digestible dictionary.
+    @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+    fileprivate func digests(codingPath: [any CodingKey]) throws -> [Data] {
+        try map { try Digester.Encoder.digest(of: $0.key, codingPath: codingPath) + Digester.Encoder.digest(of: $0.value, codingPath: codingPath) }
+    }
+}
+
+extension Set: UnorderedEncodable where Element: Encodable {
+
+    /// Returns each element's digest, matching a digestible set.
+    @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+    fileprivate func digests(codingPath: [any CodingKey]) throws -> [Data] {
+        try map { try Digester.Encoder.digest(of: $0, codingPath: codingPath) }
+    }
 }
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
@@ -438,9 +474,10 @@ extension Double: Digestible, PythonNamed {
 
     fileprivate var pythonName: String { "float" }
 
-    /// Feeds the exact bit pattern in big-endian order.
+    /// Feeds the bit pattern in big-endian order, with negative zero fed as zero and every NaN as the standard quiet NaN, so equal values match.
     public func digest(into digester: inout Digester) {
-        digester.combine(bytes: withUnsafeBytes(of: bitPattern.bigEndian) { Data($0) })
+        let canonical: Double = isNaN ? .nan : (self == 0 ? 0 : self)
+        digester.combine(bytes: withUnsafeBytes(of: canonical.bitPattern.bigEndian) { Data($0) })
     }
 }
 

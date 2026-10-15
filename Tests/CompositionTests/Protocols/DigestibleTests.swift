@@ -13,6 +13,12 @@ private struct Book: Digestible, Encodable {
     let year: Int?
 }
 
+private enum Color: String, Encodable {
+
+    case blue
+    case red
+}
+
 private enum Kind: String, Digestible, Encodable {
 
     case draft
@@ -35,6 +41,12 @@ private struct Note: Digestible {
         digester.combine(parentChecksum)
         digester.combine(body)
     }
+}
+
+private struct Palette: Digestible, Encodable {
+
+    let colors: Set<Color>
+    let counts: [Color: Int]
 }
 
 private struct Point: Digestible, Encodable {
@@ -118,6 +130,16 @@ private struct Vector: Digestible {
         #expect(digester.finalize().uuidString.lowercased() == "7aaad436-a797-53b0-974c-a71690ef7706")
     }
 
+    @Test func doubleNaNPayloadsMatchStandardNaN() {
+        #expect(Double(bitPattern: 0xFFF8_0000_0000_0001).checksum().uuidString.lowercased() == "7d669e35-d1ac-550f-9989-346921304b4a")
+        #expect(Double(bitPattern: 0xFFF8_0000_0000_0001).checksum() == Double.nan.checksum())
+    }
+
+    @Test func doubleNegativeZeroMatchesZero() {
+        #expect((-0.0).checksum().uuidString.lowercased() == "e8f434da-b64a-51ec-b2c1-e27619e59902")
+        #expect((-0.0).checksum() == 0.0.checksum())
+    }
+
     @Test func encodableEnumMatchesPythonRawValue() {
         #expect(Kind.draft.checksum().uuidString.lowercased() == "fc3d2af7-f659-548b-800f-8c3dbeacebd3")
     }
@@ -137,6 +159,10 @@ private struct Vector: Digestible {
 
     @Test func encodableStructMatchesPythonDictionary() {
         #expect(Point(x: 1, y: 2).checksum().uuidString.lowercased() == "31c4ce15-c77a-53b4-b9ba-07b3160f4e2d")
+    }
+
+    @Test func encodableUnorderedCollectionsOfNonDigestibleValuesMatchPython() {
+        #expect(Palette(colors: [.red, .blue], counts: [.red: 2, .blue: 1]).checksum().uuidString.lowercased() == "0d86daf9-fd13-56e3-aeb6-f3cd47f97d83")
     }
 
     @Test func intMatchesPython() {

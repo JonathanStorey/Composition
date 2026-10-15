@@ -182,9 +182,6 @@ extension CodingNode {
         }
     }
 
-    /// The names of the fields a value written at a record's root can use, one per kind and plural, then `value` for JSON.
-    static let rootFields: [String] = ["boolean", "data", "date", "double", "integer", "string"].flatMap { [$0, "\($0)s"] } + ["value"]
-
     /// The items as one of CloudKit's native list types, or nil when they are empty, mix kinds or nest.
     static func nativeList(_ items: [CodingNode]) -> (any CKRecordValueProtocol)? {
         func all<V: CKRecordValueProtocol>(_ value: KeyPath<CodingNode, V?>) -> [V]? {
@@ -193,20 +190,6 @@ extension CodingNode {
         }
         let lists: [(any CKRecordValueProtocol)?] = [all(\.boolValue), all(\.dataValue), all(\.dateValue), all(\.doubleValue), all(\.integerValue), all(\.stringValue)]
         return lists.lazy.compactMap { $0 }.first
-    }
-
-    /// The field a value written at a record's root goes to: its kind, the plural of its items' kind for a native list, or `value` for JSON.
-    var rootField: String {
-        switch self {
-        case .bool: "boolean"
-        case .data: "data"
-        case .date: "date"
-        case .double: "double"
-        case .integer: "integer"
-        case .string: "string"
-        case .list(let items) where CodingNode.nativeList(items) != nil: "\(items[0].rootField)s"
-        case .keyed, .list, .null: "value"
-        }
     }
 
     /// The node as the value to store in a field: native when CloudKit has the type, JSON bytes when it doesn't, and nil when there is nothing to store.

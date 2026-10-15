@@ -17,14 +17,14 @@ public protocol CKRecordable {
 
 public extension CKRecordable where Self: Codable {
 
-    /// Creates the value from the record's fields and name, reading children from the source given to `CKDecoder`.
+    /// Creates the value from the record's fields with `CKDecoder`.
     init(from record: CKRecord) throws {
-        self = try CKDecoder.fields(Self.self, from: record)
+        self = try CKDecoder().decode(Self.self, from: record)
     }
 
-    /// Writes the value's own fields into the record, removing any it no longer has, and hands its children to `CKEncoder`.
+    /// Writes the value into the record's fields with `CKEncoder`.
     func encode(to record: CKRecord) throws {
-        try CKEncoder.fields(self, to: record)
+        try CKEncoder().encode(self, to: record)
     }
 }
 #endif

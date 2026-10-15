@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Coders/CKDecoderTests.swift
-// dependencies: [Coders/CKDecoder.swift, Coders/CKEncoder.swift, Extensions/UUID.swift]
+// dependencies: [Coders/CKDecoder.swift, Coders/CKEncoder.swift, Extensions/UUID.swift, Protocols/CKRecordable.swift]
 
 #if canImport(CloudKit)
 import CloudKit
@@ -8,7 +8,7 @@ import Foundation
 import Testing
 @testable import Composition
 
-private struct Book: Codable, Equatable, Identifiable {
+private struct Book: CKRecordable, Equatable {
 
     struct Size: Codable, Equatable {
 

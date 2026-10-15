@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Coders/CKEncoderTests.swift
-// dependencies: [Coders/CKEncoder.swift, Extensions/UUID.swift]
+// dependencies: [Coders/CKEncoder.swift, Extensions/UUID.swift, Protocols/CKRecordable.swift]
 
 #if canImport(CloudKit)
 import CloudKit
@@ -8,7 +8,7 @@ import Foundation
 import Testing
 @testable import Composition
 
-private struct Book: Codable, Identifiable {
+private struct Book: CKRecordable {
 
     enum Genre: String, Codable {
 
@@ -35,13 +35,13 @@ private struct Book: Codable, Identifiable {
     var size: Size = Size(height: 23, width: 15)
 }
 
-private struct Box<Value: Codable>: Codable, Identifiable {
+private struct Box<Value: Codable>: CKRecordable {
 
     let id: Int
     var value: Value
 }
 
-private struct Badly: Codable, Identifiable {
+private struct Badly: CKRecordable {
 
     enum CodingKeys: String, CodingKey {
 
@@ -52,7 +52,7 @@ private struct Badly: Codable, Identifiable {
     var name: String = ""
 }
 
-private struct Counter: Codable, Identifiable {
+private struct Counter: CKRecordable {
 
     let id: String
     var count: UInt64 = .max

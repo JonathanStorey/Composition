@@ -34,6 +34,14 @@ public extension UUID {
     }
 }
 
+extension UUID: @retroactive LosslessStringConvertible {
+
+    /// Creates a UUID from its description, or `nil` when the string isn't a UUID.
+    public init?(_ description: String) {
+        self.init(uuidString: description)
+    }
+}
+
 private extension UUID {
 
     /// Builds an RFC 9562 version 7 UUID with 12 bits of sub-millisecond precision (Method 3) and 62 random bits.

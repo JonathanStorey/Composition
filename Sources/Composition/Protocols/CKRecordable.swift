@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Protocols/CKRecordable.swift
-// dependencies: []
+// dependencies: [Coders/CKDecoder.swift, Coders/CKEncoder.swift]
 
 #if canImport(CloudKit)
 import CloudKit
@@ -13,5 +13,18 @@ public protocol CKRecordable {
 
     /// Writes the value's fields into the record.
     func encode(to record: CKRecord) throws
+}
+
+public extension CKRecordable where Self: Codable {
+
+    /// Creates the value from the record's fields and name, reading children from the source given to `CKDecoder`.
+    init(from record: CKRecord) throws {
+        self = try CKDecoder.fields(Self.self, from: record)
+    }
+
+    /// Writes the value's own fields into the record, removing any it no longer has, and hands its children to `CKEncoder`.
+    func encode(to record: CKRecord) throws {
+        try CKEncoder.fields(self, to: record)
+    }
 }
 #endif

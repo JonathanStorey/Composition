@@ -23,6 +23,7 @@ Write elegant, creative, beautiful code: general enough to serve many use cases,
 
 ```
 Sources/Composition/
+├── Coders/            Encoders and decoders, one per file (CKEncoder.swift)
 ├── Collections/       Custom collection types, one per file (Branch.swift)
 ├── Extensions/        Extensions on existing types, one file per type (String.swift, View.swift)
 ├── Macros/            Public macro declarations, one macro per file

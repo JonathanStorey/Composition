@@ -13,6 +13,7 @@ Guidance for AI coding agents working in this repository.
 
 Write elegant, creative, beautiful code: general enough to serve many use cases, small enough to read at a glance, and shaped like modern Swift.
 
+- Prefer extending an existing standard library or Foundation type over creating a new type. Before adding a new type, name the existing types it could extend and say why none fits.
 - Solve the general case. Reach for a protocol with a default implementation, a generic type, or a constrained extension before writing code for one concrete type.
 - Let the type system carry the rules. Constrain generics so misuse fails to compile instead of failing at runtime.
 - Keep the surface small. Prefer one requirement over three, and compose existing pieces before adding new ones.

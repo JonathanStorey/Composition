@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/SyncedStorage.swift
-// dependencies: [PropertyWrappers/FileStorage.swift]
+// dependencies: [Extensions/FileManager.swift, PropertyWrappers/FileStorage.swift]
 // permissions: [aps-environment, com.apple.developer.icloud-container-identifiers, com.apple.developer.icloud-services, UIBackgroundModes]
 
 // Setup in Xcode:
@@ -119,7 +119,7 @@ final class SyncEngine: CKSyncEngineDelegate, Observable, Sendable {
     static let shared: SyncEngine = SyncEngine()
 
     /// The folder in the app's own folder that keeps each key's values in a file named after the key, and the engine's state in `_engine.json`, a name no key can take.
-    private static let folder: URL = StoredFile.appFolder.appending(components: "Composition", "SyncedStorage", directoryHint: .isDirectory)
+    private static let folder: URL = FileManager.default.url(for: .app).appending(components: "Composition", "SyncedStorage", directoryHint: .isDirectory)
 
     /// The engine's state, kept so the next launch picks up where this one left off.
     private static let state: FileStorage<CKSyncEngine.State.Serialization?> = FileStorage("Composition/SyncedStorage/_engine")

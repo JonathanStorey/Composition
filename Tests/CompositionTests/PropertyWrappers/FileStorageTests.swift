@@ -26,8 +26,8 @@ import Testing
     }
 
     @Test func hasExtensionLooksOnlyAtTheLastName() {
-        #expect(StoredFile.hasExtension("Images/avatar.png"))
-        #expect(!StoredFile.hasExtension("Exports.2026/report"))
+        #expect(FileManager.CachedFile.hasExtension("Images/avatar.png"))
+        #expect(!FileManager.CachedFile.hasExtension("Exports.2026/report"))
     }
 
     #if os(macOS)
@@ -45,13 +45,13 @@ import Testing
     #endif
 
     @Test func pathViolationAllowsRelativePathsWithOrWithoutExtensions() {
-        #expect(StoredFile.pathViolation("Settings/Colors/theme") == nil)
-        #expect(StoredFile.pathViolation("Images/avatar.png") == nil)
+        #expect(FileManager.CachedFile.pathViolation("Settings/Colors/theme") == nil)
+        #expect(FileManager.CachedFile.pathViolation("Images/avatar.png") == nil)
     }
 
     @Test func pathViolationCatchesPathsThatLeaveTheLocation() {
         for path: String in ["", "/theme", "Settings/", "Settings//theme", "../theme", "Settings/./theme", ".hidden"] {
-            #expect(StoredFile.pathViolation(path) != nil)
+            #expect(FileManager.CachedFile.pathViolation(path) != nil)
         }
     }
 
@@ -63,7 +63,7 @@ import Testing
 
     @Test func unwatchedFileKeepsItsContentsWhenTheFileChangesOnDisk() async throws {
         let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
-        let file: StoredFile = StoredFile.at(url)
+        let file: FileManager.CachedFile = FileManager.CachedFile.at(url)
         #expect(file.data == nil)
         try Data("9".utf8).write(to: url, options: .atomic)
         try await Task.sleep(for: .milliseconds(300))
@@ -72,7 +72,7 @@ import Testing
 
     @Test func watchedFileReloadsWhenTheFileChangesOnDisk() async throws {
         let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
-        let file: StoredFile = StoredFile.at(url, watched: true)
+        let file: FileManager.CachedFile = FileManager.CachedFile.at(url, watched: true)
         #expect(file.data == nil)
         try Data("9".utf8).write(to: url, options: .atomic)
         for _ in 0..<60 where file.data != Data("9".utf8) {
@@ -82,9 +82,9 @@ import Testing
     }
 
     @Test func withExtensionAddsTheDefaultOnlyWhenThereIsNone() {
-        #expect(StoredFile.withExtension("Settings/theme", "json") == "Settings/theme.json")
-        #expect(StoredFile.withExtension("Exports.2026/report", "data") == "Exports.2026/report.data")
-        #expect(StoredFile.withExtension("Images/avatar.png", "data") == "Images/avatar.png")
+        #expect(FileManager.CachedFile.withExtension("Settings/theme", "json") == "Settings/theme.json")
+        #expect(FileManager.CachedFile.withExtension("Exports.2026/report", "data") == "Exports.2026/report.data")
+        #expect(FileManager.CachedFile.withExtension("Images/avatar.png", "data") == "Images/avatar.png")
     }
 
     @Test func wrappedValueChangeNotifiesObservers() async {
@@ -111,7 +111,7 @@ import Testing
         let path: String = UUID().uuidString
         let storage: FileStorage<String> = FileStorage(wrappedValue: "", path, .temp)
         storage.wrappedValue = "Dune"
-        StoredFile.flushAll()
+        FileManager.CachedFile.flushAll()
         #expect((try? String(contentsOf: URL.temporaryDirectory.appending(path: "\(path).txt"), encoding: .utf8)) == "Dune")
     }
 
@@ -119,7 +119,7 @@ import Testing
         let path: String = "\(UUID().uuidString).json"
         let storage: FileStorage<String?> = FileStorage(path, .temp)
         storage.wrappedValue = "# Dune"
-        StoredFile.flushAll()
+        FileManager.CachedFile.flushAll()
         #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data("# Dune".utf8))
     }
 
@@ -127,7 +127,7 @@ import Testing
         let path: String = "\(UUID().uuidString).png"
         let storage: FileStorage<Data?> = FileStorage(path, .temp)
         storage.wrappedValue = Data([1, 2, 3])
-        StoredFile.flushAll()
+        FileManager.CachedFile.flushAll()
         #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data([1, 2, 3]))
     }
 
@@ -135,7 +135,7 @@ import Testing
         let path: String = UUID().uuidString
         let storage: FileStorage<Data?> = FileStorage(path, .temp)
         storage.wrappedValue = Data([5])
-        StoredFile.flushAll()
+        FileManager.CachedFile.flushAll()
         #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: "\(path).data"))) == Data([5]))
     }
 
@@ -143,7 +143,7 @@ import Testing
         let path: String = "\(UUID().uuidString).txt"
         let storage: FileStorage<[Int]> = FileStorage(wrappedValue: [], path, .temp)
         storage.wrappedValue = [3]
-        StoredFile.flushAll()
+        FileManager.CachedFile.flushAll()
         #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data("[3]".utf8))
     }
 
@@ -151,10 +151,10 @@ import Testing
         let path: String = UUID().uuidString
         let storage: FileStorage<[String]?> = FileStorage(path, .temp)
         storage.wrappedValue = ["Dune", "Emma"]
-        StoredFile.flushAll()
+        FileManager.CachedFile.flushAll()
         #expect(FileManager.default.fileExists(atPath: URL.temporaryDirectory.appending(path: "\(path).json").path(percentEncoded: false)))
         storage.wrappedValue = nil
-        StoredFile.flushAll()
+        FileManager.CachedFile.flushAll()
         #expect(storage.wrappedValue == nil)
         #expect(!FileManager.default.fileExists(atPath: URL.temporaryDirectory.appending(path: "\(path).json").path(percentEncoded: false)))
     }
@@ -163,7 +163,7 @@ import Testing
         let path: String = "Nested/Folder/\(UUID().uuidString)"
         let storage: FileStorage<[Int]> = FileStorage(wrappedValue: [], path, .temp)
         storage.wrappedValue = [1, 2]
-        StoredFile.flushAll()
+        FileManager.CachedFile.flushAll()
         let data: Data? = try? Data(contentsOf: URL.temporaryDirectory.appending(path: "\(path).json"))
         #expect(data.flatMap { try? JSONDecoder().decode([Int].self, from: $0) } == [1, 2])
     }

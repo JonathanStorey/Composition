@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Coders/CKEncoderTests.swift
-// dependencies: [Coders/CKEncoder.swift, Extensions/UUID.swift, Protocols/CKRecordable.swift]
+// dependencies: [Coders/CKEncoder.swift, Extensions/UUID.swift]
 
 #if canImport(CloudKit)
 import CloudKit
@@ -8,7 +8,7 @@ import Foundation
 import Testing
 @testable import Composition
 
-private struct Book: CKRecordable {
+private struct Book: Codable {
 
     enum Genre: String, Codable {
 
@@ -35,13 +35,7 @@ private struct Book: CKRecordable {
     var size: Size = Size(height: 23, width: 15)
 }
 
-private struct Box<Value: Codable>: CKRecordable {
-
-    let id: Int
-    var value: Value
-}
-
-private struct Badly: CKRecordable {
+private struct Badly: Codable {
 
     enum CodingKeys: String, CodingKey {
 
@@ -52,7 +46,7 @@ private struct Badly: CKRecordable {
     var name: String = ""
 }
 
-private struct Counter: CKRecordable {
+private struct Counter: Codable {
 
     let id: String
     var count: UInt64 = .max
@@ -62,10 +56,8 @@ private struct Counter: CKRecordable {
 
     @Test func encodesFieldsNativelyAndEverythingElseAsJSON() throws {
         let book: Book = Book(id: .timestamp)
-        let record: CKRecord = try CKEncoder().encode(book)
-        #expect(record.recordType == "Book")
-        #expect(record.recordID.recordName == "Book.\(book.id)")
-        #expect(record.recordID.zoneID.zoneName == "DefaultZone")
+        let record: CKRecord = CKRecord(recordType: "Book")
+        try CKEncoder().encode(book, to: record)
         #expect(record["id"] as? String == book.id.uuidString)
         #expect(record["title"] as? String == "Dune")
         #expect(record["subtitle"] == nil)
@@ -80,12 +72,8 @@ private struct Counter: CKRecordable {
         #expect(record["size"] as? Data == Data(#"{"height":23,"width":15}"#.utf8))
     }
 
-    @Test func namesGenericTypesWithUnderscores() throws {
-        #expect(try CKEncoder().encode(Box(id: 1, value: "a")).recordID.recordName == "Box_String.1")
-    }
-
     @Test func leavesFieldsTheValueDoesntName() throws {
-        let record: CKRecord = try CKEncoder().encode(Book(id: .timestamp))
+        let record: CKRecord = CKRecord(recordType: "Book")
         record["note"] = "kept"
         try CKEncoder().encode(Book(id: .timestamp, title: "Emma"), to: record)
         #expect(record["note"] as? String == "kept")
@@ -94,7 +82,8 @@ private struct Counter: CKRecordable {
 
     @Test func removesFieldsTheValueNoLongerHas() throws {
         var book: Book = Book(id: .timestamp, subtitle: "Part One")
-        let record: CKRecord = try CKEncoder().encode(book)
+        let record: CKRecord = CKRecord(recordType: "Book")
+        try CKEncoder().encode(book, to: record)
         book.subtitle = nil
         book.tags = []
         try CKEncoder().encode(book, to: record)
@@ -104,9 +93,8 @@ private struct Counter: CKRecordable {
     }
 
     @Test func throwsForValuesCloudKitCantKeep() {
-        #expect(throws: EncodingError.self) { try CKEncoder().encode(Badly(id: "a")) }
-        #expect(throws: EncodingError.self) { try CKEncoder().encode(Badly(id: "é")) }
-        #expect(throws: EncodingError.self) { try CKEncoder().encode(Counter(id: "a")) }
+        #expect(throws: EncodingError.self) { try CKEncoder().encode(Badly(id: "a"), to: CKRecord(recordType: "Badly")) }
+        #expect(throws: EncodingError.self) { try CKEncoder().encode(Counter(id: "a"), to: CKRecord(recordType: "Counter")) }
         #expect(throws: EncodingError.self) { try CKEncoder().encode("text", to: CKRecord(recordType: "Text")) }
     }
 }

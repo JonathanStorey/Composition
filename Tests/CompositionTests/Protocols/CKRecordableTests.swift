@@ -22,18 +22,18 @@ private struct Page: CKRecordable, Equatable {
 
 @Suite struct CKRecordableTests {
 
-    @Test func namesTheRecordByAnIdentifierThatReadsBack() throws {
-        let note: Note = Note(id: .timestamp, text: "Hello")
-        let record: CKRecord = try CKEncoder().encode(note)
-        #expect(record.recordID.recordName == "Note.\(note.id)")
-        #expect(UUID(String(record.recordID.recordName.dropFirst(5))) == note.id)
-        #expect(try CKDecoder().decode(Note.self, from: record) == note)
+    @Test func roundTripsAnIntegerIdentifier() throws {
+        let record: CKRecord = CKRecord(recordType: "Page")
+        try CKEncoder().encode(Page(id: 7, text: "Hello"), to: record)
+        #expect(try CKDecoder().decode(Page.self, from: record) == Page(id: 7, text: "Hello"))
     }
 
-    @Test func roundTripsAnIntegerIdentifier() throws {
-        let record: CKRecord = try CKEncoder().encode(Page(id: 7, text: "Hello"))
-        #expect(record.recordID.recordName == "Page.7")
-        #expect(try CKDecoder().decode(Page.self, from: record) == Page(id: 7, text: "Hello"))
+    @Test func roundTripsAUUIDIdentifierThroughItsDescription() throws {
+        let note: Note = Note(id: .timestamp, text: "Hello")
+        let record: CKRecord = CKRecord(recordType: "Note")
+        try CKEncoder().encode(note, to: record)
+        #expect(Note.ID(note.id.description) == note.id)
+        #expect(try CKDecoder().decode(Note.self, from: record) == note)
     }
 }
 #endif

@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/SyncedStorageTests.swift
-// dependencies: [PropertyWrappers/FileStorage.swift, PropertyWrappers/SyncedStorage.swift]
+// dependencies: [Extensions/FileManager.swift, PropertyWrappers/FileStorage.swift, PropertyWrappers/SyncedStorage.swift]
 
 // MARK: - CloudKit + Foundation + Observation + os + Security + UniformTypeIdentifiers
 
@@ -97,8 +97,8 @@ import Testing
         let key: String = UUID().uuidString
         let storage: SyncedStorage<Int?> = SyncedStorage(key)
         storage.wrappedValue = 4
-        StoredFile.flushAll()
-        #expect(FileManager.default.fileExists(atPath: StoredFile.appFolder.appending(components: "Composition", "SyncedStorage", "\(key).json").path(percentEncoded: false)))
+        FileManager.CachedFile.flushAll()
+        #expect(FileManager.default.fileExists(atPath: FileManager.default.url(for: .app).appending(components: "Composition", "SyncedStorage", "\(key).json").path(percentEncoded: false)))
         storage.wrappedValue = nil
     }
 

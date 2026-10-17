@@ -53,7 +53,7 @@ Start every file with this header and a blank line:
 
 ### Access and availability
 
-- Mark everything callers use `public`. Give everything else the narrowest access that compiles: `private` for use inside its own declaration, `fileprivate` for use within the file, and internal (no modifier) only for use from another file, including tests.
+- Mark everything callers use `public`. Give everything else the narrowest access that compiles: `private` for use inside its own declaration, `fileprivate` for use within the file, and internal (no modifier) only for use from another source file. Never widen access just so a test can reach something.
 - When code needs iOS 13 / macOS 10.15 or later, add `@available(iOS x, macOS x, tvOS x, watchOS x, *)` with the correct version for every platform, on the member, or on the whole type or extension when every member needs it.
 
 ### Member order
@@ -113,3 +113,4 @@ Each public declaration gets a single-line `///` summary, with no examples, extr
 - Use Swift Testing (`import Testing`, `@Suite`, `@Test`, `#expect`), never XCTest.
 - Mirror the source path, as in `Tests/CompositionTests/Extensions/StringTests.swift`.
 - Every new public API gets a test of its main behavior and one edge case.
+- Test through the public API. Cover private helpers through the public behavior that uses them.

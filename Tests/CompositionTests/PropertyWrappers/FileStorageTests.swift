@@ -12,6 +12,12 @@ import Testing
 
 @Suite struct FileStorageTests {
 
+    #if compiler(>=6.2) && os(macOS)
+    @Test func absolutePathStopsTheApp() async {
+        await #expect(processExitsWith: .failure) { _ = FileStorage<Int>(wrappedValue: 0, "/theme", .temp) }
+    }
+    #endif
+
     @Test func cachedFileIsSharedForTheURL() {
         let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
         #expect(FileManager.default.cachedFile(at: url) === FileManager.default.cachedFile(at: url))
@@ -39,11 +45,6 @@ import Testing
         #expect(number.wrappedValue == nil)
     }
 
-    @Test func hasExtensionLooksOnlyAtTheLastName() {
-        #expect(FileManager.CachedFile.hasExtension("Images/avatar.png"))
-        #expect(!FileManager.CachedFile.hasExtension("Exports.2026/report"))
-    }
-
     #if os(macOS)
     @Test func iCloudDriveKeepsDataOnTheDeviceWithoutAnAccount() {
         let storage: FileStorage<Data> = FileStorage(wrappedValue: Data(), "\(UUID().uuidString).pdf", .iCloudDrive)
@@ -58,18 +59,11 @@ import Testing
     }
     #endif
 
-    @Test func pathViolationAllowsRelativePathsWithOrWithoutExtensions() {
-        #expect(FileManager.CachedFile.pathViolation("Settings/Colors/theme") == nil)
-        #expect(FileManager.CachedFile.pathViolation("Images/avatar.png") == nil)
-    }
-
-    @Test func pathViolationCatchesPathsThatLeaveTheLocation() {
-        for path: String in ["", "/theme", "Settings/", "Settings//theme", "../theme", "Settings/./theme", ".hidden"] {
-            #expect(FileManager.CachedFile.pathViolation(path) != nil)
-        }
-    }
-
     #if compiler(>=6.2) && os(macOS)
+    @Test func pathWithHiddenNameStopsTheApp() async {
+        await #expect(processExitsWith: .failure) { _ = FileStorage<Int>(wrappedValue: 0, "Settings/.theme", .temp) }
+    }
+
     @Test func pathWithParentFolderStopsTheApp() async {
         await #expect(processExitsWith: .failure) { _ = FileStorage<Int>(wrappedValue: 0, "../theme", .temp) }
     }
@@ -95,10 +89,12 @@ import Testing
         #expect(file.contents == Data("9".utf8))
     }
 
-    @Test func withExtensionAddsTheDefaultOnlyWhenThereIsNone() {
-        #expect(FileManager.CachedFile.withExtension("Settings/theme", "json") == "Settings/theme.json")
-        #expect(FileManager.CachedFile.withExtension("Exports.2026/report", "data") == "Exports.2026/report.data")
-        #expect(FileManager.CachedFile.withExtension("Images/avatar.png", "data") == "Images/avatar.png")
+    @Test func wrappedValueAddsTheDefaultExtensionWhenOnlyAFolderHasADot() {
+        let path: String = "Exports.2026/\(UUID().uuidString)"
+        let storage: FileStorage<[Int]> = FileStorage(wrappedValue: [], path, .temp)
+        storage.wrappedValue = [3]
+        FileManager.CachedFile.flush()
+        #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: "\(path).json"))) == Data("[3]".utf8))
     }
 
     @Test func wrappedValueChangeNotifiesObservers() async {

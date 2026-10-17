@@ -17,6 +17,7 @@ Write elegant, creative, beautiful code: general enough to serve many use cases,
 - Let the type system carry the rules. Constrain generics so misuse fails to compile instead of failing at runtime.
 - Keep the surface small. Prefer one requirement over three, and compose existing pieces before adding new ones.
 - Follow the standard library and the latest Swift releases: static member lookup for dot syntax, primary associated types, `some` and `any`, typed throws, and macros where they remove boilerplate.
+- Keep caches and other state in a type of their own, never on a shared object such as `FileManager.default` that callers expect to be stateless.
 - When elegance and clarity conflict, choose clarity. The beautiful solution is the one a reader understands immediately.
 
 ## Layout
@@ -31,6 +32,8 @@ Sources/Composition/
 └── ViewModifiers/     One ViewModifier per file
 Tests/CompositionTests/  Mirrors the Sources folder structure
 ```
+
+Keep each file standalone. Members added to an existing type live in that type's file in `Extensions/`, even when only one other file uses them, and that file's tests cover them. Other files depend only on its public API.
 
 ## Conventions
 
@@ -101,6 +104,8 @@ When the whole file needs the same frameworks, wrap it all in one `#if canImport
 
 ### Naming
 
+- When extending an existing type, mirror the names and argument labels of its closest standard method, as in `contents(at:)` beside `FileManager`'s `contents(atPath:)`.
+- Nest a new type inside the existing type it serves, as in `FileManager.CachedFile`, instead of adding a top-level name an app might already use.
 - Name a generic parameter with one capital letter from its protocol and the value for what it is, as in `init<L: LabelRepresentable>(_ label: L)`. Use a named generic parameter instead of `some Protocol` when a `where` clause needs its associated type.
 - Give a parameter both an argument label and a parameter name when the label reads better at the call site and the name gives more context inside the declaration, as in `init?(timestamp uuid: UUID)`, called as `Date(timestamp: id)`, or `squashed(with next: Self)`, where `next` says which change comes second.
 

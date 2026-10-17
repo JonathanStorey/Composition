@@ -22,7 +22,7 @@ public struct CKEncoder: Sendable {
         return record
     }
 
-    /// Encodes the value into the record's fields, removing fields the value no longer has and leaving unchanged ones untouched.
+    /// Encodes the value into the record's fields, clearing the ones it names as nil or empty and leaving unchanged fields, and fields it doesn't name, untouched.
     public func encode<T: Encodable>(_ value: T, to record: CKRecord) throws {
         let slot: Slot = Slot()
         try NodeEncoder.encode(value, into: slot, at: [])
@@ -93,9 +93,21 @@ private struct KeyedContainer<Key: CodingKey>: KeyedEncodingContainerProtocol {
     mutating func encode(_ value: UInt8, forKey key: Key) throws { try put(value, key) }
     mutating func encode<T: Encodable>(_ value: T, forKey key: Key) throws { try put(value, key) }
 
-    mutating func encodeIfPresent<T: Encodable>(_ value: T?, forKey key: Key) throws {
-        if let value { try put(value, key) }  // nil writes nothing, which removes the field
-    }
+    mutating func encodeIfPresent(_ value: Bool?, forKey key: Key) throws { try putIfPresent(value, key) }
+    mutating func encodeIfPresent(_ value: Double?, forKey key: Key) throws { try putIfPresent(value, key) }
+    mutating func encodeIfPresent(_ value: Float?, forKey key: Key) throws { try putIfPresent(value, key) }
+    mutating func encodeIfPresent(_ value: Int?, forKey key: Key) throws { try putIfPresent(value, key) }
+    mutating func encodeIfPresent(_ value: Int16?, forKey key: Key) throws { try putIfPresent(value, key) }
+    mutating func encodeIfPresent(_ value: Int32?, forKey key: Key) throws { try putIfPresent(value, key) }
+    mutating func encodeIfPresent(_ value: Int64?, forKey key: Key) throws { try putIfPresent(value, key) }
+    mutating func encodeIfPresent(_ value: Int8?, forKey key: Key) throws { try putIfPresent(value, key) }
+    mutating func encodeIfPresent(_ value: String?, forKey key: Key) throws { try putIfPresent(value, key) }
+    mutating func encodeIfPresent(_ value: UInt?, forKey key: Key) throws { try putIfPresent(value, key) }
+    mutating func encodeIfPresent(_ value: UInt16?, forKey key: Key) throws { try putIfPresent(value, key) }
+    mutating func encodeIfPresent(_ value: UInt32?, forKey key: Key) throws { try putIfPresent(value, key) }
+    mutating func encodeIfPresent(_ value: UInt64?, forKey key: Key) throws { try putIfPresent(value, key) }
+    mutating func encodeIfPresent(_ value: UInt8?, forKey key: Key) throws { try putIfPresent(value, key) }
+    mutating func encodeIfPresent<T: Encodable>(_ value: T?, forKey key: Key) throws { try putIfPresent(value, key) }
 
     mutating func encodeNil(forKey key: Key) throws {
         slot(for: key).value = .null
@@ -120,6 +132,11 @@ private struct KeyedContainer<Key: CodingKey>: KeyedEncodingContainerProtocol {
     /// Writes the value under the key.
     private func put<T: Encodable>(_ value: T, _ key: Key) throws {
         try NodeEncoder.encode(value, into: slot(for: key), at: codingPath + [key])
+    }
+
+    /// Writes the value under the key, or for nil at a record's root clears the field, while nested nils are left out as in JSON.
+    private func putIfPresent<T: Encodable>(_ value: T?, _ key: Key) throws {
+        if let value { try put(value, key) } else if codingPath.isEmpty { slot(for: key).value = .null }
     }
 
     /// A new slot under the key.
@@ -227,12 +244,12 @@ private struct UnkeyedContainer: UnkeyedEncodingContainer {
 
 private extension CKRecord {
 
-    /// Makes the record's fields match, leaving any that already hold the value untouched so a save uploads only real changes.
+    /// Writes the fields, skipping any that already hold the value so a save uploads only real changes, and leaving fields the value doesn't name alone.
     func apply(_ fields: [String: CodingNode]) throws {
-        for key in allKeys() where fields[key] == nil { self[key] = nil }
         for (key, node) in fields {
             guard let first: Character = key.first, first.isASCII, first.isLetter, key.count <= 255, key.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") }) else { throw EncodingError.invalidValue(key, EncodingError.Context(codingPath: [CodingNode.Key(stringValue: key)], debugDescription: "CloudKit field names start with a letter and hold only ASCII letters, digits and underscores, unlike \"\(key)\".")) }
             let value: (any CKRecordValueProtocol)? = try node.field()
+            if value == nil, self[key] == nil { continue }  // already clear
             if let old: CodingNode = self[key].flatMap({ CodingNode(field: $0) }), let new: CodingNode = value.flatMap({ CodingNode(field: $0) }), old.isSame(as: new) { continue }
             self[key] = value
         }

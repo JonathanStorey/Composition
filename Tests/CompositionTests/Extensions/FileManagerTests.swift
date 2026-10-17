@@ -2,6 +2,8 @@
 // path: Extensions/FileManagerTests.swift
 // dependencies: [Extensions/FileManager.swift]
 
+// MARK: - Foundation
+
 #if canImport(Foundation)
 import Foundation
 import Testing
@@ -82,6 +84,48 @@ import Testing
         try Data("Dune".utf8).write(to: url)
         try FileManager.default.write(Data("Emma".utf8), to: url)
         #expect(try Data(contentsOf: url) == Data("Emma".utf8))
+    }
+}
+#endif
+
+// MARK: - Foundation + Observation + os
+
+#if canImport(Foundation) && canImport(Observation) && canImport(os)
+
+extension FileManagerTests {
+
+    @Test func cachedFileIsSharedForTheURL() {
+        let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
+        #expect(FileManager.default.cachedFile(at: url) === FileManager.default.cachedFile(at: url))
+    }
+
+    @Test func cachedFileWriteKeepsTheContentsAndReachesTheDiskAfterFlush() {
+        let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
+        let file: FileManager.CachedFile = FileManager.default.cachedFile(at: url)
+        file.write(Data("9".utf8))
+        #expect(file.contents == Data("9".utf8))
+        FileManager.CachedFile.flush()
+        #expect((try? Data(contentsOf: url)) == Data("9".utf8))
+    }
+
+    @Test func unwatchedFileKeepsItsContentsWhenTheFileChangesOnDisk() async throws {
+        let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
+        let file: FileManager.CachedFile = FileManager.default.cachedFile(at: url)
+        #expect(file.contents == nil)
+        try Data("9".utf8).write(to: url, options: .atomic)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(file.contents == nil)
+    }
+
+    @Test func watchedFileReloadsWhenTheFileChangesOnDisk() async throws {
+        let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
+        let file: FileManager.CachedFile = FileManager.default.cachedFile(at: url, watched: true)
+        #expect(file.contents == nil)
+        try Data("9".utf8).write(to: url, options: .atomic)
+        for _ in 0..<60 where file.contents != Data("9".utf8) {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(file.contents == Data("9".utf8))
     }
 }
 #endif

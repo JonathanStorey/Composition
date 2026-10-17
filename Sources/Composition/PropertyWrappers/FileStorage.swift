@@ -125,18 +125,18 @@ public extension FileManager {
         }
 
         /// A Boolean value indicating whether the path's last name has an extension.
-        public static func hasExtension(_ path: String) -> Bool {
+        fileprivate static func hasExtension(_ path: String) -> Bool {
             path.split(separator: "/").last?.contains(".") == true
         }
 
         /// Why the path can't name a file inside its location, or `nil` when it can: a relative path of names, none empty or starting with ".".
-        public static func pathViolation(_ path: String) -> String? {
+        fileprivate static func pathViolation(_ path: String) -> String? {
             guard !path.hasPrefix("/"), path.split(separator: "/", omittingEmptySubsequences: false).allSatisfy({ !$0.isEmpty && !$0.hasPrefix(".") }) else { return "The FileStorage path \"\(path)\" must be relative, without empty components or ones starting with \".\"." }
             return nil
         }
 
         /// The path as given when its last name has an extension, or with the default extension added when it has none.
-        public static func withExtension(_ path: String, _ defaultExtension: String) -> String {
+        fileprivate static func withExtension(_ path: String, _ defaultExtension: String) -> String {
             hasExtension(path) ? path : "\(path).\(defaultExtension)"
         }
 

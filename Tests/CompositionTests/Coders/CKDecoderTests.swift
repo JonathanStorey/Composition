@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Coders/CKDecoderTests.swift
-// dependencies: [Coders/CKDecoder.swift, Coders/CKEncoder.swift, Extensions/UUID.swift, Protocols/CKRecordable.swift]
+// dependencies: [Coders/CKDecoder.swift, Coders/CKEncoder.swift, Extensions/UUID.swift]
 
 #if canImport(CloudKit)
 import CloudKit
@@ -8,7 +8,7 @@ import Foundation
 import Testing
 @testable import Composition
 
-private struct Book: CKRecordable, Equatable {
+private struct Book: Codable, Equatable {
 
     struct Size: Codable, Equatable {
 
@@ -33,18 +33,22 @@ private struct Book: CKRecordable, Equatable {
 @Suite struct CKDecoderTests {
 
     @Test func readsAMissingListAsEmpty() throws {
-        let record: CKRecord = try CKEncoder().encode(Book(id: .timestamp))
+        let record: CKRecord = CKRecord(recordType: "Book")
+        try CKEncoder().encode(Book(id: .timestamp), to: record)
         #expect(record["tags"] == nil)
         #expect(try CKDecoder().decode(Book.self, from: record).tags == [])
     }
 
     @Test func roundTripsEveryKindOfField() throws {
         let book: Book = Book(id: .timestamp, subtitle: "Part One", tags: ["classic"])
-        #expect(try CKDecoder().decode(Book.self, from: CKEncoder().encode(book)) == book)
+        let record: CKRecord = CKRecord(recordType: "Book")
+        try CKEncoder().encode(book, to: record)
+        #expect(try CKDecoder().decode(Book.self, from: record) == book)
     }
 
     @Test func throwsWhenTheRecordCantHoldTheValue() throws {
-        let record: CKRecord = try CKEncoder().encode(Book(id: .timestamp))
+        let record: CKRecord = CKRecord(recordType: "Book")
+        try CKEncoder().encode(Book(id: .timestamp), to: record)
         record["title"] = nil
         #expect(throws: DecodingError.self) { try CKDecoder().decode(Book.self, from: record) }
         record["title"] = 7 as Int64

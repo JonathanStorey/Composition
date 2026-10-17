@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: Coders/CKEncoder.swift
-// dependencies: [Coders/CodingNode.swift, Extensions/CKRecord.swift, Extensions/CKRecordZone.swift, Protocols/CKRecordable.swift]
+// dependencies: [Coders/CodingNode.swift]
 
 #if canImport(CloudKit) && canImport(Foundation)
 import CloudKit
@@ -11,16 +11,6 @@ public struct CKEncoder: Sendable {
 
     /// Creates an encoder.
     public init() {}
-
-    /// Encodes the value into a new record named `Type.id` in the zone.
-    public func encode<R: CKRecordable>(_ value: R, in zoneID: CKRecordZone.ID = .defaultZone) throws -> CKRecord {
-        let recordType: CKRecord.RecordType = CKRecord.recordType(of: R.self)
-        let name: String = "\(recordType).\(value.id)"
-        guard name.count <= 255, name.allSatisfy(\.isASCII) else { throw EncodingError.invalidValue(value.id, EncodingError.Context(codingPath: [], debugDescription: "CloudKit needs a record name of at most 255 ASCII characters, unlike \"\(name)\".")) }
-        let record: CKRecord = CKRecord(recordType: recordType, recordID: CKRecord.ID(recordName: name, zoneID: zoneID))
-        try encode(value, to: record)
-        return record
-    }
 
     /// Encodes the value into the record's fields, clearing the ones it names as nil or empty and leaving unchanged fields, and fields it doesn't name, untouched.
     public func encode<T: Encodable>(_ value: T, to record: CKRecord) throws {

@@ -84,6 +84,14 @@ private struct Counter: CKRecordable {
         #expect(try CKEncoder().encode(Box(id: 1, value: "a")).recordID.recordName == "Box_String.1")
     }
 
+    @Test func leavesFieldsTheValueDoesntName() throws {
+        let record: CKRecord = try CKEncoder().encode(Book(id: .timestamp))
+        record["note"] = "kept"
+        try CKEncoder().encode(Book(id: .timestamp, title: "Emma"), to: record)
+        #expect(record["note"] as? String == "kept")
+        #expect(record["title"] as? String == "Emma")
+    }
+
     @Test func removesFieldsTheValueNoLongerHas() throws {
         var book: Book = Book(id: .timestamp, subtitle: "Part One")
         let record: CKRecord = try CKEncoder().encode(book)

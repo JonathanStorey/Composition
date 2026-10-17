@@ -20,6 +20,14 @@ import Testing
         #expect(throws: (any Error).self) { try FileManager.default.contents(at: url) }
     }
 
+    @Test func localFolderForICloudDriveIsTheDocumentsFolderOfTheDeviceCopy() {
+        #expect(FileManager.default.localFolder(for: .iCloudDrive) == FileManager.default.localFolder(for: .iCloud).appending(component: "Documents", directoryHint: .isDirectory))
+    }
+
+    @Test func localFolderIsTheLocationsFolderOutsideICloud() {
+        #expect(FileManager.default.localFolder(for: .caches) == FileManager.default.url(for: .caches))
+    }
+
     @Test func moveItemToICloudLeavesAFileICloudAlreadyHas() throws {
         let local: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).txt")
         let destination: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).txt")

@@ -53,6 +53,19 @@ public extension FileManager {
         return try result.get()
     }
 
+    /// The folder on the device that keeps the location's files until iCloud is available, beside the app's own folder so no path inside it can collide, or the location's own folder when it isn't in iCloud.
+    func localFolder(for location: Location) -> URL {
+        let iCloud: URL = URL.applicationSupportDirectory.appending(component: "\(Self.bundleID).iCloud", directoryHint: .isDirectory)
+        switch location {
+        case .iCloud:
+            return iCloud
+        case .iCloudDrive:
+            return iCloud.appending(component: "Documents", directoryHint: .isDirectory)
+        case .app, .caches, .documents, .group, .temp:
+            return url(for: location)
+        }
+    }
+
     /// Moves the file at the local URL into iCloud at the destination, returning `false` without moving it when there is no local file or iCloud already has one.
     @discardableResult
     func moveItemToICloud(at local: URL, to destination: URL) throws -> Bool {
@@ -113,18 +126,5 @@ extension FileManager {
 
     /// The app's first iCloud container, or `nil` when iCloud isn't available.
     fileprivate static let iCloudContainer: URL? = FileManager.default.url(forUbiquityContainerIdentifier: nil)
-
-    /// The folder on the device that keeps the location's files until iCloud is available, beside the app's own folder so no path inside it can collide, or the location's own folder when it isn't in iCloud.
-    func localFolder(for location: Location) -> URL {
-        let iCloud: URL = URL.applicationSupportDirectory.appending(component: "\(Self.bundleID).iCloud", directoryHint: .isDirectory)
-        switch location {
-        case .iCloud:
-            return iCloud
-        case .iCloudDrive:
-            return iCloud.appending(component: "Documents", directoryHint: .isDirectory)
-        case .app, .caches, .documents, .group, .temp:
-            return url(for: location)
-        }
-    }
 }
 #endif

@@ -12,6 +12,20 @@ import Testing
 
 @Suite struct FileStorageTests {
 
+    @Test func cachedFileIsSharedForTheURL() {
+        let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
+        #expect(FileManager.default.cachedFile(at: url) === FileManager.default.cachedFile(at: url))
+    }
+
+    @Test func cachedFileWriteKeepsTheContentsAndReachesTheDiskAfterFlush() {
+        let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
+        let file: FileManager.CachedFile = FileManager.default.cachedFile(at: url)
+        file.write(Data("9".utf8))
+        #expect(file.contents == Data("9".utf8))
+        FileManager.CachedFile.flush()
+        #expect((try? Data(contentsOf: url)) == Data("9".utf8))
+    }
+
     @Test func cachesKeepTheValue() {
         let storage: FileStorage<String> = FileStorage(wrappedValue: "", UUID().uuidString, .caches)
         storage.wrappedValue = "Dune"
@@ -63,22 +77,22 @@ import Testing
 
     @Test func unwatchedFileKeepsItsContentsWhenTheFileChangesOnDisk() async throws {
         let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
-        let file: FileManager.CachedFile = FileManager.CachedFile.at(url)
-        #expect(file.data == nil)
+        let file: FileManager.CachedFile = FileManager.default.cachedFile(at: url)
+        #expect(file.contents == nil)
         try Data("9".utf8).write(to: url, options: .atomic)
         try await Task.sleep(for: .milliseconds(300))
-        #expect(file.data == nil)
+        #expect(file.contents == nil)
     }
 
     @Test func watchedFileReloadsWhenTheFileChangesOnDisk() async throws {
         let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
-        let file: FileManager.CachedFile = FileManager.CachedFile.at(url, watched: true)
-        #expect(file.data == nil)
+        let file: FileManager.CachedFile = FileManager.default.cachedFile(at: url, watched: true)
+        #expect(file.contents == nil)
         try Data("9".utf8).write(to: url, options: .atomic)
-        for _ in 0..<60 where file.data != Data("9".utf8) {
+        for _ in 0..<60 where file.contents != Data("9".utf8) {
             try await Task.sleep(for: .milliseconds(50))
         }
-        #expect(file.data == Data("9".utf8))
+        #expect(file.contents == Data("9".utf8))
     }
 
     @Test func withExtensionAddsTheDefaultOnlyWhenThereIsNone() {
@@ -111,7 +125,7 @@ import Testing
         let path: String = UUID().uuidString
         let storage: FileStorage<String> = FileStorage(wrappedValue: "", path, .temp)
         storage.wrappedValue = "Dune"
-        FileManager.CachedFile.flushAll()
+        FileManager.CachedFile.flush()
         #expect((try? String(contentsOf: URL.temporaryDirectory.appending(path: "\(path).txt"), encoding: .utf8)) == "Dune")
     }
 
@@ -119,7 +133,7 @@ import Testing
         let path: String = "\(UUID().uuidString).json"
         let storage: FileStorage<String?> = FileStorage(path, .temp)
         storage.wrappedValue = "# Dune"
-        FileManager.CachedFile.flushAll()
+        FileManager.CachedFile.flush()
         #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data("# Dune".utf8))
     }
 
@@ -127,7 +141,7 @@ import Testing
         let path: String = "\(UUID().uuidString).png"
         let storage: FileStorage<Data?> = FileStorage(path, .temp)
         storage.wrappedValue = Data([1, 2, 3])
-        FileManager.CachedFile.flushAll()
+        FileManager.CachedFile.flush()
         #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data([1, 2, 3]))
     }
 
@@ -135,7 +149,7 @@ import Testing
         let path: String = UUID().uuidString
         let storage: FileStorage<Data?> = FileStorage(path, .temp)
         storage.wrappedValue = Data([5])
-        FileManager.CachedFile.flushAll()
+        FileManager.CachedFile.flush()
         #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: "\(path).data"))) == Data([5]))
     }
 
@@ -143,7 +157,7 @@ import Testing
         let path: String = "\(UUID().uuidString).txt"
         let storage: FileStorage<[Int]> = FileStorage(wrappedValue: [], path, .temp)
         storage.wrappedValue = [3]
-        FileManager.CachedFile.flushAll()
+        FileManager.CachedFile.flush()
         #expect((try? Data(contentsOf: URL.temporaryDirectory.appending(path: path))) == Data("[3]".utf8))
     }
 
@@ -151,10 +165,10 @@ import Testing
         let path: String = UUID().uuidString
         let storage: FileStorage<[String]?> = FileStorage(path, .temp)
         storage.wrappedValue = ["Dune", "Emma"]
-        FileManager.CachedFile.flushAll()
+        FileManager.CachedFile.flush()
         #expect(FileManager.default.fileExists(atPath: URL.temporaryDirectory.appending(path: "\(path).json").path(percentEncoded: false)))
         storage.wrappedValue = nil
-        FileManager.CachedFile.flushAll()
+        FileManager.CachedFile.flush()
         #expect(storage.wrappedValue == nil)
         #expect(!FileManager.default.fileExists(atPath: URL.temporaryDirectory.appending(path: "\(path).json").path(percentEncoded: false)))
     }
@@ -163,7 +177,7 @@ import Testing
         let path: String = "Nested/Folder/\(UUID().uuidString)"
         let storage: FileStorage<[Int]> = FileStorage(wrappedValue: [], path, .temp)
         storage.wrappedValue = [1, 2]
-        FileManager.CachedFile.flushAll()
+        FileManager.CachedFile.flush()
         let data: Data? = try? Data(contentsOf: URL.temporaryDirectory.appending(path: "\(path).json"))
         #expect(data.flatMap { try? JSONDecoder().decode([Int].self, from: $0) } == [1, 2])
     }

@@ -97,7 +97,7 @@ import Testing
         let key: String = UUID().uuidString
         let storage: SyncedStorage<Int?> = SyncedStorage(key)
         storage.wrappedValue = 4
-        FileManager.CachedFile.flushAll()
+        FileManager.CachedFile.flush()
         #expect(FileManager.default.fileExists(atPath: FileManager.default.url(for: .app).appending(components: "Composition", "SyncedStorage", "\(key).json").path(percentEncoded: false)))
         storage.wrappedValue = nil
     }

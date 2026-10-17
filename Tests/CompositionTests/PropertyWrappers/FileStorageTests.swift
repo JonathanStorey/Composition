@@ -1,6 +1,6 @@
 // repository: https://github.com/JonathanStorey/Composition
 // path: PropertyWrappers/FileStorageTests.swift
-// dependencies: [PropertyWrappers/FileStorage.swift, Protocols/FileRepresentable.swift]
+// dependencies: [Extensions/FileManager.swift, PropertyWrappers/FileStorage.swift, Protocols/FileRepresentable.swift]
 
 // MARK: - Foundation + Observation + os + UniformTypeIdentifiers
 
@@ -17,20 +17,6 @@ import Testing
         await #expect(processExitsWith: .failure) { _ = FileStorage<Int>(wrappedValue: 0, "/theme", .temp) }
     }
     #endif
-
-    @Test func cachedFileIsSharedForTheURL() {
-        let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
-        #expect(FileManager.default.cachedFile(at: url) === FileManager.default.cachedFile(at: url))
-    }
-
-    @Test func cachedFileWriteKeepsTheContentsAndReachesTheDiskAfterFlush() {
-        let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
-        let file: FileManager.CachedFile = FileManager.default.cachedFile(at: url)
-        file.write(Data("9".utf8))
-        #expect(file.contents == Data("9".utf8))
-        FileManager.CachedFile.flush()
-        #expect((try? Data(contentsOf: url)) == Data("9".utf8))
-    }
 
     @Test func cachesKeepTheValue() {
         let storage: FileStorage<String> = FileStorage(wrappedValue: "", UUID().uuidString, .caches)
@@ -68,26 +54,6 @@ import Testing
         await #expect(processExitsWith: .failure) { _ = FileStorage<Int>(wrappedValue: 0, "../theme", .temp) }
     }
     #endif
-
-    @Test func unwatchedFileKeepsItsContentsWhenTheFileChangesOnDisk() async throws {
-        let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
-        let file: FileManager.CachedFile = FileManager.default.cachedFile(at: url)
-        #expect(file.contents == nil)
-        try Data("9".utf8).write(to: url, options: .atomic)
-        try await Task.sleep(for: .milliseconds(300))
-        #expect(file.contents == nil)
-    }
-
-    @Test func watchedFileReloadsWhenTheFileChangesOnDisk() async throws {
-        let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
-        let file: FileManager.CachedFile = FileManager.default.cachedFile(at: url, watched: true)
-        #expect(file.contents == nil)
-        try Data("9".utf8).write(to: url, options: .atomic)
-        for _ in 0..<60 where file.contents != Data("9".utf8) {
-            try await Task.sleep(for: .milliseconds(50))
-        }
-        #expect(file.contents == Data("9".utf8))
-    }
 
     @Test func wrappedValueAddsTheDefaultExtensionWhenOnlyAFolderHasADot() {
         let path: String = "Exports.2026/\(UUID().uuidString)"

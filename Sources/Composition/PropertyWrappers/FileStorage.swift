@@ -21,13 +21,13 @@ public struct FileStorage<Value: Codable & Sendable>: Sendable {
 
     /// Creates storage for the path that returns the default value until something is stored, where a path without an extension, such as "Settings/theme", gets the preferred extension of the `FileRepresentable` type's content type or ".json", stopping on a path that could leave the location, and stopping debug builds on a path without an extension when the content type has none.
     public init(wrappedValue: Value, _ path: String, _ location: Location = .app) {
-        let violation: String? = FileManager.CachedFile.pathViolation(path)
+        let violation: String? = path.pathViolation
         precondition(violation == nil, violation ?? "")
         let representable: (any FileRepresentable.Type)? = Value.self as? any FileRepresentable.Type
         let defaultExtension: String? = if let representable { representable.contentType.preferredFilenameExtension } else { "json" }
-        if defaultExtension == nil, !FileManager.CachedFile.hasExtension(path) { assertionFailure("The FileStorage path \"\(path)\" needs an extension, since \(Value.self)'s content type has no preferred one.") }
+        if defaultExtension == nil, !path.hasPathExtension { assertionFailure("The FileStorage path \"\(path)\" needs an extension, since \(Value.self)'s content type has no preferred one.") }
         self.defaultValue = wrappedValue
-        self.file = location.file(defaultExtension.map { FileManager.CachedFile.withExtension(path, $0) } ?? path)
+        self.file = location.file(defaultExtension.map { path.withPathExtension($0) } ?? path)
         self.isRepresentable = representable != nil
     }
 
@@ -82,167 +82,23 @@ fileprivate extension FileManager.Location {
     }
 }
 
-@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
-public extension FileManager {
+fileprivate extension String {
 
-    /// The cached file at the URL, shared by every caller and created on first use, whose folder is watched for changes on disk only when asked, since only another process or iCloud can change it behind the app's back.
-    func cachedFile(at url: URL, watched: Bool = false, ubiquitous: Bool = false, moving local: URL? = nil) -> CachedFile {
-        CachedFile.files.withLock { files in
-            if let file: CachedFile = files[url] { return file }
-            let file: CachedFile = CachedFile(url, watched: watched, ubiquitous: ubiquitous, moving: local)
-            files[url] = file
-            return file
-        }
+    /// A Boolean value indicating whether the path's last name has an extension.
+    var hasPathExtension: Bool {
+        split(separator: "/").last?.contains(".") == true
     }
 
-    /// One file's contents, shared by every wrapper for the same file, kept in memory after the first read, written in the background, and, when watched, reloaded when the file changes on disk.
-    final class CachedFile: NSObject, NSFilePresenter, Observable, Sendable {
-
-        private let isUbiquitous: Bool
-        private let isWriting: OSAllocatedUnfairLock<Bool> = OSAllocatedUnfairLock(initialState: false)
-        private let queue: DispatchQueue = DispatchQueue(label: "Composition.FileStorage", qos: .utility)
-        private let registrar: ObservationRegistrar = ObservationRegistrar()
-        private let state: OSAllocatedUnfairLock<Contents> = OSAllocatedUnfairLock(initialState: Contents())
-        private let url: URL
-        private let watcher: OSAllocatedUnfairLock<(any DispatchSourceFileSystemObject)?> = OSAllocatedUnfairLock(uncheckedState: nil)
-
-        /// Creates the file at the URL, watching its folder when asked and, in iCloud Drive, presenting it, and moving in the local copy kept while iCloud was unavailable.
-        fileprivate init(_ url: URL, watched: Bool, ubiquitous: Bool, moving local: URL?) {
-            self.isUbiquitous = ubiquitous
-            self.url = url
-            super.init()
-            if watched { watch() }
-            if ubiquitous { NSFileCoordinator.addFilePresenter(self) }
-            if let local: URL { queue.async { [self] in move(local) } }
-        }
-
-        /// Every file in use, by URL.
-        fileprivate static let files: OSAllocatedUnfairLock<[URL: CachedFile]> = OSAllocatedUnfairLock(initialState: [:])
-
-        /// Waits for every write still waiting to reach the disk, in every file in use.
-        public static func flush() {
-            files.withLock { Array($0.values) }.forEach { $0.queue.sync {} }
-        }
-
-        /// A Boolean value indicating whether the path's last name has an extension.
-        fileprivate static func hasExtension(_ path: String) -> Bool {
-            path.split(separator: "/").last?.contains(".") == true
-        }
-
-        /// Why the path can't name a file inside its location, or `nil` when it can: a relative path of names, none empty or starting with ".".
-        fileprivate static func pathViolation(_ path: String) -> String? {
-            guard !path.hasPrefix("/"), path.split(separator: "/", omittingEmptySubsequences: false).allSatisfy({ !$0.isEmpty && !$0.hasPrefix(".") }) else { return "The FileStorage path \"\(path)\" must be relative, without empty components or ones starting with \".\"." }
-            return nil
-        }
-
-        /// The path as given when its last name has an extension, or with the default extension added when it has none.
-        fileprivate static func withExtension(_ path: String, _ defaultExtension: String) -> String {
-            hasExtension(path) ? path : "\(path).\(defaultExtension)"
-        }
-
-        /// The file's contents, read once from disk and from memory after that, or `nil` when there is no file.
-        public var contents: Data? {
-            registrar.access(self, keyPath: \.revision)
-            return state.withLock { contents in
-                if !contents.isLoaded { contents = Contents(data: read(), isLoaded: true) }
-                return contents.data
-            }
-        }
-
-        /// The queue that tells the file of changes made by other processes and by iCloud.
-        public var presentedItemOperationQueue: OperationQueue {
-            .main
-        }
-
-        /// The URL of the file, for iCloud Drive's coordination.
-        public var presentedItemURL: URL? {
-            url
-        }
-
-        /// A placeholder property that observers track in place of the contents.
-        private var revision: Void { () }
-
-        /// Reloads the file after another process or iCloud changed it.
-        public func presentedItemDidChange() {
-            queue.async { [self] in reload() }
-        }
-
-        /// Keeps the contents in memory and tells observers at once, then writes them to disk in the background, where newer contents replace any still waiting, and `nil` removes the file.
-        public func write(_ data: Data?) {
-            registrar.withMutation(of: self, keyPath: \.revision) {
-                state.withLock { $0 = Contents(data: data, isLoaded: true, writes: $0.writes + 1) }
-            }
-            let isIdle: Bool = isWriting.withLock { isWriting in
-                defer { isWriting = true }
-                return !isWriting
-            }
-            guard isIdle else { return }
-            queue.async { [self] in
-                isWriting.withLock { $0 = false }
-                save(state.withLock { $0.data })
-            }
-        }
-
-        /// Moves the copy kept on the device while iCloud was unavailable into iCloud, unless iCloud already has the file.
-        private func move(_ local: URL) {
-            guard (try? FileManager.default.moveItemToICloud(at: local, to: url)) == true else { return }
-            reload()
-        }
-
-        /// The file's contents on disk, read through iCloud Drive's coordination when it lives there, starting a download when only iCloud has it.
-        private func read() -> Data? {
-            guard isUbiquitous else { return try? Data(contentsOf: url) }
-            try? FileManager.default.startDownloadingUbiquitousItem(at: url)
-            return try? FileManager.default.contents(at: url, presenter: self)
-        }
-
-        /// Takes in the file as it is on disk, keeping iCloud's chosen version of a conflict, unless this process wrote since the reload began or a write is still waiting.
-        private func reload() {
-            let writes: Int = state.withLock { $0.writes }
-            guard !isWriting.withLock({ $0 }) else { return }
-            #if os(iOS) || os(macOS) || os(visionOS)
-            if isUbiquitous, let conflicts: [NSFileVersion] = NSFileVersion.unresolvedConflictVersionsOfItem(at: url), !conflicts.isEmpty {
-                conflicts.forEach { $0.isResolved = true }
-                try? NSFileVersion.removeOtherVersionsOfItem(at: url)
-            }
-            #endif
-            let data: Data? = read()
-            guard data != state.withLock({ $0.data }) else { return }
-            registrar.withMutation(of: self, keyPath: \.revision) {
-                state.withLock { contents in
-                    guard contents.writes == writes else { return }
-                    contents.data = data
-                    contents.isLoaded = true
-                }
-            }
-        }
-
-        /// Writes the contents atomically under file coordination, or removes the file for `nil`.
-        private func save(_ data: Data?) {
-            try? FileManager.default.write(data, to: url, presenter: self)
-        }
-
-        /// Watches the file's folder, which sees a file replaced by an atomic write where watching the file itself would not, and reloads on every change.
-        private func watch() {
-            let folder: URL = url.deletingLastPathComponent()
-            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let descriptor: Int32 = open(folder.path(percentEncoded: false), O_EVTONLY)
-            guard descriptor >= 0 else { return }
-            let source: any DispatchSourceFileSystemObject = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: [.write, .rename, .delete], queue: queue)
-            source.setEventHandler { [weak self] in self?.reload() }
-            source.setCancelHandler { close(descriptor) }
-            source.resume()
-            watcher.withLockUnchecked { $0 = source }
-        }
+    /// Why the path can't name a file inside its location, or `nil` when it can: a relative path of names, none empty or starting with ".".
+    var pathViolation: String? {
+        guard !hasPrefix("/"), split(separator: "/", omittingEmptySubsequences: false).allSatisfy({ !$0.isEmpty && !$0.hasPrefix(".") }) else { return "The FileStorage path \"\(self)\" must be relative, without empty components or ones starting with \".\"." }
+        return nil
     }
-}
 
-/// A file's contents in memory, whether they were read from disk yet, and how many writes this process made.
-fileprivate struct Contents: Sendable {
-
-    var data: Data?
-    var isLoaded: Bool = false
-    var writes: Int = 0
+    /// The path as given when its last name has an extension, or with the default extension added when it has none.
+    func withPathExtension(_ defaultExtension: String) -> String {
+        hasPathExtension ? self : "\(self).\(defaultExtension)"
+    }
 }
 
 /// Values decoded from stored files, remembered by the data they came from so reading unchanged data again skips the decoder, and dropped when memory runs low.

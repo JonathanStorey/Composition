@@ -11,7 +11,7 @@
 //   1. Select the app target, open Signing & Capabilities, click + Capability, and add iCloud.
 //   2. Under iCloud, check iCloud Documents and select or create the container named iCloud. followed by the bundle identifier. url(for:) uses the first container listed.
 //   3. .iCloud keeps files hidden in the container. For .iCloudDrive, show the files in iCloud Drive by adding NSUbiquitousContainers to the Info tab: a dictionary keyed by the container identifier, holding NSUbiquitousContainerIsDocumentScopePublic set to YES, NSUbiquitousContainerName set to the folder's name, and NSUbiquitousContainerSupportedFolderLevels set to Any. Raise the build number so iCloud Drive notices the change.
-//   4. Run on a device or simulator signed in to iCloud. While iCloud is unavailable, url(for:) returns a folder on the device, and moveToICloud(_:at:) moves its files into iCloud once it's available.
+//   4. Run on a device or simulator signed in to iCloud. While iCloud is unavailable, url(for:) returns a folder on the device, and moveItemToICloud(at:to:) moves its files into iCloud once it's available.
 
 #if canImport(Foundation)
 import Foundation
@@ -45,7 +45,7 @@ public extension FileManager {
     }
 
     /// The contents of the file at the URL, read under file coordination so no other process or iCloud changes it midway.
-    func coordinatedContents(of url: URL, presenter: (any NSFilePresenter)? = nil) throws -> Data {
+    func contents(at url: URL, presenter: (any NSFilePresenter)? = nil) throws -> Data {
         var coordinationError: NSError?
         var result: Result<Data, any Error> = .failure(CocoaError(.fileReadUnknown))
         NSFileCoordinator(filePresenter: presenter).coordinate(readingItemAt: url, options: [], error: &coordinationError) { url in result = Result { try Data(contentsOf: url) } }
@@ -53,18 +53,9 @@ public extension FileManager {
         return try result.get()
     }
 
-    /// Writes the data to the URL, or removes the file for `nil`, under file coordination so no other process or iCloud reads it midway.
-    func coordinatedWrite(_ data: Data?, to url: URL, presenter: (any NSFilePresenter)? = nil) throws {
-        var coordinationError: NSError?
-        var result: Result<Void, any Error> = .success(())
-        NSFileCoordinator(filePresenter: presenter).coordinate(writingItemAt: url, options: data == nil ? .forDeleting : .forReplacing, error: &coordinationError) { url in result = Result { try write(data, to: url) } }
-        if let coordinationError: NSError { throw coordinationError }
-        try result.get()
-    }
-
     /// Moves the file at the local URL into iCloud at the destination, returning `false` without moving it when there is no local file or iCloud already has one.
     @discardableResult
-    func moveToICloud(_ local: URL, at destination: URL) throws -> Bool {
+    func moveItemToICloud(at local: URL, to destination: URL) throws -> Bool {
         guard fileExists(atPath: local.path(percentEncoded: false)), !fileExists(atPath: destination.path(percentEncoded: false)) else { return false }
         try createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
         try setUbiquitous(true, itemAt: local, destinationURL: destination)
@@ -95,14 +86,22 @@ public extension FileManager {
         }
     }
 
-    /// Writes the data to the URL atomically, creating its folder, or removes the file for `nil` when there is one.
-    func write(_ data: Data?, to url: URL) throws {
-        guard let data: Data else {
-            guard fileExists(atPath: url.path(percentEncoded: false)) else { return }
-            return try removeItem(at: url)
+    /// Writes the data to the URL atomically under file coordination, creating its folder, or removes the file for `nil` when there is one.
+    func write(_ data: Data?, to url: URL, presenter: (any NSFilePresenter)? = nil) throws {
+        var coordinationError: NSError?
+        var result: Result<Void, any Error> = .success(())
+        NSFileCoordinator(filePresenter: presenter).coordinate(writingItemAt: url, options: data == nil ? .forDeleting : .forReplacing, error: &coordinationError) { url in
+            result = Result {
+                guard let data: Data else {
+                    guard fileExists(atPath: url.path(percentEncoded: false)) else { return }
+                    return try removeItem(at: url)
+                }
+                try createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try data.write(to: url, options: .atomic)
+            }
         }
-        try createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try data.write(to: url, options: .atomic)
+        if let coordinationError: NSError { throw coordinationError }
+        try result.get()
     }
 }
 

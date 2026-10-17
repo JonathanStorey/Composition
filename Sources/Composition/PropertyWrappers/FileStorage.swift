@@ -185,7 +185,7 @@ extension FileManager {
 
         /// Moves the copy kept on the device while iCloud was unavailable into iCloud, unless iCloud already has the file.
         private func move(_ local: URL) {
-            guard (try? FileManager.default.moveToICloud(local, at: url)) == true else { return }
+            guard (try? FileManager.default.moveItemToICloud(at: local, to: url)) == true else { return }
             reload()
         }
 
@@ -193,7 +193,7 @@ extension FileManager {
         private func read() -> Data? {
             guard isUbiquitous else { return try? Data(contentsOf: url) }
             try? FileManager.default.startDownloadingUbiquitousItem(at: url)
-            return try? FileManager.default.coordinatedContents(of: url, presenter: self)
+            return try? FileManager.default.contents(at: url, presenter: self)
         }
 
         /// Takes in the file as it is on disk, keeping iCloud's chosen version of a conflict, unless this process wrote since the reload began or a write is still waiting.
@@ -217,13 +217,9 @@ extension FileManager {
             }
         }
 
-        /// Writes the contents atomically, or removes the file for `nil`, through iCloud Drive's coordination when it lives there.
+        /// Writes the contents atomically under file coordination, or removes the file for `nil`.
         private func save(_ data: Data?) {
-            if isUbiquitous {
-                try? FileManager.default.coordinatedWrite(data, to: url, presenter: self)
-            } else {
-                try? FileManager.default.write(data, to: url)
-            }
+            try? FileManager.default.write(data, to: url, presenter: self)
         }
 
         /// Watches the file's folder, which sees a file replaced by an atomic write where watching the file itself would not, and reloads on every change.

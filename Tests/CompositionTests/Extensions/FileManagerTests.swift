@@ -9,44 +9,30 @@ import Testing
 
 @Suite struct FileManagerTests {
 
-    @Test func coordinatedContentsReadsTheFile() throws {
+    @Test func contentsReadsTheFile() throws {
         let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).txt")
         try Data("Dune".utf8).write(to: url)
-        #expect(try FileManager.default.coordinatedContents(of: url) == Data("Dune".utf8))
+        #expect(try FileManager.default.contents(at: url) == Data("Dune".utf8))
     }
 
-    @Test func coordinatedContentsThrowsWithoutAFile() {
+    @Test func contentsThrowsWithoutAFile() {
         let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).txt")
-        #expect(throws: (any Error).self) { try FileManager.default.coordinatedContents(of: url) }
+        #expect(throws: (any Error).self) { try FileManager.default.contents(at: url) }
     }
 
-    @Test func coordinatedWriteOfNilRemovesTheFile() throws {
-        let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).txt")
-        try Data("Dune".utf8).write(to: url)
-        try FileManager.default.coordinatedWrite(nil, to: url)
-        #expect(!FileManager.default.fileExists(atPath: url.path(percentEncoded: false)))
-    }
-
-    @Test func coordinatedWriteReplacesTheFile() throws {
-        let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).txt")
-        try Data("Dune".utf8).write(to: url)
-        try FileManager.default.coordinatedWrite(Data("Emma".utf8), to: url)
-        #expect(try Data(contentsOf: url) == Data("Emma".utf8))
-    }
-
-    @Test func moveToICloudLeavesAFileICloudAlreadyHas() throws {
+    @Test func moveItemToICloudLeavesAFileICloudAlreadyHas() throws {
         let local: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).txt")
         let destination: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).txt")
         try Data("Dune".utf8).write(to: local)
         try Data("Emma".utf8).write(to: destination)
-        #expect(try !FileManager.default.moveToICloud(local, at: destination))
+        #expect(try !FileManager.default.moveItemToICloud(at: local, to: destination))
         #expect(try Data(contentsOf: destination) == Data("Emma".utf8))
     }
 
-    @Test func moveToICloudSkipsAMissingFile() throws {
+    @Test func moveItemToICloudSkipsAMissingFile() throws {
         let local: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).txt")
         let destination: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).txt")
-        #expect(try !FileManager.default.moveToICloud(local, at: destination))
+        #expect(try !FileManager.default.moveItemToICloud(at: local, to: destination))
     }
 
     @Test func urlForAppIsTheAppsFolderInApplicationSupport() {
@@ -74,6 +60,20 @@ import Testing
         let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).txt")
         try FileManager.default.write(nil, to: url)
         #expect(!FileManager.default.fileExists(atPath: url.path(percentEncoded: false)))
+    }
+
+    @Test func writeOfNilRemovesTheFile() throws {
+        let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).txt")
+        try Data("Dune".utf8).write(to: url)
+        try FileManager.default.write(nil, to: url)
+        #expect(!FileManager.default.fileExists(atPath: url.path(percentEncoded: false)))
+    }
+
+    @Test func writeReplacesTheFile() throws {
+        let url: URL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).txt")
+        try Data("Dune".utf8).write(to: url)
+        try FileManager.default.write(Data("Emma".utf8), to: url)
+        #expect(try Data(contentsOf: url) == Data("Emma".utf8))
     }
 }
 #endif
